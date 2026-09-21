@@ -117,6 +117,11 @@ test.describe('Storefront', () => {
     if (await options.count()) await options.first().click();
     await page.getByRole('button', { name: /^add to cart$/i }).first().click();
 
+    // Wait for the add request to finish before navigating. On a remote/free
+    // deployment an immediate goto can abort the request and make the cart
+    // appear empty even though the UI is working correctly.
+    await expect(page.getByRole('dialog')).toBeVisible();
+
     await page.goto('/cart');
     await expect(page.getByRole('heading', { name: /cart/i })).toBeVisible();
 
