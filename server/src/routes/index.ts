@@ -11,6 +11,7 @@ import webhookRoutes from './public/webhook.routes';
 import adminProductRoutes from './admin/products.routes';
 import adminContentRoutes from './admin/content.routes';
 import adminOperationsRoutes from './admin/operations.routes';
+import adminBuilderRoutes from './admin/builder.routes';
 
 const router = Router();
 
@@ -28,6 +29,7 @@ router.use('/', orderRoutes); // /orders, /checkout/*, /payments/*
 const admin = Router();
 admin.use(requireAdmin);
 admin.use('/products', adminProductRoutes);
+admin.use('/builder', adminBuilderRoutes);
 admin.use('/', adminContentRoutes);
 admin.use('/', adminOperationsRoutes);
 

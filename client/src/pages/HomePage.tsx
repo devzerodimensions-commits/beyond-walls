@@ -4,11 +4,7 @@ import type { Faq, HomeSection } from '../lib/types';
 import { Seo, faqSchema, localBusinessSchema, websiteSchema } from '../lib/seo';
 import { useSettings } from '../context/StoreProvider';
 import { ButtonLink, Skeleton } from '../components/ui';
-import {
-  BannerSplit, BannerWide, CategoryGrid, CtaSection, FaqSection, FeaturedProducts,
-  GallerySection, HeroSection, PersonalisationDemo, RichTextSection, ShopByAttribute,
-  TestimonialsSection, UspStrip,
-} from '../components/home/Sections';
+import { SectionRenderer } from '../components/home/Sections';
 
 export default function HomePage() {
   const { settings } = useSettings();
@@ -41,41 +37,6 @@ export default function HomePage() {
       )}
     </>
   );
-}
-
-/** Dispatches each admin-configured section to its renderer. */
-function SectionRenderer({ section }: { section: HomeSection }) {
-  switch (section.type) {
-    case 'HERO':
-      return <HeroSection section={section} />;
-    case 'USP_STRIP':
-      return <UspStrip section={section} />;
-    case 'CATEGORY_GRID':
-      return <CategoryGrid section={section} />;
-    case 'SHOP_BY_ATTRIBUTE':
-      return <ShopByAttribute section={section} />;
-    case 'FEATURED_PRODUCTS':
-      return <FeaturedProducts section={section} />;
-    case 'PERSONALISATION_DEMO':
-      return <PersonalisationDemo section={section} />;
-    case 'BANNER_SPLIT':
-      return <BannerSplit section={section} />;
-    case 'BANNER_WIDE':
-      return <BannerWide section={section} />;
-    case 'GALLERY':
-      return <GallerySection section={section} />;
-    case 'TESTIMONIALS':
-      return <TestimonialsSection section={section} />;
-    case 'FAQ':
-      return <FaqSection section={section} />;
-    case 'CUSTOM_ORDER_CTA':
-    case 'CTA':
-      return <CtaSection section={section} />;
-    case 'RICH_TEXT':
-      return <RichTextSection section={section} />;
-    default:
-      return null;
-  }
 }
 
 function HomeSkeleton() {

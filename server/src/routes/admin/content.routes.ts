@@ -188,29 +188,10 @@ router.delete(
 
 // ---------------------------------------------------------------------------
 // Homepage sections
+//
+// Removed: the homepage is an ordinary page now and its blocks are edited in
+// Admin -> Design Pages, through /admin/builder. See pageSection.service.ts.
 // ---------------------------------------------------------------------------
-router.use(
-  '/home-sections',
-  createCrudRouter({
-    model: 'homeSection',
-    searchFields: ['key', 'title'],
-    hasStatus: true,
-    hasSortOrder: true,
-    writableFields: [
-      'key', 'type', 'title', 'subtitle', 'bodyText', 'ctaLabel', 'ctaLink',
-      'config', 'sortOrder', 'status',
-    ],
-    numberFields: ['sortOrder'],
-    jsonFields: ['config'],
-    beforeWrite: (data, _req, mode) => {
-      if (mode === 'create' && !data.key) {
-        data.key = `section-${Date.now().toString(36)}`;
-      }
-      if (data.config === null) data.config = {};
-      return data;
-    },
-  }),
-);
 
 // ---------------------------------------------------------------------------
 // Banners
@@ -304,6 +285,23 @@ router.use(
     ],
     numberFields: ['sortOrder'],
     booleanFields: ['showInFooter'],
+    beforeWrite: async (data, _req, mode, existingId) => {
+      if (mode === 'update' && existingId) {
+        const existing = await prisma.page.findUnique({ where: { id: existingId } });
+        // A system page is linked to by name from elsewhere in the site, so its
+        // address is held. Everything else about it stays editable.
+        if (existing?.isSystem) delete data.slug;
+      }
+      return data;
+    },
+    beforeDelete: (record) => {
+      const page = record as { title?: string; isSystem?: boolean } | null;
+      if (page?.isSystem) {
+        throw ApiError.badRequest(
+          `"${page.title}" is part of the site's structure and cannot be deleted. Unpublish it instead.`,
+        );
+      }
+    },
   }),
 );
 

@@ -8,6 +8,7 @@ import type {
 import { ProductGrid } from '../product/ProductCard';
 import { LivePreview, buildPreviewSlots } from '../product/LivePreview';
 import { ArrowRight, ButtonLink, ChevronDown, Input } from '../ui';
+import { useSettings } from '../../context/StoreProvider';
 
 /** An attribute tile as resolved by the SHOP_BY_ATTRIBUTE section. */
 interface AttributeTile {
@@ -67,13 +68,20 @@ export function SectionHeading({
 
 export function HeroSection({ section }: { section: HomeSection }) {
   const banner = (section.items as Banner[])?.[0];
+  const config = (section.config ?? {}) as { image?: string; eyebrow?: string };
 
-  const eyebrow = banner?.eyebrow;
-  const title = banner?.title ?? section.title;
-  const subtitle = banner?.subtitle ?? section.subtitle;
-  const ctaLabel = banner?.ctaLabel ?? section.ctaLabel;
-  const ctaLink = banner?.link ?? section.ctaLink ?? '/shop';
-  const image = banner?.image;
+  /*
+   * What an admin typed into the page editor wins. A banner record only fills
+   * in what the block itself does not say — otherwise editing the heading in
+   * the editor would appear to do nothing, because the banner silently
+   * overrode it.
+   */
+  const eyebrow = config.eyebrow || banner?.eyebrow;
+  const title = section.title || banner?.title;
+  const subtitle = section.subtitle || banner?.subtitle;
+  const ctaLabel = section.ctaLabel || banner?.ctaLabel;
+  const ctaLink = section.ctaLink || banner?.link || '/shop';
+  const image = config.image || banner?.image;
 
   return (
     <section className="relative isolate border-b border-stone-line bg-ink text-paper">
@@ -686,4 +694,180 @@ export function RichTextSection({ section }: { section: HomeSection }) {
       </div>
     </section>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Blocks the homepage never needed, but a content page does
+// ---------------------------------------------------------------------------
+
+/** A heading and a line of text, with nothing else. */
+export function SectionHeadingBlock({ section }: { section: HomeSection }) {
+  return (
+    <section className="container-site py-12">
+      <SectionHeading title={section.title} subtitle={section.subtitle} align="center" />
+    </section>
+  );
+}
+
+/** An image beside a paragraph. The side is chosen in the editor. */
+export function ImageTextSection({ section }: { section: HomeSection }) {
+  const config = (section.config ?? {}) as { image?: string; imageSide?: string };
+  const imageFirst = config.imageSide !== 'right';
+
+  return (
+    <section className="container-site py-14">
+      <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+        {config.image ? (
+          <div className={clsx('overflow-hidden bg-paper-warm', imageFirst ? 'lg:order-1' : 'lg:order-2')}>
+            <img
+              src={assetUrl(config.image)}
+              alt={section.title ?? ''}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        ) : null}
+
+        <div className={clsx(imageFirst ? 'lg:order-2' : 'lg:order-1')}>
+          {section.subtitle ? <p className="eyebrow mb-4">{section.subtitle}</p> : null}
+          {section.title ? <h2 className="text-2xl lg:text-3xl">{section.title}</h2> : null}
+          {section.bodyText ? (
+            <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-ink-500">
+              {section.bodyText}
+            </p>
+          ) : null}
+          {section.ctaLabel && section.ctaLink ? (
+            <ButtonLink to={section.ctaLink} className="mt-8">
+              {section.ctaLabel}
+            </ButtonLink>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The studio's address, phone, email and opening hours.
+ *
+ * Read from Settings rather than typed into the section, so there is one place
+ * to change them and a page can never quietly go out of date.
+ */
+export function ContactBlock({ section }: { section: HomeSection }) {
+  const { settings } = useSettings();
+  const str = (key: string) => {
+    const value = settings[key];
+    return typeof value === 'string' && value.trim() ? value : null;
+  };
+
+  const phone = str('contact.phone');
+  const email = str('contact.email');
+  const address = str('contact.address');
+  const hours = Array.isArray(settings['hours.weekly'])
+    ? (settings['hours.weekly'] as { day: string; open?: string; close?: string; closed?: boolean }[])
+    : [];
+
+  return (
+    <section className="container-site py-14">
+      <div className="grid gap-10 border border-stone-line p-8 lg:grid-cols-2 lg:p-12">
+        <div>
+          {section.subtitle ? <p className="eyebrow mb-4">{section.subtitle}</p> : null}
+          {section.title ? <h2 className="text-2xl lg:text-3xl">{section.title}</h2> : null}
+          {section.bodyText ? (
+            <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-ink-500">
+              {section.bodyText}
+            </p>
+          ) : null}
+        </div>
+
+        <dl className="space-y-5 text-sm">
+          {address ? (
+            <div>
+              <dt className="eyebrow mb-1.5 text-ink-300">Studio</dt>
+              <dd className="leading-relaxed text-ink-600">{address}</dd>
+            </div>
+          ) : null}
+          {phone ? (
+            <div>
+              <dt className="eyebrow mb-1.5 text-ink-300">Phone</dt>
+              <dd>
+                <a href={`tel:${phone.replace(/\s/g, '')}`} className="link-underline text-ink">
+                  {phone}
+                </a>
+              </dd>
+            </div>
+          ) : null}
+          {email ? (
+            <div>
+              <dt className="eyebrow mb-1.5 text-ink-300">Email</dt>
+              <dd>
+                <a href={`mailto:${email}`} className="link-underline text-ink">
+                  {email}
+                </a>
+              </dd>
+            </div>
+          ) : null}
+          {hours.length ? (
+            <div>
+              <dt className="eyebrow mb-1.5 text-ink-300">Open</dt>
+              <dd className="space-y-0.5 text-ink-600">
+                {hours.map((row) => (
+                  <p key={row.day}>
+                    {row.day} ·{' '}
+                    {row.closed ? 'Closed' : `${row.open ?? ''}${row.close ? ` – ${row.close}` : ''}`}
+                  </p>
+                ))}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Dispatches a section to its renderer.
+ *
+ * Shared by the homepage, every content page and the admin page builder, so the
+ * builder's preview is the real thing rather than an approximation of it.
+ */
+export function SectionRenderer({ section }: { section: HomeSection }) {
+  switch (section.type) {
+    case 'HERO':
+      return <HeroSection section={section} />;
+    case 'USP_STRIP':
+      return <UspStrip section={section} />;
+    case 'CATEGORY_GRID':
+      return <CategoryGrid section={section} />;
+    case 'SHOP_BY_ATTRIBUTE':
+      return <ShopByAttribute section={section} />;
+    case 'FEATURED_PRODUCTS':
+      return <FeaturedProducts section={section} />;
+    case 'PERSONALISATION_DEMO':
+      return <PersonalisationDemo section={section} />;
+    case 'BANNER_SPLIT':
+      return <BannerSplit section={section} />;
+    case 'BANNER_WIDE':
+      return <BannerWide section={section} />;
+    case 'GALLERY':
+      return <GallerySection section={section} />;
+    case 'TESTIMONIALS':
+      return <TestimonialsSection section={section} />;
+    case 'FAQ':
+      return <FaqSection section={section} />;
+    case 'CUSTOM_ORDER_CTA':
+    case 'CTA':
+      return <CtaSection section={section} />;
+    case 'RICH_TEXT':
+      return <RichTextSection section={section} />;
+    case 'SECTION_HEADING':
+      return <SectionHeadingBlock section={section} />;
+    case 'IMAGE_TEXT':
+      return <ImageTextSection section={section} />;
+    case 'CONTACT_BLOCK':
+      return <ContactBlock section={section} />;
+    default:
+      return null;
+  }
 }

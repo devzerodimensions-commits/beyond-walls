@@ -1,11 +1,12 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api, assetUrl } from '../lib/api';
-import type { Page } from '../lib/types';
+import type { HomeSection, Page } from '../lib/types';
 import { renderMarkdown } from '../lib/format';
 import { Seo, breadcrumbSchema } from '../lib/seo';
 import { useSettings } from '../context/StoreProvider';
 import { ButtonLink, EmptyState, PageLoader } from '../components/ui';
+import { SectionRenderer } from '../components/home/Sections';
 
 /** Renders any published CMS page: /about, /privacy-policy, and so on. */
 export default function StaticPage() {
@@ -14,10 +15,12 @@ export default function StaticPage() {
 
   const { data: page, isLoading, isError } = useQuery({
     queryKey: ['page', slug],
-    queryFn: () => api.get<Page>(`/pages/${slug}`),
+    queryFn: () => api.get<Page & { sections?: HomeSection[] }>(`/pages/${slug}/sections`),
     enabled: Boolean(slug),
     retry: false,
   });
+
+  const sections = page?.sections ?? [];
 
   if (isLoading) return <PageLoader />;
 
@@ -54,6 +57,27 @@ export default function StaticPage() {
         ]}
       />
 
+      {sections.length ? (
+        <>
+          {sections.map((section) => (
+            <SectionRenderer key={section.id} section={section} />
+          ))}
+        </>
+      ) : (
+        <LegacyPageBody page={page} />
+      )}
+    </>
+  );
+}
+
+/**
+ * How a page looked before the visual builder: a hero image, a title and a
+ * block of rich text. Still used by any page that has no sections, so older
+ * content keeps rendering exactly as it did.
+ */
+function LegacyPageBody({ page }: { page: Page }) {
+  return (
+    <>
       {page.heroImage ? (
         <div className="relative h-56 w-full overflow-hidden bg-paper-warm lg:h-80">
           <img src={assetUrl(page.heroImage)} alt="" className="h-full w-full object-cover" />

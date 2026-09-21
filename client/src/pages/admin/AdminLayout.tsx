@@ -41,12 +41,11 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Content',
     items: [
-      { to: '/admin/homepage', label: 'Homepage' },
+      { to: '/admin/design-pages', label: 'Design Pages' },
       { to: '/admin/banners', label: 'Banners' },
       { to: '/admin/gallery', label: 'Gallery' },
       { to: '/admin/testimonials', label: 'Testimonials' },
       { to: '/admin/faqs', label: 'FAQs' },
-      { to: '/admin/pages', label: 'Pages' },
       { to: '/admin/navigation', label: 'Navigation' },
       { to: '/admin/media', label: 'Media' },
     ],

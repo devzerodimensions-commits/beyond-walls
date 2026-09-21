@@ -136,6 +136,11 @@ enum SectionType {
   CUSTOM_ORDER_CTA
   SHOP_BY_ATTRIBUTE
   PERSONALISATION_DEMO
+  // Added with the visual page builder, so pages other than the homepage have
+  // the plain building blocks they need.
+  SECTION_HEADING
+  IMAGE_TEXT
+  CONTACT_BLOCK
 }
 
 enum BannerPlacement {
@@ -728,23 +733,33 @@ model Coupon {
 // Editable site content
 // ---------------------------------------------------------------------------
 
-model HomeSection {
-  id       String      @id @default(cuid())
-  key      String      @unique
+/// One block on a page: a hero, a category grid, a row of products, a banner.
+/// Composed and reordered in Admin -> Design Pages.
+///
+/// Replaces the old HomeSection, which could only describe the homepage. The
+/// columns are deliberately the same so existing content carried straight over.
+model PageSection {
+  id     String @id @default(cuid())
+  pageId String
+  page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
   type     SectionType
   title    String?
   subtitle String?
   bodyText String?
   ctaLabel String?
   ctaLink  String?
-  /// Type-specific settings, e.g. { "productIds": [...], "limit": 8 }
-  config    Json          @default("{}")
+
+  /// Type-specific settings, e.g. { "productIds": [...], "limit": 8 }.
+  /// Free-form so a new widget option never needs a migration.
+  config Json @default("{}")
+
   sortOrder Int           @default(0)
   status    ContentStatus @default(PUBLISHED)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
-  @@index([sortOrder])
+  @@index([pageId, sortOrder])
 }
 
 model Banner {
@@ -818,11 +833,19 @@ model Page {
   slug         String        @unique
   title        String
   excerpt      String?
+  /// Legacy rich text. A page with sections renders those instead; this is kept
+  /// so nothing written before the visual builder is lost.
   content      String        @default("")
   heroImage    String?
   status       ContentStatus @default(DRAFT)
   showInFooter Boolean       @default(false)
   sortOrder    Int           @default(0)
+
+  /// Pages the storefront routes to by name. Their slug cannot be changed and
+  /// they cannot be deleted, because a link elsewhere in the site depends on it.
+  isSystem Boolean @default(false)
+
+  sections PageSection[]
 
   seoTitle       String?
   seoDescription String?

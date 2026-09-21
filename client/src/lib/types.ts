@@ -17,7 +17,8 @@ export type PaymentMethod = 'RAZORPAY' | 'COD';
 export type SectionType =
   | 'HERO' | 'USP_STRIP' | 'CATEGORY_GRID' | 'FEATURED_PRODUCTS' | 'BANNER_SPLIT'
   | 'BANNER_WIDE' | 'GALLERY' | 'TESTIMONIALS' | 'FAQ' | 'RICH_TEXT' | 'CTA' | 'CUSTOM_ORDER_CTA'
-  | 'SHOP_BY_ATTRIBUTE' | 'PERSONALISATION_DEMO';
+  | 'SHOP_BY_ATTRIBUTE' | 'PERSONALISATION_DEMO'
+  | 'SECTION_HEADING' | 'IMAGE_TEXT' | 'CONTACT_BLOCK';
 
 export interface User {
   id: string;

@@ -44,9 +44,9 @@ const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'));
 const AdminOrderDetail = lazy(() => import('./pages/admin/AdminOrderDetail'));
 const AdminCustomers = lazy(() => import('./pages/admin/AdminCustomers'));
 const AdminEnquiries = lazy(() => import('./pages/admin/AdminEnquiries'));
-const AdminHomepage = lazy(() => import('./pages/admin/AdminHomepage'));
+const AdminDesignPages = lazy(() => import('./pages/admin/AdminDesignPages'));
+const AdminPageBuilder = lazy(() => import('./pages/admin/AdminPageBuilder'));
 const AdminContentLists = lazy(() => import('./pages/admin/AdminContentLists'));
-const AdminPages = lazy(() => import('./pages/admin/AdminPages'));
 const AdminMedia = lazy(() => import('./pages/admin/AdminMedia'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
@@ -143,6 +143,16 @@ export default function App() {
 
         {/* ---------------- Admin ---------------- */}
         <Route
+          path="admin/builder"
+          element={
+            <RequireAdmin>
+              <Suspense fallback={<PageLoader label="Opening the editor" />}>
+                <AdminPageBuilder />
+              </Suspense>
+            </RequireAdmin>
+          }
+        />
+        <Route
           path="admin/login"
           element={
             <Suspense fallback={<PageLoader />}>
@@ -170,7 +180,7 @@ export default function App() {
           <Route path="orders/:id" element={<AdminOrderDetail />} />
           <Route path="customers" element={<AdminCustomers />} />
           <Route path="enquiries" element={<AdminEnquiries />} />
-          <Route path="homepage" element={<AdminHomepage />} />
+          <Route path="design-pages" element={<AdminDesignPages />} />
           <Route path="banners" element={<AdminContentLists resource="banners" />} />
           <Route path="gallery" element={<AdminContentLists resource="gallery" />} />
           <Route path="testimonials" element={<AdminContentLists resource="testimonials" />} />
@@ -178,7 +188,6 @@ export default function App() {
           <Route path="coupons" element={<AdminContentLists resource="coupons" />} />
           <Route path="reviews" element={<AdminContentLists resource="reviews" />} />
           <Route path="navigation" element={<AdminContentLists resource="nav-links" />} />
-          <Route path="pages" element={<AdminPages />} />
           <Route path="media" element={<AdminMedia />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>

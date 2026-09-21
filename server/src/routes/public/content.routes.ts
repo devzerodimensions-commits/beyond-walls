@@ -4,7 +4,7 @@ import prisma from '../../lib/prisma';
 import { ApiError, asyncHandler } from '../../utils/http';
 import { getPublicSettings } from '../../services/settings.service';
 import { persistUploads, upload } from '../../middleware/upload';
-import { PRODUCT_CARD_SELECT } from './catalog.routes';
+import { getPageWithSections } from '../../services/pageSection.service';
 import { sendEnquiryAcknowledgement, sendEnquiryNotification } from '../../services/email.service';
 import { getSetting } from '../../services/settings.service';
 import { env } from '../../config/env';
@@ -35,154 +35,32 @@ router.get(
   }),
 );
 
-// GET /api/home — the full, ordered homepage payload.
+/**
+ * GET /api/home — the full, ordered homepage payload.
+ *
+ * The homepage is a page like any other now; this endpoint is kept because the
+ * storefront and the older clients call it by name.
+ */
 router.get(
   '/home',
   asyncHandler(async (_req, res) => {
-    const sections = await prisma.homeSection.findMany({
-      where: PUBLISHED,
-      orderBy: { sortOrder: 'asc' },
-    });
+    const page = await getPageWithSections('home');
+    res.json({ success: true, data: page?.sections ?? [] });
+  }),
+);
 
-    // Resolve the data each section type needs, so the client renders in one pass.
-    const resolved = await Promise.all(
-      sections.map(async (section) => {
-        const config = (section.config ?? {}) as Record<string, unknown>;
-        const limit = Number(config.limit) || 8;
-
-        switch (section.type) {
-          case 'HERO':
-          case 'BANNER_SPLIT':
-          case 'BANNER_WIDE': {
-            const placement =
-              section.type === 'HERO' ? 'HOME_HERO' : section.type === 'BANNER_SPLIT' ? 'HOME_SPLIT' : 'HOME_WIDE';
-            const now = new Date();
-            const banners = await prisma.banner.findMany({
-              where: {
-                ...PUBLISHED,
-                placement,
-                AND: [
-                  { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
-                  { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
-                ],
-              },
-              orderBy: { sortOrder: 'asc' },
-            });
-            return { ...section, items: banners };
-          }
-
-          case 'CATEGORY_GRID': {
-            const ids = (config.categoryIds as string[] | undefined) ?? [];
-            const categories = await prisma.category.findMany({
-              where: ids.length ? { id: { in: ids }, ...PUBLISHED } : { ...PUBLISHED, parentId: null },
-              orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-              take: ids.length ? undefined : limit,
-              include: { _count: { select: { products: true } } },
-            });
-            // Preserve the admin-chosen order when explicit ids are configured.
-            const ordered = ids.length
-              ? ids.map((id) => categories.find((c) => c.id === id)).filter(Boolean)
-              : categories;
-            return { ...section, items: ordered };
-          }
-
-          case 'FEATURED_PRODUCTS': {
-            const ids = (config.productIds as string[] | undefined) ?? [];
-            const products = await prisma.product.findMany({
-              where: ids.length ? { id: { in: ids }, ...PUBLISHED } : { ...PUBLISHED, featured: true },
-              orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-              take: ids.length ? undefined : limit,
-              select: PRODUCT_CARD_SELECT,
-            });
-            const ordered = ids.length
-              ? ids.map((id) => products.find((p) => p.id === id)).filter(Boolean)
-              : products;
-            return { ...section, items: ordered };
-          }
-
-          case 'SHOP_BY_ATTRIBUTE': {
-            // Renders an attribute rail (Material, Style, Shape...) as a
-            // browsable strip. The admin picks which group via config.groupSlug.
-            const groupSlug = String(config.groupSlug ?? 'material');
-            const group = await prisma.attributeGroup.findFirst({
-              where: { slug: groupSlug, ...PUBLISHED },
-              include: {
-                values: {
-                  where: PUBLISHED,
-                  orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-                  include: { _count: { select: { products: true } } },
-                },
-              },
-            });
-            if (!group) return { ...section, items: [] };
-
-            return {
-              ...section,
-              items: group.values.slice(0, limit).map((value) => ({
-                id: value.id,
-                name: value.name,
-                slug: value.slug,
-                hexColor: value.hexColor,
-                image: value.image,
-                count: value._count.products,
-                groupSlug: group.slug,
-              })),
-            };
-          }
-
-          case 'PERSONALISATION_DEMO': {
-            // Shows a live-preview product so visitors can try personalising
-            // before they commit. Falls back to any preview-enabled product.
-            const slug = config.productSlug ? String(config.productSlug) : null;
-            const product = await prisma.product.findFirst({
-              where: {
-                ...PUBLISHED,
-                livePreviewEnabled: true,
-                ...(slug ? { slug } : {}),
-              },
-              orderBy: { sortOrder: 'asc' },
-              include: {
-                images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-                personalization: { where: PUBLISHED, orderBy: { sortOrder: 'asc' } },
-              },
-            });
-            return { ...section, items: product ? [product] : [] };
-          }
-
-          case 'GALLERY': {
-            const items = await prisma.galleryItem.findMany({
-              where: PUBLISHED,
-              orderBy: { sortOrder: 'asc' },
-              take: limit,
-            });
-            return { ...section, items };
-          }
-
-          case 'TESTIMONIALS': {
-            const items = await prisma.testimonial.findMany({
-              where: PUBLISHED,
-              orderBy: { sortOrder: 'asc' },
-              take: limit,
-            });
-            return { ...section, items };
-          }
-
-          case 'FAQ': {
-            const items = await prisma.faq.findMany({
-              where: { ...PUBLISHED, ...(config.group ? { group: String(config.group) } : {}) },
-              orderBy: { sortOrder: 'asc' },
-              take: limit,
-            });
-            return { ...section, items };
-          }
-
-          default:
-            return { ...section, items: [] };
-        }
-      }),
-    );
-
-    res.json({ success: true, data: resolved });
+/**
+ * GET /api/pages/:slug/sections — a composed content page.
+ *
+ * Returns the page with its sections already resolved, so the storefront
+ * renders in one pass exactly as the homepage does.
+ */
+router.get(
+  '/pages/:slug/sections',
+  asyncHandler(async (req, res) => {
+    const page = await getPageWithSections(req.params.slug);
+    if (!page) throw ApiError.notFound('Page not found');
+    res.json({ success: true, data: page });
   }),
 );
 
