@@ -1,6 +1,6 @@
 # Beyond Walls on Render
 # ---------------------------------------------------------------------------
-# One web service and one PostgreSQL database.
+# One web service backed by an external PostgreSQL database.
 #
 # The service hosts the storefront, the admin panel and the API together on a
 # single origin. That is deliberate: the refresh token is an HttpOnly
@@ -9,19 +9,9 @@
 # fifteen minutes after logging in.
 #
 # To deploy: Render Dashboard -> New -> Blueprint -> pick this repository.
-# Render reads this file, creates both resources and asks for the values marked
-# sync:false below.
+# Render reads this file, creates the web service and asks for the values marked
+# sync:false below. DATABASE_URL points to the external Neon project.
 # ---------------------------------------------------------------------------
-
-databases:
-  - name: beyondwalls-db
-    databaseName: beyondwalls
-    user: beyondwalls
-    # The free database is removed after 30 days and cannot be backed up.
-    # Change to `basic-256mb` (or higher) before taking real orders.
-    plan: free
-    # Only the web service may connect; nothing is exposed to the internet.
-    ipAllowList: []
 
 services:
   - type: web
@@ -48,9 +38,8 @@ services:
         value: production
 
       - key: DATABASE_URL
-        fromDatabase:
-          name: beyondwalls-db
-          property: connectionString
+        # Supplied securely in the Render Blueprint form (Neon PostgreSQL).
+        sync: false
 
       # --- Secrets: generated once by Render, never seen by anyone ----------
       - key: JWT_SECRET
