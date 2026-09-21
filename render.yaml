@@ -26,7 +26,7 @@ services:
     # FIRST DEPLOY ONLY: seed the empty free database because Render's free
     # service has no Shell access. Remove `&& npm run seed` after the first
     # successful deploy so future deploys never touch admin-edited content.
-    buildCommand: npm ci && npm run build:deploy && npm run seed
+    buildCommand: npm ci --include=dev && npm run build:deploy && npm run seed
     startCommand: npm start
 
     # Render restarts the service if this stops answering. It is exempt from
@@ -64,9 +64,9 @@ services:
       # it tells you the real URL after the first deploy. Correct these two and
       # your own domain goes here once it is attached in Render -> Settings.
       - key: PUBLIC_SITE_URL
-        value: https://beyondwalls.onrender.com
+        value: https://beyondwalls-sbyr.onrender.com
       - key: API_BASE_URL
-        value: https://beyondwalls.onrender.com
+        value: https://beyondwalls-sbyr.onrender.com
       # Same-origin means there is no cross-origin request to allow.
       - key: CORS_ORIGINS
         value: ""
