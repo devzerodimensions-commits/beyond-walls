@@ -1,0 +1,34 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+client/dist/
+coverage/
+
+# Secrets — every .env variant, except the committed templates.
+# The templates document which variables exist; the real values never leave
+# the machine or the hosting provider's dashboard.
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Customer uploads are runtime data, not source. The seeded product
+# photography is the exception: the seed script references those files.
+server/uploads/**
+!server/uploads/products/
+!server/uploads/products/**
+!server/uploads/.gitkeep
+
+# Test and release artefacts
+test-results/
+playwright-report/
+blob-report/
+release/
+
+# OS noise
+.DS_Store
+Thumbs.db

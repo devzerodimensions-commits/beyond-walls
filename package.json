@@ -1,0 +1,40 @@
+{
+  "name": "beyond-walls",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Beyond Walls — premium signage & nameplates e-commerce platform",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "prisma:generate": "npm run prisma:generate -w server",
+    "prisma:migrate": "npm run prisma:migrate -w server",
+    "prisma:push": "npm run prisma:push -w server",
+    "seed": "npm run seed -w server",
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "build": "npm run build -w server && npm run build -w client",
+    "start": "npm run start -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
+    "verify": "npm run verify -w server",
+    "verify:payments": "npm run verify:payments -w server",
+    "package": "node scripts/package-release.mjs",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:desktop": "playwright test --project=desktop",
+    "e2e:mobile": "playwright test --project=mobile",
+    "build:deploy": "npm run build:deploy -w server && npm run build -w client"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=18.18"
+  }
+}

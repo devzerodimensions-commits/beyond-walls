@@ -1,0 +1,903 @@
+// Beyond Walls — PostgreSQL schema
+// Every piece of site content below is editable from the admin panel at /admin.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+/// Draft / Published / Archived drives visibility on the public site.
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// Attribute groups power the dynamic filter rails (Material, Style, Shape...).
+enum AttributeKind {
+  MATERIAL
+  STYLE
+  SHAPE
+  PROFESSION
+  REQUIREMENT
+  PRINT_CATEGORY
+  SIGN_CATEGORY
+  OCCASION
+  COLOUR
+  FONT
+  OTHER
+}
+
+/// Field types available for product personalization.
+enum PersonalizationType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  SELECT
+  RADIO
+  CHECKBOX
+  COLOR
+  FONT
+  IMAGE_UPLOAD
+  FILE_UPLOAD
+  URL
+  GSTIN
+  PHONE
+  EMAIL
+  DATE
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  IN_PRODUCTION
+  READY_TO_SHIP
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  COD
+}
+
+enum PaymentEventType {
+  ORDER_CREATED
+  PAYMENT_AUTHORIZED
+  PAYMENT_CAPTURED
+  PAYMENT_FAILED
+  SIGNATURE_VERIFIED
+  SIGNATURE_MISMATCH
+  WEBHOOK
+  REFUND
+  RETRY
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+  FREE_SHIPPING
+}
+
+enum EnquiryType {
+  CONTACT
+  CUSTOM_ORDER
+  PRODUCT_ENQUIRY
+  BULK_ORDER
+  PRICE_REQUEST
+}
+
+enum EnquiryStatus {
+  NEW
+  IN_PROGRESS
+  QUOTED
+  CLOSED
+  SPAM
+}
+
+/// Homepage is a re-orderable stack of typed sections.
+enum SectionType {
+  HERO
+  USP_STRIP
+  CATEGORY_GRID
+  FEATURED_PRODUCTS
+  BANNER_SPLIT
+  BANNER_WIDE
+  GALLERY
+  TESTIMONIALS
+  FAQ
+  RICH_TEXT
+  CTA
+  CUSTOM_ORDER_CTA
+  SHOP_BY_ATTRIBUTE
+  PERSONALISATION_DEMO
+}
+
+enum BannerPlacement {
+  HOME_HERO
+  HOME_SPLIT
+  HOME_WIDE
+  SHOP_TOP
+  CATEGORY_TOP
+  ANNOUNCEMENT
+}
+
+enum AddressType {
+  SHIPPING
+  BILLING
+}
+
+// ---------------------------------------------------------------------------
+// Users, auth, addresses
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role      @default(CUSTOMER)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  addresses     Address[]
+  orders        Order[]
+  wishlist      WishlistItem[]
+  carts         Cart[]
+  reviews       Review[]
+  refreshTokens RefreshToken[]
+  resetTokens   PasswordResetToken[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Address {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      AddressType @default(SHIPPING)
+  fullName  String
+  phone     String
+  line1     String
+  line2     String?
+  landmark  String?
+  city      String
+  state     String
+  pincode   String
+  country   String      @default("India")
+  isDefault Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Catalogue taxonomy
+// ---------------------------------------------------------------------------
+
+model Category {
+  id          String        @id @default(cuid())
+  name        String
+  slug        String        @unique
+  description String?
+  shortText   String?
+  image       String?
+  bannerImage String?
+  icon        String?
+  parentId    String?
+  parent      Category?     @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[]    @relation("CategoryTree")
+  sortOrder   Int           @default(0)
+  status      ContentStatus @default(DRAFT)
+  featured    Boolean       @default(false)
+  showInMenu  Boolean       @default(true)
+
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String?
+  ogImage        String?
+
+  products    Product[] @relation("ProductCategory")
+  subProducts Product[] @relation("ProductSubcategory")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([status])
+  @@index([sortOrder])
+}
+
+/// A filter rail: "Material", "Style", "Shape", "Profession", "Budget"...
+model AttributeGroup {
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  kind         AttributeKind @default(OTHER)
+  helpText     String?
+  sortOrder    Int           @default(0)
+  status       ContentStatus @default(PUBLISHED)
+  showInFilter Boolean       @default(true)
+  multiSelect  Boolean       @default(true)
+
+  values    AttributeValue[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([kind])
+  @@index([sortOrder])
+}
+
+model AttributeValue {
+  id        String         @id @default(cuid())
+  groupId   String
+  group     AttributeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String
+  hexColor  String?
+  image     String?
+  sortOrder Int            @default(0)
+  status    ContentStatus  @default(PUBLISHED)
+
+  products  ProductAttribute[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@unique([groupId, slug])
+  @@index([groupId])
+}
+
+model ProductAttribute {
+  productId String
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  valueId   String
+  value     AttributeValue @relation(fields: [valueId], references: [id], onDelete: Cascade)
+
+  @@id([productId, valueId])
+  @@index([valueId])
+}
+
+// ---------------------------------------------------------------------------
+// Products
+// ---------------------------------------------------------------------------
+
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  sku              String?  @unique
+  shortDescription String?
+  description      String?
+  designNote       String?
+  materialNote     String?
+  careInstructions String?
+  /// Fulfilment copy shown as its own section on the product page.
+  installationNote String?
+  shippingNote     String?
+  features         String[] @default([])
+  applications     String[] @default([])
+  includedItems    String[] @default([])
+
+  categoryId    String?
+  category      Category? @relation("ProductCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  subcategoryId String?
+  subcategory   Category? @relation("ProductSubcategory", fields: [subcategoryId], references: [id], onDelete: SetNull)
+
+  /// Base price. May be null when every purchasable variant carries its own
+  /// price — `effectivePrice` then resolves from the selected variant.
+  /// A product with neither a base price nor a priced variant cannot be sold
+  /// and is blocked from publishing.
+  price          Decimal? @db.Decimal(10, 2)
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+  costPrice      Decimal? @db.Decimal(10, 2)
+  taxRatePercent Decimal  @default(18) @db.Decimal(5, 2)
+  /// Set once the owner has reviewed the seeded placeholder price.
+  priceConfirmed Boolean  @default(false)
+
+  trackInventory Boolean @default(true)
+  stock          Int     @default(0)
+  lowStockAlert  Int     @default(5)
+  minOrderQty    Int     @default(1)
+  maxOrderQty    Int?
+
+  widthInches  Decimal? @db.Decimal(6, 2)
+  heightInches Decimal? @db.Decimal(6, 2)
+  depthMm      Decimal? @db.Decimal(6, 2)
+  weightGrams  Int?
+
+  status    ContentStatus @default(DRAFT)
+  featured  Boolean       @default(false)
+  isNew     Boolean       @default(false)
+  badge     String?
+  sortOrder Int           @default(0)
+
+  /// Live nameplate preview toggle + which preview template to render.
+  livePreviewEnabled  Boolean @default(false)
+  livePreviewTemplate String?
+  /// Per-product overrides for the chosen template: plate ratio, corner radius,
+  /// screw positions, rule, default colours and font stacks. The template acts
+  /// as the preset; anything set here wins. See preview.service.ts.
+  livePreviewConfig   Json    @default("{}")
+
+  productionDays Int?
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String?
+  ogImage        String?
+
+  images          ProductImage[]
+  variants        ProductVariant[]
+  attributes      ProductAttribute[]
+  personalization PersonalizationField[]
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+  wishlistItems   WishlistItem[]
+  reviews         Review[]
+  enquiries       Enquiry[]
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([status])
+  @@index([featured])
+  @@index([price])
+  @@index([sortOrder])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+/// An explicit purchasable variant row (size / material / finish combination).
+model ProductVariant {
+  id             String        @id @default(cuid())
+  productId      String
+  product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label          String
+  sku            String?
+  price          Decimal?      @db.Decimal(10, 2)
+  compareAtPrice Decimal?      @db.Decimal(10, 2)
+  stock          Int           @default(0)
+  image          String?
+  /// Free-form option map, e.g. { "Size": "6.5 x 7 in", "Material": "Acrylic" }
+  options        Json          @default("{}")
+  sortOrder      Int           @default(0)
+  isDefault      Boolean       @default(false)
+  status         ContentStatus @default(PUBLISHED)
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+}
+
+/// Dynamic personalization inputs rendered on the product page.
+model PersonalizationField {
+  id          String              @id @default(cuid())
+  productId   String
+  product     Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key         String
+  label       String
+  type        PersonalizationType @default(TEXT)
+  placeholder String?
+  helpText    String?
+  required    Boolean             @default(false)
+  maxLength   Int?
+  minLength   Int?
+  pattern     String?
+  /// For SELECT / RADIO / COLOR / FONT: [{ label, value, hex?, priceDelta? }]
+  options      Json          @default("[]")
+  defaultValue String?
+  priceDelta   Decimal       @default(0) @db.Decimal(10, 2)
+  sortOrder    Int           @default(0)
+  status       ContentStatus @default(PUBLISHED)
+  /// Binds this field to a slot in the live preview renderer.
+  previewSlot  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, key])
+  @@index([productId])
+}
+
+model Review {
+  id         String        @id @default(cuid())
+  productId  String
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authorName String
+  rating     Int
+  title      String?
+  content    String
+  status     ContentStatus @default(DRAFT)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([productId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Cart and wishlist
+// ---------------------------------------------------------------------------
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Anonymous carts are keyed by a client-generated token.
+  sessionId String?    @unique
+  couponId  String?
+  coupon    Coupon?    @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId])
+}
+
+model CartItem {
+  id        String          @id @default(cuid())
+  cartId    String
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  quantity  Int             @default(1)
+  /// Snapshot of personalization: [{ key, label, type, value, priceDelta }]
+  personalization Json      @default("[]")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([cartId])
+  @@index([productId])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Orders and payments
+// ---------------------------------------------------------------------------
+
+model Order {
+  id          String @id @default(cuid())
+  orderNumber String @unique
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  customerName  String
+  customerEmail String
+  customerPhone String
+
+  status        OrderStatus   @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod PaymentMethod @default(RAZORPAY)
+
+  subtotal       Decimal @db.Decimal(10, 2)
+  discountAmount Decimal @default(0) @db.Decimal(10, 2)
+  shippingAmount Decimal @default(0) @db.Decimal(10, 2)
+  taxAmount      Decimal @default(0) @db.Decimal(10, 2)
+  total          Decimal @db.Decimal(10, 2)
+  currency       String  @default("INR")
+
+  couponId   String?
+  coupon     Coupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode String?
+
+  /// GST invoice request captured at checkout.
+  gstInvoice  Boolean @default(false)
+  companyName String?
+  gstin       String?
+
+  shippingAddress Json
+  billingAddress  Json
+  customerNote    String?
+  adminNote       String?
+  trackingNumber  String?
+  trackingUrl     String?
+  courierName     String?
+
+  items    OrderItem[]
+  payments Payment[]
+
+  placedAt    DateTime  @default(now())
+  confirmedAt DateTime?
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+  /// Set the first time reserved stock is released, so a repeated cancel
+  /// (admin + customer, or a retried request) cannot inflate inventory.
+  stockReleasedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([placedAt])
+}
+
+model OrderItem {
+  id        String          @id @default(cuid())
+  orderId   String
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  /// Snapshotted so historical orders survive catalogue edits.
+  productName  String
+  variantLabel String?
+  sku          String?
+  imageUrl     String?
+  slug         String?
+
+  unitPrice           Decimal @db.Decimal(10, 2)
+  personalizationCost Decimal @default(0) @db.Decimal(10, 2)
+  quantity            Int
+  lineTotal           Decimal @db.Decimal(10, 2)
+
+  /// The customization travels with the order forever.
+  personalization Json @default("[]")
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model Payment {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider String        @default("razorpay")
+  method   PaymentMethod @default(RAZORPAY)
+  status   PaymentStatus @default(PENDING)
+
+  razorpayOrderId   String?
+  razorpayPaymentId String? @unique
+  razorpaySignature String?
+
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("INR")
+
+  /// Instrument reported by Razorpay: upi | card | netbanking | wallet | emi
+  instrument       String?
+  bank             String?
+  wallet           String?
+  cardLast4        String?
+  vpa              String?
+  errorCode        String?
+  errorDescription String?
+  refundedAmount   Decimal @default(0) @db.Decimal(10, 2)
+
+  /// Razorpay orders expire if the customer never pays. Past this point the
+  /// attempt is swept to CANCELLED and the reserved stock is released.
+  expiresAt DateTime?
+
+  events    PaymentEvent[]
+  refunds   Refund[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([orderId])
+  @@index([razorpayOrderId])
+  @@index([status, expiresAt])
+}
+
+/// One row per Razorpay refund. `razorpayRefundId` is unique, so a replayed
+/// webhook or a double-clicked admin refund can never double-count.
+model Refund {
+  id               String   @id @default(cuid())
+  paymentId        String
+  payment          Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  razorpayRefundId String   @unique
+  amount           Decimal  @db.Decimal(10, 2)
+  status           String   @default("processed")
+  speed            String?
+  notes            Json     @default("{}")
+  createdAt        DateTime @default(now())
+
+  @@index([paymentId])
+}
+
+/// Full audit trail of every payment transition (create / verify / fail / retry).
+model PaymentEvent {
+  id        String           @id @default(cuid())
+  paymentId String
+  payment   Payment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  type      PaymentEventType
+  message   String?
+  payload   Json             @default("{}")
+  /// Razorpay's own event id (`x-razorpay-event-id`). Unique per payment, so a
+  /// redelivered webhook is recognised and skipped instead of re-applied.
+  externalId String?
+  createdAt  DateTime        @default(now())
+
+  @@unique([paymentId, externalId])
+  @@index([paymentId])
+}
+
+/// Single-use password reset tokens. Only the hash is stored.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Coupon {
+  id            String        @id @default(cuid())
+  code          String        @unique
+  description   String?
+  type          CouponType    @default(PERCENT)
+  value         Decimal       @default(0) @db.Decimal(10, 2)
+  minOrderValue Decimal?      @db.Decimal(10, 2)
+  maxDiscount   Decimal?      @db.Decimal(10, 2)
+  usageLimit    Int?
+  usedCount     Int           @default(0)
+  perUserLimit  Int?
+  startsAt      DateTime?
+  endsAt        DateTime?
+  status        ContentStatus @default(DRAFT)
+
+  carts     Cart[]
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Editable site content
+// ---------------------------------------------------------------------------
+
+model HomeSection {
+  id       String      @id @default(cuid())
+  key      String      @unique
+  type     SectionType
+  title    String?
+  subtitle String?
+  bodyText String?
+  ctaLabel String?
+  ctaLink  String?
+  /// Type-specific settings, e.g. { "productIds": [...], "limit": 8 }
+  config    Json          @default("{}")
+  sortOrder Int           @default(0)
+  status    ContentStatus @default(PUBLISHED)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([sortOrder])
+}
+
+model Banner {
+  id          String          @id @default(cuid())
+  title       String?
+  subtitle    String?
+  eyebrow     String?
+  image       String?
+  mobileImage String?
+  link        String?
+  ctaLabel    String?
+  placement   BannerPlacement @default(HOME_HERO)
+  sortOrder   Int             @default(0)
+  status      ContentStatus   @default(DRAFT)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([placement])
+  @@index([sortOrder])
+}
+
+model GalleryItem {
+  id        String        @id @default(cuid())
+  title     String?
+  caption   String?
+  image     String
+  tag       String?
+  link      String?
+  sortOrder Int           @default(0)
+  status    ContentStatus @default(DRAFT)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([sortOrder])
+}
+
+model Testimonial {
+  id        String        @id @default(cuid())
+  name      String
+  role      String?
+  location  String?
+  content   String
+  rating    Int?
+  image     String?
+  sortOrder Int           @default(0)
+  status    ContentStatus @default(DRAFT)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([sortOrder])
+}
+
+model Faq {
+  id        String        @id @default(cuid())
+  question  String
+  answer    String
+  group     String?       @default("General")
+  sortOrder Int           @default(0)
+  status    ContentStatus @default(PUBLISHED)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([sortOrder])
+}
+
+/// About / Contact / Policies — fully editable pages.
+model Page {
+  id           String        @id @default(cuid())
+  slug         String        @unique
+  title        String
+  excerpt      String?
+  content      String        @default("")
+  heroImage    String?
+  status       ContentStatus @default(DRAFT)
+  showInFooter Boolean       @default(false)
+  sortOrder    Int           @default(0)
+
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String?
+  ogImage        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model Enquiry {
+  id        String      @id @default(cuid())
+  type      EnquiryType @default(CONTACT)
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  subject   String?
+  message   String
+  quantity  Int?
+  budget    String?
+  productId String?
+  product   Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  /// Uploaded artwork / reference files: [{ url, filename, size, mime }]
+  attachments Json          @default("[]")
+  status      EnquiryStatus @default(NEW)
+  adminNote   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+/// Key/value store for logo, contact details, hours, socials, payment toggles, SEO.
+model Setting {
+  key       String   @id
+  group     String   @default("general")
+  label     String?
+  value     Json     @default("null")
+  updatedAt DateTime @updatedAt
+
+  @@index([group])
+}
+
+/// Media library — every upload is tracked so admin can reuse images.
+model MediaAsset {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  filename  String
+  mimeType  String
+  size      Int
+  folder    String   @default("general")
+  alt       String?
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+
+  @@index([folder])
+}
+
+/// Editable header / footer navigation.
+model NavLink {
+  id           String        @id @default(cuid())
+  label        String
+  href         String
+  group        String        @default("footer")
+  sortOrder    Int           @default(0)
+  status       ContentStatus @default(PUBLISHED)
+  openInNewTab Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([group, sortOrder])
+}

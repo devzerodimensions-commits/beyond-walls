@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  * {
+    @apply border-stone-line;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-paper-off text-ink font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  /*
+   * Headings inherit their colour from the surrounding block. The body sets
+   * `text-ink`, so headings are black by default, while a dark section that
+   * sets `text-paper` gets light headings without each one needing an override.
+   */
+  h1, h2, h3, h4, h5 {
+    @apply font-display font-medium tracking-tight;
+    color: inherit;
+    text-wrap: balance;
+  }
+
+  /* Keyboard focus only — pointer clicks stay clean. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ink ring-offset-2 ring-offset-paper-off;
+  }
+
+  ::selection {
+    @apply bg-ink text-paper;
+  }
+
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .container-site {
+    @apply mx-auto w-full max-w-site px-5 sm:px-8 lg:px-12;
+  }
+
+  /* The small uppercase label used throughout the architectural layout. */
+  .eyebrow {
+    @apply text-2xs font-medium uppercase tracking-architect text-ink-400;
+  }
+
+  .rule {
+    @apply h-px w-full bg-stone-line;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-architect text-ink-500;
+  }
+
+  /* Drawn, not written: keeps the asterisk out of the accessible name. */
+  .field-label[data-required]::after {
+    content: '*';
+    @apply ml-1 text-state-danger;
+  }
+
+  .field {
+    @apply w-full border border-stone-line bg-paper px-3.5 py-2.5 text-sm text-ink
+           transition-colors duration-200 placeholder:text-ink-300
+           focus:border-ink focus:outline-none focus:ring-0
+           disabled:cursor-not-allowed disabled:bg-paper-warm disabled:text-ink-300;
+  }
+
+  .field-error {
+    @apply border-state-danger focus:border-state-danger;
+  }
+
+  .link-underline {
+    @apply relative inline-block after:absolute after:bottom-0 after:left-0 after:h-px
+           after:w-full after:origin-right after:scale-x-0 after:bg-current
+           after:transition-transform after:duration-300 after:ease-architect
+           hover:after:origin-left hover:after:scale-x-100;
+  }
+
+  .skeleton {
+    @apply bg-[linear-gradient(90deg,#EDEAE4_25%,#F6F4F1_50%,#EDEAE4_75%)] bg-[length:200%_100%] animate-shimmer;
+  }
+
+  /* Admin table primitives */
+  .admin-table {
+    @apply w-full border-collapse text-sm;
+  }
+  .admin-table th {
+    @apply border-b border-stone-line px-4 py-3 text-left text-2xs font-semibold
+           uppercase tracking-architect text-ink-400;
+  }
+  .admin-table td {
+    @apply border-b border-stone-line/70 px-4 py-3 align-middle text-ink-700;
+  }
+  .admin-table tbody tr:hover {
+    @apply bg-paper-warm/60;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Slim scrollbars that suit the neutral palette. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f4f2ee;
+}
+::-webkit-scrollbar-thumb {
+  background: #cfcbc3;
+  border: 3px solid #f4f2ee;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8f8f8f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
