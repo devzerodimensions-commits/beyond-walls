@@ -23,10 +23,9 @@ services:
 
     # postinstall runs `prisma generate`; build:deploy applies migrations and
     # then compiles the server and the client.
-    # FIRST DEPLOY ONLY: seed the empty free database because Render's free
-    # service has no Shell access. Remove `&& npm run seed` after the first
-    # successful deploy so future deploys never touch admin-edited content.
-    buildCommand: npm ci --include=dev && npm run build:deploy && npm run seed
+    # The database is seeded separately on first deploy. Routine deploys only
+    # apply migrations, preserving all content edited through the admin panel.
+    buildCommand: npm ci --include=dev && npm run build:deploy
     startCommand: npm start
 
     # Render restarts the service if this stops answering. It is exempt from
