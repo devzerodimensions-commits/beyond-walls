@@ -19,7 +19,7 @@ import {
   validatePersonalizationValues,
 } from '../../components/product/PersonalizationForm';
 import {
-  Badge, Button, ButtonLink, CartIcon, CheckIcon, ChevronDown, EmptyState,
+  Badge, Button, ButtonLink, CartIcon, CheckIcon, ChevronDown, Drawer, EmptyState,
   HeartIcon, MinusIcon, PageLoader, PlusIcon,
 } from '../../components/ui';
 
@@ -35,6 +35,7 @@ export default function ProductPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<'cart' | 'buy' | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', slug],
@@ -128,6 +129,33 @@ export default function ProductPage() {
   const wishlistEnabled = get<boolean>('store.enableWishlist', true);
   const previewSlots = buildPreviewSlots(fields, values);
 
+  const setField = (key: string, value: string) => {
+    setValues((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  /*
+   * What the collapsed personalisation row shows. The customer's own words are
+   * far more reassuring than "3 of 6 fields completed", so it echoes back the
+   * text they typed and falls back to counting only when there is none.
+   */
+  const personalisationErrors = fields.some((f) => errors[f.key]);
+  const answered = fields.filter((f) => (values[f.key] ?? '').trim() !== '');
+  const personalisationDone = answered.length > 0;
+  const personalisationSummary = (() => {
+    const spoken = answered
+      .filter((f) => ['TEXT', 'TEXTAREA', 'NUMBER'].includes(f.type))
+      .map((f) => values[f.key].trim())
+      .filter(Boolean);
+    if (spoken.length) return spoken.join(' · ');
+    if (answered.length) return `${answered.length} of ${fields.length} chosen`;
+    return '';
+  })();
+
   const crumbs = [
     { name: 'Home', href: '/' },
     { name: 'Shop', href: '/shop' },
@@ -180,9 +208,13 @@ export default function ProductPage() {
       />
 
       <div className="container-site py-6 lg:py-10">
-        {/* Breadcrumbs */}
-        <nav aria-label="Breadcrumb" className="mb-6">
-          <ol className="flex flex-wrap items-center gap-1.5 text-2xs uppercase tracking-architect text-ink-400">
+        {/*
+          Breadcrumbs. On a phone they stay on one line and scroll rather than
+          wrapping to two — four words of navigation are not worth a second line
+          of the screen the customer came to buy from.
+        */}
+        <nav aria-label="Breadcrumb" className="mb-3 sm:mb-6">
+          <ol className="no-scrollbar flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-2xs uppercase tracking-architect text-ink-400 sm:flex-wrap sm:whitespace-normal">
             {crumbs.map((crumb, i) => (
               <li key={crumb.href} className="flex items-center gap-1.5">
                 {i > 0 ? <span className="text-ink-200">/</span> : null}
@@ -199,8 +231,13 @@ export default function ProductPage() {
         </nav>
 
         {/* ---------------- Gallery + purchase panel ---------------- */}
-        <div className="grid gap-8 lg:grid-cols-12 lg:gap-12">
-          <div className="lg:col-span-7">
+        {/*
+          On a laptop (1024–1400) a 7/5 split leaves the buying column too
+          narrow — the size buttons wrap and the personalisation form is
+          cramped. It only earns the extra image width on a wide screen.
+        */}
+        <div className="grid gap-5 sm:gap-8 lg:grid-cols-12 lg:gap-10 xl:gap-12">
+          <div className="lg:col-span-6 xl:col-span-7">
             <ProductGallery
               images={product.images}
               productName={product.name}
@@ -209,9 +246,15 @@ export default function ProductPage() {
               }
             />
 
-            {/* Live preview sits under the gallery, at a generous size. */}
+            {/*
+              Live preview sits under the gallery, at a generous size.
+              Laptop only: on a phone it would sit between the photograph and
+              the price, pushing the price and the buy button off the screen.
+              The phone gets it inside the personalisation sheet instead, where
+              it is actually being used.
+            */}
             {product.livePreviewEnabled ? (
-              <div className="mt-4 border border-stone-line">
+              <div className="mt-4 hidden border border-stone-line lg:block">
                 <LivePreview
                   template={product.livePreviewTemplate}
                   config={product.livePreviewConfig}
@@ -222,7 +265,7 @@ export default function ProductPage() {
           </div>
 
           {/* Sticky purchase panel */}
-          <div className="lg:col-span-5">
+          <div className="lg:col-span-6 xl:col-span-5">
             <div className="lg:sticky lg:top-[92px]">
               {product.category ? (
                 <Link to={`/shop/${product.category.slug}`} className="eyebrow link-underline">
@@ -230,16 +273,16 @@ export default function ProductPage() {
                 </Link>
               ) : null}
 
-              <h1 className="mt-3 text-[1.75rem] leading-tight lg:text-4xl">{product.name}</h1>
+              <h1 className="mt-2 text-[1.6rem] leading-tight sm:mt-3 sm:text-[1.75rem] lg:text-4xl">{product.name}</h1>
 
               {product.shortDescription ? (
-                <p className="mt-3.5 text-sm leading-relaxed text-ink-500">
+                <p className="mt-2.5 text-sm leading-relaxed text-ink-500 sm:mt-3.5">
                   {product.shortDescription}
                 </p>
               ) : null}
 
               {/* Price */}
-              <div className="mt-5 flex flex-wrap items-baseline gap-3">
+              <div className="mt-3.5 flex flex-wrap items-baseline gap-3 sm:mt-5">
                 {hasPrice ? (
                   <>
                     <span className="text-2xl font-medium">{formatPrice(unitPrice)}</span>
@@ -282,7 +325,7 @@ export default function ProductPage() {
                 </p>
               ) : null}
 
-              <div className="my-6 rule" />
+              <div className="my-4 rule sm:my-6" />
 
               {/* Variants */}
               {variants.length > 1 ? (
@@ -330,29 +373,62 @@ export default function ProductPage() {
                 </div>
               ) : null}
 
-              {/* Personalisation */}
+              {/*
+                Personalisation.
+
+                On a laptop it sits inline, where there is room. On a phone it
+                would push the price and the buy button off the bottom of the
+                screen, so it collapses to one line that opens a sheet — the
+                decision to buy stays on the first screen, and customising is a
+                deliberate second step.
+              */}
               {fields.length ? (
-                <div id="personalise" className="mb-6 border border-stone-line bg-paper p-5">
-                  <h2 className="mb-1 text-xs font-semibold uppercase tracking-architect">
-                    Personalise
-                  </h2>
-                  <p className="mb-5 text-2xs text-ink-400">
-                    Your details are attached to the order and used for production.
-                  </p>
-                  <PersonalizationForm
-                    fields={fields}
-                    values={values}
-                    errors={errors}
-                    onChange={(key, value) => {
-                      setValues((prev) => ({ ...prev, [key]: value }));
-                      setErrors((prev) => {
-                        const next = { ...prev };
-                        delete next[key];
-                        return next;
-                      });
-                    }}
-                  />
-                </div>
+                <>
+                  <div
+                    id="personalise"
+                    className="mb-6 hidden border border-stone-line bg-paper p-5 lg:block"
+                  >
+                    <h2 className="mb-1 text-xs font-semibold uppercase tracking-architect">
+                      Personalise
+                    </h2>
+                    <p className="mb-5 text-2xs text-ink-400">
+                      Your details are attached to the order and used for production.
+                    </p>
+                    <PersonalizationForm
+                      fields={fields}
+                      values={values}
+                      errors={errors}
+                      onChange={setField}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSheetOpen(true)}
+                    className={clsx(
+                      'mb-4 flex w-full items-center justify-between gap-3 border px-4 py-3.5 text-left transition-colors lg:hidden',
+                      personalisationErrors
+                        ? 'border-state-danger bg-[#FDEDEC]'
+                        : personalisationDone
+                          ? 'border-ink bg-paper'
+                          : 'border-stone-line bg-paper',
+                    )}
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold uppercase tracking-architect">
+                        Personalise
+                      </span>
+                      <span className="mt-0.5 block truncate text-2xs text-ink-400">
+                        {personalisationErrors
+                          ? 'Something still needs filling in'
+                          : personalisationSummary || 'Add your name and choose a finish'}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-2xs uppercase tracking-architect text-ink-500">
+                      {personalisationDone ? 'Edit' : 'Add'} →
+                    </span>
+                  </button>
+                </>
               ) : null}
 
               {/* Quantity + actions */}
@@ -633,6 +709,46 @@ export default function ProductPage() {
           </section>
         ) : null}
       </div>
+
+      {/*
+        The personalisation sheet. Same form, same state — it is the desktop
+        panel moved somewhere it fits, not a second implementation that could
+        drift out of step.
+      */}
+      {fields.length ? (
+        <Drawer
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          title="Personalise"
+          width="max-w-md"
+          footer={
+            <Button fullWidth size="lg" onClick={() => setSheetOpen(false)}>
+              Done
+            </Button>
+          }
+        >
+          <p className="mb-5 text-xs leading-relaxed text-ink-500">
+            Your details are attached to the order and used for production.
+          </p>
+
+          {/* The plate updates as they type, which is the whole point. */}
+          {product.livePreviewEnabled ? (
+            <LivePreview
+              template={product.livePreviewTemplate}
+              config={product.livePreviewConfig}
+              slots={previewSlots}
+              className="mb-6 border border-stone-line"
+            />
+          ) : null}
+
+          <PersonalizationForm
+            fields={fields}
+            values={values}
+            errors={errors}
+            onChange={setField}
+          />
+        </Drawer>
+      ) : null}
 
       {/* ---------------- Mobile sticky buy bar ---------------- */}
       {hasPrice && !outOfStock ? (

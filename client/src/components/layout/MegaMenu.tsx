@@ -93,6 +93,18 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
                   onClick={onNavigate}
                   onMouseEnter={() => setActiveId(category.id)}
                   onFocus={() => setActiveId(category.id)}
+                  /*
+                   * A touch screen has no hover. Without this, the first tap
+                   * would navigate away before the panel had ever shown that
+                   * category's work — so the first tap previews it and the
+                   * second opens it.
+                   */
+                  onTouchStart={(event) => {
+                    if (active?.id !== category.id) {
+                      event.preventDefault();
+                      setActiveId(category.id);
+                    }
+                  }}
                   className={clsx(
                     'flex items-center justify-between gap-2 px-2.5 py-2 text-sm transition-colors duration-200',
                     active?.id === category.id

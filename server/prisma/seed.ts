@@ -815,13 +815,22 @@ async function seedHomepage() {
       config: { limit: 6 },
     },
     {
+      key: 'materials',
+      type: 'SHOP_BY_ATTRIBUTE' as const,
+      title: 'Shop by material',
+      subtitle: 'Acrylic, steel, brass and more.',
+      sortOrder: 3,
+      status: PUBLISHED,
+      config: { groupSlug: 'material', limit: 6 },
+    },
+    {
       key: 'featured',
       type: 'FEATURED_PRODUCTS' as const,
       title: 'Featured',
       subtitle: 'A selection from the catalogue.',
       ctaLabel: 'View all products',
       ctaLink: '/shop',
-      sortOrder: 3,
+      sortOrder: 4,
       status: PUBLISHED,
       config: { limit: 8 },
     },
@@ -856,10 +865,19 @@ async function seedHomepage() {
       config: { limit: 6 },
     },
     {
+      key: 'preview',
+      type: 'PERSONALISATION_DEMO' as const,
+      title: 'See your nameplate before you order',
+      subtitle: 'Type a name and watch the plate change.',
+      sortOrder: 7,
+      status: PUBLISHED,
+      config: {},
+    },
+    {
       key: 'faq',
       type: 'FAQ' as const,
       title: 'Frequently asked questions',
-      sortOrder: 7,
+      sortOrder: 8,
       status: PUBLISHED,
       config: { limit: 6, group: 'General' },
     },
@@ -883,29 +901,29 @@ async function seedHomepage() {
   });
 
   /*
-   * Keyed by type and order rather than by a key column, because PageSection
-   * has none — two pages may each hold a hero. Re-seeding therefore updates the
-   * block already in that slot instead of stacking up duplicates.
+   * The homepage is laid out once, then it belongs to whoever is running the
+   * site.
+   *
+   * An earlier version matched blocks by sortOrder so it could "update" them,
+   * which broke as soon as the running order changed: positions shifted, the
+   * wrong rows were rewritten and a block disappeared. There is no stable key
+   * to match on — PageSection deliberately has none, since two pages may each
+   * hold a hero — so it does not try. If the page already has blocks, they are
+   * left exactly as they are; re-seeding never rearranges a homepage somebody
+   * has since edited.
    */
-  const existing = await prisma.pageSection.findMany({
-    where: { pageId: home.id },
-    orderBy: { sortOrder: 'asc' },
-  });
+  const already = await prisma.pageSection.count({ where: { pageId: home.id } });
 
-  for (const section of sections) {
-    const { key: _key, ...data } = section;
-    const match = existing.find((row) => row.sortOrder === section.sortOrder);
-
-    if (match) {
-      await prisma.pageSection.update({
-        where: { id: match.id },
-        data: { type: data.type, sortOrder: data.sortOrder },
-      });
-    } else {
-      await prisma.pageSection.create({
-        data: { ...data, pageId: home.id, config: data.config as never },
-      });
-    }
+  if (already > 0) {
+    log('homepage', `${already} blocks already — left untouched`);
+  } else {
+    await prisma.pageSection.createMany({
+      data: sections.map(({ key: _key, ...data }) => ({
+        ...data,
+        pageId: home.id,
+        config: data.config as never,
+      })),
+    });
   }
 
   // Hero banner uses the supplied product photography.

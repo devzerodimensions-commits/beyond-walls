@@ -24,12 +24,73 @@ export interface PreviewSlots {
   logo?: string;
 }
 
-const FONT_STACKS: Record<string, string> = {
-  grotesque: '"Archivo", "Inter", system-ui, sans-serif',
-  serif: 'Georgia, "Times New Roman", serif',
-  condensed: '"Archivo Narrow", "Archivo", system-ui, sans-serif',
-  mono: '"JetBrains Mono", ui-monospace, monospace',
-};
+/**
+ * The lettering a customer can choose for their plate.
+ *
+ * This is the one list: the admin's font picker is built from it, and the
+ * preview renders from it. Adding a face here is all it takes for it to appear
+ * as an option and to draw correctly — previously the admin could type any
+ * font name and the preview would quietly ignore it.
+ *
+ * Every face is loaded in styles/index.css. A font that is offered but not
+ * loaded falls back to the first entry rather than to whatever the browser
+ * happens to have.
+ */
+export interface PlateFont {
+  id: string;
+  label: string;
+  stack: string;
+  /** A word or two about where it suits, shown to the admin. */
+  note: string;
+}
+
+export const PLATE_FONTS: PlateFont[] = [
+  {
+    id: 'grotesque',
+    label: 'Grotesque',
+    stack: '"Space Grotesk", "Archivo", "Inter", system-ui, sans-serif',
+    note: 'Clean and modern. The default.',
+  },
+  {
+    id: 'display',
+    label: 'Display',
+    stack: '"Clash Display", "Archivo", system-ui, sans-serif',
+    note: 'The Beyond Walls face — confident, architectural.',
+  },
+  {
+    id: 'serif',
+    label: 'Serif',
+    stack: '"Playfair Display", Georgia, "Times New Roman", serif',
+    note: 'Traditional and formal. Suits bungalows and chambers.',
+  },
+  {
+    id: 'condensed',
+    label: 'Condensed',
+    stack: '"Archivo Narrow", "Archivo", system-ui, sans-serif',
+    note: 'Narrow — fits a long name on a small plate.',
+  },
+  {
+    id: 'mono',
+    label: 'Technical',
+    stack: '"JetBrains Mono", ui-monospace, monospace',
+    note: 'Even spacing. Reads as industrial or wayfinding.',
+  },
+  {
+    id: 'script',
+    label: 'Script',
+    stack: '"Great Vibes", "Segoe Script", cursive',
+    note: 'Flowing and decorative, like the Rasik Vatika sign.',
+  },
+];
+
+const FONT_STACKS: Record<string, string> = Object.fromEntries(
+  PLATE_FONTS.map((font) => [font.id, font.stack]),
+);
+
+/** The stack for a chosen font, falling back to the default rather than nothing. */
+export function fontStack(id: string | undefined | null): string {
+  return FONT_STACKS[id ?? ''] ?? PLATE_FONTS[0].stack;
+}
 
 const COLOR_MAP: Record<string, string> = {
   black: '#111111',
@@ -203,7 +264,7 @@ export function LivePreview({ template, slots, className, placeholders, config }
 
   const plate = resolveColor(merged.plateColor, '#111111');
   const text = resolveColor(merged.textColor, '#FFFFFF');
-  const font = FONT_STACKS[merged.fontFamily ?? 'grotesque'] ?? FONT_STACKS.grotesque;
+  const font = fontStack(merged.fontFamily);
 
   // A light plate needs a visible edge against the light backdrop.
   const isLightPlate = resolved.plate.borderOnLight && isLight(plate);

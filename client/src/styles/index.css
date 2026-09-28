@@ -1,7 +1,9 @@
 /* Brand faces, from BW_Brand Book.pdf: Clash Display for display, Space
    Grotesk for text. Archivo and Inter remain as metric-ish fallbacks. */
 @import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Archivo:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+/* Site faces, plus the lettering a customer can choose for their plate —
+   see PLATE_FONTS in components/product/LivePreview.tsx. */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Great+Vibes&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -262,6 +264,13 @@
 }
 
 .admin-ui .field {
+  /*
+   * Stated rather than inherited from the storefront's `w-full`. A native
+   * date input has a wide intrinsic size and was keeping it, pushing the
+   * orders filter row off the side of the page.
+   */
+  width: 100%;
+  min-width: 0;
   border-radius: var(--a-radius-sm);
   border-color: var(--a-line);
   background: var(--a-surface);

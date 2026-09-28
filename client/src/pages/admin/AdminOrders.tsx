@@ -111,9 +111,23 @@ export default function AdminOrders() {
               { value: 'COD', label: 'Cash on delivery' },
             ]}
           />
-          <div className="grid grid-cols-2 gap-2">
-            <Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} aria-label="From date" />
-            <Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} aria-label="To date" />
+          {/*
+            A native date input carries an intrinsic minimum width — wide
+            enough for "mm/dd/yyyy" and the picker button — and a grid item
+            will not shrink past that unless told to. Without min-w-0 the two
+            of them push the filter row off the side of the page.
+          */}
+          <div className="grid min-w-0 grid-cols-2 gap-2">
+            <Input
+              type="date" value={from} aria-label="From date"
+              wrapClassName="min-w-0" className="min-w-0"
+              onChange={(e) => { setFrom(e.target.value); setPage(1); }}
+            />
+            <Input
+              type="date" value={to} aria-label="To date"
+              wrapClassName="min-w-0" className="min-w-0"
+              onChange={(e) => { setTo(e.target.value); setPage(1); }}
+            />
           </div>
         </div>
 

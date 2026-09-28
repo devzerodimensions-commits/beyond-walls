@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { fillPersonalisation } from './helpers';
 
 /**
  * The full purchase path, end to end in a real browser:
@@ -78,12 +79,8 @@ test('a customer can register, personalise, apply a coupon and pay cash on deliv
 
   // Required personalisation must be filled, or the page refuses the add and
   // scrolls back to the field — which is the behaviour a customer gets too.
-  const name = page.getByLabel('Name', { exact: true });
-  await expect(name).toBeVisible();
-  await name.fill('E2E Household');
-
-  const houseNumber = page.getByLabel('House / flat number');
-  if (await houseNumber.count()) await houseNumber.fill('A 01');
+  // It is inline on a laptop and behind a sheet on a phone.
+  await fillPersonalisation(page, 'E2E Household');
 
   // Options are buttons in a radiogroup, not native radios.
   const options = page.getByRole('radio').and(page.locator(':not([disabled])'));

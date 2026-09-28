@@ -57,7 +57,7 @@ export function ProductGallery({
 
   if (!count) {
     return (
-      <div className="flex aspect-square items-center justify-center bg-paper-warm text-2xs uppercase tracking-architect text-ink-300">
+      <div className="flex aspect-[4/3] items-center justify-center bg-paper-warm text-2xs uppercase tracking-architect text-ink-300 sm:aspect-square">
         No image
       </div>
     );
@@ -68,9 +68,13 @@ export function ProductGallery({
   return (
     <>
       <div className="flex flex-col-reverse gap-3 lg:flex-row lg:gap-4">
-        {/* Thumbnail rail — below on mobile, beside on desktop */}
+        {/*
+          Thumbnail rail — beside the image on a laptop, hidden on a phone.
+          The phone already has swipe and the dot indicators, so a second way
+          to change image costs a third of the screen for nothing.
+        */}
         {count > 1 ? (
-          <div className="no-scrollbar flex gap-2.5 overflow-x-auto lg:w-[76px] lg:shrink-0 lg:flex-col lg:overflow-visible">
+          <div className="no-scrollbar hidden gap-2.5 overflow-x-auto sm:flex lg:w-[76px] lg:shrink-0 lg:flex-col lg:overflow-visible">
             {images.map((image, index) => (
               <button
                 key={image.url}
@@ -103,7 +107,7 @@ export function ProductGallery({
             onMouseLeave={() => setZooming(false)}
             onMouseMove={onMove}
             onClick={() => setLightbox(true)}
-            className="group relative aspect-square cursor-zoom-in overflow-hidden bg-paper-warm"
+            className="group relative aspect-[4/3] cursor-zoom-in overflow-hidden bg-paper-warm sm:aspect-square"
           >
             <img
               src={assetUrl(current.url)}

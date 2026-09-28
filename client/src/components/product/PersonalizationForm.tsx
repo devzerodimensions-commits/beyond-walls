@@ -4,6 +4,7 @@ import type { PersonalizationField } from '../../lib/types';
 import { api, assetUrl } from '../../lib/api';
 import { formatPrice, toNumber } from '../../lib/format';
 import { FieldWrap, Input, Select, Spinner, Textarea, UploadIcon, CloseIcon } from '../ui';
+import { fontStack } from './LivePreview';
 
 interface Props {
   fields: PersonalizationField[];
@@ -165,14 +166,9 @@ function PersonalizationInput({
                   'border px-4 py-2 text-sm transition-colors',
                   value === opt.value ? 'border-ink bg-ink text-paper' : 'border-stone-line hover:border-ink',
                 )}
-                style={{
-                  fontFamily:
-                    opt.value === 'serif'
-                      ? 'Georgia, serif'
-                      : opt.value === 'condensed'
-                        ? '"Archivo Narrow", Archivo, sans-serif'
-                        : 'Archivo, Inter, sans-serif',
-                }}
+                // Each choice is set in the face it produces, so the customer
+                // is choosing by eye rather than by name.
+                style={{ fontFamily: fontStack(opt.value) }}
               >
                 {opt.label}
                 {priceSuffix(opt.priceDelta)}

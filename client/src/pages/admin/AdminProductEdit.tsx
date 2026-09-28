@@ -13,8 +13,8 @@ import {
   AdminCard, AdminPageHeader, MultiImageUpload, SortableList, StringListEditor,
 } from '../../components/admin/AdminKit';
 import {
-  LivePreview, PREVIEW_SLOTS, PREVIEW_TEMPLATES, buildPreviewSlots, resolvePreviewConfig,
-  type PreviewConfig,
+  LivePreview, PLATE_FONTS, PREVIEW_SLOTS, PREVIEW_TEMPLATES, buildPreviewSlots,
+  resolvePreviewConfig, type PreviewConfig,
 } from '../../components/product/LivePreview';
 import {
   Badge, Button, Checkbox, CloseIcon, ConfirmDialog, Input, Modal, PageLoader,
@@ -1651,6 +1651,12 @@ function FieldForm({
       {needsOptions ? (
         <div className="border border-stone-line p-4">
           <p className="field-label">Options</p>
+          {form.type === 'FONT' ? (
+            <p className="mb-3 text-xs leading-relaxed a-muted">
+              Each face is shown to the customer in its own lettering, and drawn
+              that way on the live preview.
+            </p>
+          ) : null}
           {form.options.map((option, index) => (
             // eslint-disable-next-line react/no-array-index-key
             <div key={index} className="mb-2 grid grid-cols-12 gap-2">
@@ -1662,14 +1668,45 @@ function FieldForm({
                   setForm({ ...form, options: next });
                 }}
               />
-              <input
-                value={option.value} placeholder="value" className="field col-span-3 font-mono text-xs"
-                onChange={(e) => {
-                  const next = [...form.options];
-                  next[index] = { ...next[index], value: e.target.value };
-                  setForm({ ...form, options: next });
-                }}
-              />
+              {/*
+                For a font, the value has to be one the preview can actually
+                draw — a typed name would be silently ignored — so it is chosen
+                from the faces the site loads. Everything else stays free text.
+              */}
+              {form.type === 'FONT' ? (
+                <select
+                  value={option.value}
+                  className="field col-span-3 text-xs"
+                  onChange={(e) => {
+                    const next = [...form.options];
+                    const face = PLATE_FONTS.find((f) => f.id === e.target.value);
+                    next[index] = {
+                      ...next[index],
+                      value: e.target.value,
+                      // Fill the label in on first pick, but never overwrite
+                      // wording the admin has already chosen.
+                      label: next[index].label || (face?.label ?? ''),
+                    };
+                    setForm({ ...form, options: next });
+                  }}
+                >
+                  <option value="">Choose a face…</option>
+                  {PLATE_FONTS.map((face) => (
+                    <option key={face.id} value={face.id}>
+                      {face.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={option.value} placeholder="value" className="field col-span-3 font-mono text-xs"
+                  onChange={(e) => {
+                    const next = [...form.options];
+                    next[index] = { ...next[index], value: e.target.value };
+                    setForm({ ...form, options: next });
+                  }}
+                />
+              )}
               {form.type === 'COLOR' ? (
                 <input
                   type="color" value={option.hex ?? '#111111'} className="col-span-2 h-10 cursor-pointer border border-stone-line bg-paper p-1"

@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { fillPersonalisation, isMobile } from './helpers';
 
 /**
  * The storefront journey a customer actually takes, on desktop and on a phone.
@@ -7,7 +8,8 @@ import { expect, test, type Page } from '@playwright/test';
  * rather than on specific product names wherever it can.
  */
 
-const isMobile = (page: Page) => page.viewportSize()!.width < 768;
+
+
 
 test.describe('Storefront', () => {
   test('homepage renders its sections and the hero is readable', async ({ page }) => {
@@ -90,25 +92,22 @@ test.describe('Storefront', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.locator('main')).toContainText('₹');
 
-    // The live preview reflects what is typed, rather than a fixed mock.
-    const preview = page.locator('svg[aria-label*="preview" i]').first();
-    if (await preview.count()) {
-      const nameField = page.getByRole('textbox', { name: /name/i }).first();
-      if (await nameField.count()) {
-        await nameField.fill('Playwright Test');
-        await expect(preview).toContainText(/PLAYWRIGHT TEST/i);
-      }
-    }
-
     // A product with more than one option must make you choose before buying.
     const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
     if (await options.count()) await options.first().click();
 
+    /*
+     * Personalisation is inline on a laptop and behind a sheet on a phone, so
+     * the required fields are filled wherever they happen to be. The live
+     * preview must follow what is typed either way — that is the point of it.
+     */
+    await fillPersonalisation(page, 'Playwright Test');
+
     await page.getByRole('button', { name: /^add to cart$/i }).first().click();
 
-    const drawer = page.getByRole('dialog');
-    await expect(drawer).toBeVisible();
-    await expect(drawer).toContainText('₹');
+    const cart = page.getByRole('dialog').filter({ hasText: /your cart/i });
+    await expect(cart).toBeVisible();
+    await expect(cart).toContainText('₹');
   });
 
   test('cart totals are arithmetically consistent', async ({ page }) => {

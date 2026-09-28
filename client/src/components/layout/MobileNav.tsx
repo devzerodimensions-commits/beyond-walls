@@ -73,39 +73,46 @@ export function MobileNav({
             open={section === 'collections'}
             onToggle={() => toggle('collections')}
           >
-            <ul>
+            {/*
+              Every collection and its ranges, all visible at once — the same
+              shape as the desktop menu rather than a list that has to be
+              drilled into. Two columns is as many as 375px will carry without
+              the range names wrapping to three words a line.
+            */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
               {categories.map((category) => (
-                <li key={category.id}>
+                <div key={category.id} className="min-w-0">
                   <Link
                     to={`/shop/${category.slug}`}
                     onClick={onClose}
-                    className="flex items-center justify-between py-2.5 text-sm text-ink-600"
+                    className="block text-sm font-medium leading-snug text-ink"
                   >
                     {category.name}
-                    {category._count?.products ? (
-                      <span className="text-2xs text-ink-300">{category._count.products}</span>
-                    ) : null}
                   </Link>
 
-                  {/* Subcategories sit inline, indented — no second accordion level. */}
                   {category.children?.length ? (
-                    <ul className="mb-1 border-l border-stone-line pl-3">
+                    <ul className="mt-2 space-y-1.5">
                       {category.children.map((child) => (
                         <li key={child.id}>
                           <Link
                             to={`/shop/${child.slug}`}
                             onClick={onClose}
-                            className="block py-2 text-xs text-ink-400"
+                            className="block text-xs leading-snug text-ink-500"
                           >
                             {child.name}
                           </Link>
                         </li>
                       ))}
                     </ul>
+                  ) : category._count?.products ? (
+                    <p className="mt-1.5 text-2xs text-ink-300">
+                      {category._count.products}{' '}
+                      {category._count.products === 1 ? 'design' : 'designs'}
+                    </p>
                   ) : null}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </Accordion>
 
           {/* Shop by attribute */}
