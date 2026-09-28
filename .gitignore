@@ -22,6 +22,9 @@ server/uploads/**
 !server/uploads/products/
 !server/uploads/products/**
 !server/uploads/.gitkeep
+# The processed client photography the site actually serves.
+!server/uploads/photos/
+!server/uploads/photos/**
 
 # Test and release artefacts
 test-results/
@@ -32,3 +35,11 @@ release/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Client photography: the originals are phone-sized HEIC/JPEG and a 220MB Drive
+# export. Only the web-sized versions under server/uploads/photos are tracked —
+# run scripts/process-photos.mjs to regenerate them.
+assets/client-photos/
+assets/contact-sheet.jpg
+assets/drive-download-*.zip
+assets/*.zip

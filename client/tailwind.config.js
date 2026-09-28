@@ -19,17 +19,28 @@ export default {
         },
         paper: {
           DEFAULT: '#FFFFFF',
-          off: '#FAF9F7',
-          warm: '#F4F2EE',
-          sand: '#EDEAE4',
+          // #F5F3EE is the brand's off-white — the most used colour in the
+          // brand book after the ink.
+          off: '#FAF9F6',
+          warm: '#F5F3EE',
+          sand: '#EDE9E0',
         },
         stone: {
           line: '#E4E1DB',
           mute: '#CFCBC3',
         },
+        // Brand accents. Blue is the signature colour; red belongs to safety
+        // and prohibition signage, which is a real part of the catalogue.
+        brand: {
+          blue: '#3157FF',
+          'blue-dark': '#2545D8',
+          'blue-soft': '#EEF1FF',
+          red: '#D32118',
+          'red-soft': '#FDEDEC',
+        },
         accent: {
-          DEFAULT: '#111111',
-          soft: '#F4F2EE',
+          DEFAULT: '#3157FF',
+          soft: '#EEF1FF',
         },
         state: {
           success: '#1F6B4A',
@@ -39,8 +50,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['"Inter"', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
-        display: ['"Archivo"', '"Inter"', 'system-ui', 'sans-serif'],
+        // From the brand book.
+        sans: ['"Space Grotesk"', '"Inter"', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['"Clash Display"', '"Archivo"', '"Inter"', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       letterSpacing: {

@@ -1,0 +1,58 @@
+[
+  {
+    "name": "bw-photo-01",
+    "source": "250F04E0-4463-4C8E-8A2D-3A0FE5759E3D.jpg",
+    "width": 3072,
+    "height": 3840,
+    "orientation": "portrait",
+    "url": "/uploads/photos/bw-photo-01.webp"
+  },
+  {
+    "name": "bw-photo-02",
+    "source": "37D98220-E3E1-42AE-A717-6FB431DA70D7.jpg",
+    "width": 3024,
+    "height": 3780,
+    "orientation": "portrait",
+    "url": "/uploads/photos/bw-photo-02.webp"
+  },
+  {
+    "name": "bw-photo-03",
+    "source": "3861E234-8544-4B9E-B1AB-88769F628E88.jpg",
+    "width": 3024,
+    "height": 3780,
+    "orientation": "portrait",
+    "url": "/uploads/photos/bw-photo-03.webp"
+  },
+  {
+    "name": "bw-photo-04",
+    "source": "666EFF0D-025F-447D-BD8D-3FA0E197D000.jpg",
+    "width": 3024,
+    "height": 3780,
+    "orientation": "portrait",
+    "url": "/uploads/photos/bw-photo-04.webp"
+  },
+  {
+    "name": "bw-photo-05",
+    "source": "6EF65F05-F8B5-4793-B277-C0DC8D60A6ED.jpg",
+    "width": 3024,
+    "height": 3780,
+    "orientation": "portrait",
+    "url": "/uploads/photos/bw-photo-05.webp"
+  },
+  {
+    "name": "bw-photo-06",
+    "source": "95C24F39-C1E7-43C5-8BBA-8B64D5F67E08.jpg",
+    "width": 3072,
+    "height": 3840,
+    "orientation": "portrait",
+    "url": "/uploads/photos/bw-photo-06.webp"
+  },
+  {
+    "name": "bw-photo-07",
+    "source": "CBD32CE7-4832-43EA-ACDE-BF2A9AF59424.jpg",
+    "width": 3024,
+    "height": 3780,
+    "orientation": "portrait",
+    "url": "/uploads/photos/bw-photo-07.webp"
+  }
+]

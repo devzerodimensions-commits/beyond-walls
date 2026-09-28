@@ -677,16 +677,7 @@ async function seedProducts(
             sortOrder: 5,
             status: PUBLISHED,
           },
-          {
-            key: 'logoUpload',
-            label: 'Logo (optional)',
-            type: 'IMAGE_UPLOAD',
-            required: false,
-            helpText: 'PNG or SVG with a transparent background works best.',
-            previewSlot: 'logo',
-            sortOrder: 6,
-            status: PUBLISHED,
-          },
+
           {
             key: 'instructions',
             label: 'Instructions for us',
@@ -874,12 +865,47 @@ async function seedHomepage() {
     },
   ];
 
+  /*
+   * The homepage is a page like any other now, so its blocks are PageSection
+   * rows hanging off a page with the slug "home". It is a system page: the
+   * storefront routes to it by name, so it cannot be renamed or deleted.
+   */
+  const home = await prisma.page.upsert({
+    where: { slug: 'home' },
+    create: {
+      slug: 'home',
+      title: 'Home',
+      status: PUBLISHED,
+      isSystem: true,
+      sortOrder: -1,
+    },
+    update: { isSystem: true },
+  });
+
+  /*
+   * Keyed by type and order rather than by a key column, because PageSection
+   * has none — two pages may each hold a hero. Re-seeding therefore updates the
+   * block already in that slot instead of stacking up duplicates.
+   */
+  const existing = await prisma.pageSection.findMany({
+    where: { pageId: home.id },
+    orderBy: { sortOrder: 'asc' },
+  });
+
   for (const section of sections) {
-    await prisma.homeSection.upsert({
-      where: { key: section.key },
-      create: { ...section, config: section.config as never },
-      update: { sortOrder: section.sortOrder, type: section.type },
-    });
+    const { key: _key, ...data } = section;
+    const match = existing.find((row) => row.sortOrder === section.sortOrder);
+
+    if (match) {
+      await prisma.pageSection.update({
+        where: { id: match.id },
+        data: { type: data.type, sortOrder: data.sortOrder },
+      });
+    } else {
+      await prisma.pageSection.create({
+        data: { ...data, pageId: home.id, config: data.config as never },
+      });
+    }
   }
 
   // Hero banner uses the supplied product photography.

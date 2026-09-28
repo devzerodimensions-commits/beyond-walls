@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useState, type FormEvent } from 'react';
 import { ApiError, request } from '../lib/api';
 import { Seo } from '../lib/seo';
@@ -25,6 +26,7 @@ export default function CustomOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState(false);
+  const [size, setSize] = useState<CustomSize>({ width: '', height: '', unit: 'ft' });
 
   const intro = get<string>('store.customOrderIntro', '');
 
@@ -35,7 +37,6 @@ export default function CustomOrderPage() {
 
     // Fold the structured answers into the message, so nothing is lost.
     const requirement = String(form.get('requirement') ?? '');
-    const size = String(form.get('size') ?? '');
     const material = String(form.get('material') ?? '');
     const details = String(form.get('details') ?? '');
 
@@ -44,7 +45,7 @@ export default function CustomOrderPage() {
       'message',
       [
         requirement ? `Requirement: ${requirement}` : '',
-        size ? `Size: ${size}` : '',
+        `Size: ${describeSize(size)}`,
         material ? `Material: ${material}` : '',
         '',
         details,
@@ -53,11 +54,17 @@ export default function CustomOrderPage() {
         .join('\n'),
     );
     form.delete('requirement');
-    form.delete('size');
     form.delete('material');
     form.delete('details');
 
     for (const file of files) form.append('attachments', file);
+
+    const sizeError = validateSize(size);
+    if (sizeError) {
+      setErrors({ size: sizeError });
+      document.getElementById('custom-size')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
 
     setSubmitting(true);
     setErrors({});
@@ -147,7 +154,12 @@ export default function CustomOrderPage() {
                   ))}
                 </Select>
                 <Input name="quantity" label="Quantity" type="number" min={1} defaultValue={1} error={errors.quantity} />
-                <Input name="size" label="Size (if known)" placeholder="e.g. 12 × 6 inches" />
+                <SizeFields
+                  value={size}
+                  onChange={setSize}
+                  error={errors.size}
+                  className="sm:col-span-2"
+                />
                 <Input name="material" label="Material (if known)" placeholder="e.g. acrylic, stainless steel" />
                 <Input
                   name="budget" label="Budget (optional)" placeholder="Helps us suggest the right option"
@@ -216,5 +228,134 @@ export default function CustomOrderPage() {
         )}
       </div>
     </>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// Size
+// ---------------------------------------------------------------------------
+
+export interface CustomSize {
+  width: string;
+  height: string;
+  unit: 'ft' | 'in' | 'cm';
+}
+
+/**
+ * Beyond Walls does not take custom work below two feet by two feet.
+ *
+ * Anything smaller is already in the catalogue and is quicker and cheaper to
+ * buy there, so the form says so and points the way rather than collecting an
+ * enquiry that will only be turned down.
+ */
+const MIN_FEET = 2;
+
+const TO_FEET: Record<CustomSize['unit'], number> = {
+  ft: 1,
+  in: 1 / 12,
+  cm: 1 / 30.48,
+};
+
+export function toFeet(value: string, unit: CustomSize['unit']): number | null {
+  const n = Number(String(value).trim());
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n * TO_FEET[unit];
+}
+
+/** Returns the reason a size cannot be accepted, or null when it is fine. */
+export function validateSize(size: CustomSize): string | null {
+  const w = toFeet(size.width, size.unit);
+  const h = toFeet(size.height, size.unit);
+
+  if (w === null || h === null) {
+    return 'Enter the width and height you need.';
+  }
+  // Rounded, so 23.9 inches does not fail on a floating-point hair.
+  const round = (n: number) => Math.round(n * 100) / 100;
+  if (round(w) < MIN_FEET || round(h) < MIN_FEET) {
+    return `Custom orders start at ${MIN_FEET} ft × ${MIN_FEET} ft. For anything smaller, the ready-made range is quicker and costs less.`;
+  }
+  return null;
+}
+
+export function describeSize(size: CustomSize): string {
+  return `${size.width} × ${size.height} ${size.unit === 'ft' ? 'feet' : size.unit === 'in' ? 'inches' : 'cm'}`;
+}
+
+function SizeFields({
+  value, onChange, error, className,
+}: {
+  value: CustomSize;
+  onChange: (next: CustomSize) => void;
+  error?: string;
+  className?: string;
+}) {
+  const w = toFeet(value.width, value.unit);
+  const h = toFeet(value.height, value.unit);
+  const belowMinimum =
+    w !== null && h !== null && (Math.round(w * 100) / 100 < MIN_FEET || Math.round(h * 100) / 100 < MIN_FEET);
+
+  return (
+    <div id="custom-size" className={className}>
+      <span className="field-label" data-required>
+        Size
+      </span>
+
+      <div className="flex items-start gap-2">
+        <Input
+          name="width"
+          type="number"
+          min={0}
+          step="0.1"
+          inputMode="decimal"
+          placeholder="Width"
+          aria-label="Width"
+          value={value.width}
+          onChange={(e) => onChange({ ...value, width: e.target.value })}
+          wrapClassName="flex-1"
+          className={belowMinimum ? 'field-error' : undefined}
+        />
+        <span className="pt-2.5 text-sm text-ink-400">×</span>
+        <Input
+          name="height"
+          type="number"
+          min={0}
+          step="0.1"
+          inputMode="decimal"
+          placeholder="Height"
+          aria-label="Height"
+          value={value.height}
+          onChange={(e) => onChange({ ...value, height: e.target.value })}
+          wrapClassName="flex-1"
+          className={belowMinimum ? 'field-error' : undefined}
+        />
+        <Select
+          aria-label="Unit"
+          value={value.unit}
+          onChange={(e) => onChange({ ...value, unit: e.target.value as CustomSize['unit'] })}
+          wrapClassName="w-28"
+          options={[
+            { value: 'ft', label: 'feet' },
+            { value: 'in', label: 'inches' },
+            { value: 'cm', label: 'cm' },
+          ]}
+        />
+      </div>
+
+      {error || belowMinimum ? (
+        <p className="mt-2 border border-state-warning/40 bg-[#F8F3E6] px-3 py-2.5 text-xs leading-relaxed text-ink-700" role="alert">
+          {error ?? `Custom orders start at ${MIN_FEET} ft × ${MIN_FEET} ft.`}{' '}
+          <Link to="/shop" className="link-underline font-medium text-ink">
+            Browse the ready-made range
+          </Link>
+          .
+        </p>
+      ) : (
+        <p className="mt-1.5 text-xs text-ink-400">
+          Minimum {MIN_FEET} ft × {MIN_FEET} ft. Smaller pieces are in the ready-made range.
+        </p>
+      )}
+    </div>
   );
 }
