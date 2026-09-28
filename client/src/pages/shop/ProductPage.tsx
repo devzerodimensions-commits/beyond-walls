@@ -70,8 +70,24 @@ export default function ProductPage() {
      * buys a size they never chose.
      */
     const published = sellableVariants(product.variants);
+
+    /*
+     * Never pre-select something that cannot be bought. Landing on a sold-out
+     * size shows "Out of stock" on a product that is actually available in
+     * another size, which reads as "this product is gone".
+     */
+    const inStock = (v: (typeof published)[number]) =>
+      !product.trackInventory || (v.stock ?? 0) > 0;
+
+    /*
+     * Still only pre-select when the choice is unambiguous — one option, or the
+     * one an admin marked as default — so nobody buys a size they never chose.
+     * The only change is that sold-out options are not candidates.
+     */
+    const buyable = published.filter(inStock);
     const preselected =
-      published.length === 1 ? published[0] : published.find((v) => v.isDefault);
+      buyable.length === 1 ? buyable[0] : buyable.find((v) => v.isDefault);
+
     setVariantId(preselected?.id ?? null);
   }, [product]);
 

@@ -73,7 +73,7 @@ test('product images have editable alt text', async ({ page }) => {
   await page.getByRole('link', { name: /minimal acrylic name plate/i }).first().click();
   await expect(page).toHaveURL(/\/admin\/products\//);
 
-  await page.getByRole('button', { name: /^images$|^media$/i }).first().click();
+  await page.getByRole('tab', { name: /images|media/i }).first().click();
 
   const altField = page.getByLabel('Alt text').first();
   await expect(altField).toBeVisible();
@@ -85,7 +85,7 @@ test('product images have editable alt text', async ({ page }) => {
   await expect(page.getByText(/alt text saved/i)).toBeVisible({ timeout: 10_000 });
 
   await page.reload();
-  await page.getByRole('button', { name: /^images$|^media$/i }).first().click();
+  await page.getByRole('tab', { name: /images|media/i }).first().click();
   await expect(page.getByLabel('Alt text').first()).toHaveValue(unique);
 });
 
@@ -114,4 +114,83 @@ test('a non-admin cannot reach the admin panel', async ({ page, context }) => {
   await page.evaluate(() => window.localStorage.clear()).catch(() => {});
   await page.goto('/admin/products');
   await expect(page).toHaveURL(/\/admin\/login/);
+});
+
+// ---------------------------------------------------------------------------
+// The redesigned shell
+// ---------------------------------------------------------------------------
+
+const ADMIN_SCREENS = [
+  '/admin', '/admin/products', '/admin/orders', '/admin/categories',
+  '/admin/customers', '/admin/enquiries', '/admin/design-pages', '/admin/settings',
+  '/admin/media', '/admin/attributes', '/admin/banners', '/admin/gallery',
+  '/admin/faqs', '/admin/navigation', '/admin/coupons', '/admin/reviews',
+  '/admin/testimonials',
+];
+
+test('no admin screen scrolls sideways at this viewport', async ({ page }) => {
+  const offenders: string[] = [];
+
+  for (const path of ADMIN_SCREENS) {
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    if (overflow > 1) offenders.push(`${path} (+${overflow}px)`);
+  }
+
+  expect(offenders, offenders.join(', ')).toHaveLength(0);
+});
+
+test('the navigation is a rail on desktop and a drawer on a phone', async ({ page }, testInfo) => {
+  await page.goto('/admin');
+
+  const nav = page.getByRole('navigation', { name: 'Admin' });
+  const openMenu = page.getByRole('button', { name: 'Open menu' });
+
+  if (testInfo.project.name === 'mobile') {
+    // The rail would eat half a phone screen, so it hides behind a button.
+    await expect(openMenu).toBeVisible();
+    await expect(nav).toBeHidden();
+
+    await openMenu.click();
+    await expect(nav).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Products' })).toBeVisible();
+
+    // Choosing something closes it again, rather than leaving it covering the page.
+    await nav.getByRole('link', { name: 'Products' }).click();
+    await expect(page).toHaveURL(/\/admin\/products/);
+    await expect(nav).toBeHidden();
+  } else {
+    await expect(nav).toBeVisible();
+    await expect(openMenu).toBeHidden();
+    // Always there, so there is no menu button to reach for.
+    await expect(nav.getByRole('link', { name: 'Design Pages' })).toBeVisible();
+  }
+});
+
+test('body text is big enough to read comfortably', async ({ page }) => {
+  await page.goto('/admin/products');
+  await page.waitForLoadState('networkidle');
+
+  /*
+   * The admin inherited the storefront's display type: 11px capitals at heavy
+   * tracking. That is a look, not a reading size, and this screen is read for
+   * an hour at a time. Nothing visible should sit below 12px.
+   */
+  const tooSmall = await page.evaluate(() => {
+    const found: string[] = [];
+    document.querySelectorAll('main *').forEach((el) => {
+      const node = el as HTMLElement;
+      if (!node.offsetParent || !node.textContent?.trim()) return;
+      // Only leaf elements — a wrapper reports its own inherited size.
+      if (node.children.length) return;
+      const size = parseFloat(getComputedStyle(node).fontSize);
+      if (size && size < 11.5) found.push(`${node.tagName} ${size}px "${node.textContent.trim().slice(0, 25)}"`);
+    });
+    return found.slice(0, 5);
+  });
+
+  expect(tooSmall, tooSmall.join(' | ')).toHaveLength(0);
 });

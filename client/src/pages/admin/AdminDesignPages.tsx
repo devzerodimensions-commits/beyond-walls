@@ -99,19 +99,19 @@ export default function AdminDesignPages() {
           <table className="w-full min-w-[46rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-stone-line text-left">
-                <th className="py-3 pl-5 pr-3 text-2xs uppercase tracking-architect text-ink-400 sm:pl-0">
+                <th className="py-3 pl-5 pr-3 text-sm font-medium a-muted sm:pl-0">
                   Page name
                 </th>
-                <th className="px-3 py-3 text-2xs uppercase tracking-architect text-ink-400">
+                <th className="px-3 py-3 text-sm font-medium a-muted">
                   Web address
                 </th>
-                <th className="px-3 py-3 text-2xs uppercase tracking-architect text-ink-400">
+                <th className="px-3 py-3 text-sm font-medium a-muted">
                   Blocks
                 </th>
-                <th className="px-3 py-3 text-2xs uppercase tracking-architect text-ink-400">
+                <th className="px-3 py-3 text-sm font-medium a-muted">
                   Status
                 </th>
-                <th className="py-3 pl-3 pr-5 text-right text-2xs uppercase tracking-architect text-ink-400 sm:pr-0">
+                <th className="py-3 pl-3 pr-5 text-right text-sm font-medium a-muted sm:pr-0">
                   What do you want to do?
                 </th>
               </tr>
@@ -121,7 +121,7 @@ export default function AdminDesignPages() {
                 <tr key={page.id} className="border-b border-stone-line last:border-0">
                   <td className="py-4 pl-5 pr-3 sm:pl-0">
                     <p className="font-medium text-ink">{page.title}</p>
-                    <p className="text-2xs text-ink-400">
+                    <p className="text-sm a-faint">
                       {page.isSystem ? 'Part of the site structure' : 'Website page'}
                       {page.showInFooter ? ' · in the footer' : ''}
                     </p>
@@ -158,16 +158,16 @@ export default function AdminDesignPages() {
                         to={page.path}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 border border-stone-line px-3 py-1.5 text-2xs uppercase tracking-architect text-ink-600 transition-colors hover:border-ink hover:text-ink"
+                        className="a-btn a-btn-secondary !py-1.5 !text-sm"
                       >
                         View
                       </Link>
                       <button
                         type="button"
                         onClick={() => navigate(`/admin/builder?page=${page.slug}`)}
-                        className="inline-flex items-center gap-1.5 bg-ink px-3 py-1.5 text-2xs uppercase tracking-architect text-paper transition-opacity hover:opacity-85"
+                        className="a-btn a-btn-primary !py-1.5 !text-sm"
                       >
-                        <EditIcon size={12} />
+                        <EditIcon size={14} />
                         Edit page
                       </button>
                       {page.isSystem ? null : (
@@ -175,7 +175,7 @@ export default function AdminDesignPages() {
                           type="button"
                           onClick={() => setDeleting(page)}
                           aria-label={`Delete ${page.title}`}
-                          className="p-1.5 text-ink-400 hover:text-state-danger"
+                          className="rounded-lg p-2 text-[color:var(--a-faint)] transition-colors hover:bg-[color:var(--a-sunken)] hover:text-state-danger"
                         >
                           <TrashIcon size={14} />
                         </button>

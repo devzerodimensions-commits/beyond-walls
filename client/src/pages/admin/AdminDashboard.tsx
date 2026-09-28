@@ -309,20 +309,25 @@ function LaunchChecklist({ checks }: { checks: DashboardData['launchChecks'] }) 
   if (!items.length) return null;
 
   return (
-    <section className="mb-6 border border-stone-line">
-      <header className="flex items-center gap-2 border-b border-stone-line bg-paper-off px-5 py-3">
-        <AlertIcon size={15} className="text-state-warning" />
-        <h2 className="text-2xs uppercase tracking-architect text-ink">Before you go live</h2>
-        <Badge>{items.length}</Badge>
+    <section className="a-card mb-6 overflow-hidden">
+      <header
+        className="flex items-center gap-2.5 border-b px-5 py-3.5"
+        style={{ background: 'var(--a-sunken)', borderColor: 'var(--a-line-soft)' }}
+      >
+        <AlertIcon size={16} className="text-state-warning" />
+        <h2 className="text-[0.9375rem] font-medium">Before you go live</h2>
+        <Badge tone="warning">{items.length}</Badge>
       </header>
-      <ul className="divide-y divide-stone-line">
-        {items.map((item) => (
+      <ul>
+        {items.map((item, index) => (
           <li
             key={item.key}
             className={clsx(
-              'px-5 py-4 text-xs text-ink-600',
-              item.tone === 'warn' && 'border-l-2 border-l-state-warning',
+              'px-5 py-4 text-sm leading-relaxed',
+              index > 0 && 'border-t',
+              item.tone === 'warn' && 'border-l-[3px] border-l-state-warning',
             )}
+            style={{ borderTopColor: 'var(--a-line-soft)', color: 'var(--a-muted)' }}
           >
             {item.body}
           </li>
@@ -342,18 +347,21 @@ function Stat({
 }) {
   const content = (
     <>
-      <p className="eyebrow">{label}</p>
-      <p className="mt-2 text-2xl font-medium tabular-nums">{value}</p>
-      {sub ? <p className="mt-1 text-2xs text-ink-400">{sub}</p> : null}
+      <p className="text-sm a-muted">{label}</p>
+      {/* Tabular figures so a column of numbers lines up. */}
+      <p className="mt-2 text-[1.75rem] font-medium leading-none tabular-nums">{value}</p>
+      {sub ? <p className="mt-2 text-sm a-faint">{sub}</p> : null}
     </>
   );
 
+  const base = 'a-card p-5 transition-shadow';
+
   return to ? (
-    <Link to={to} className="border border-stone-line bg-paper p-5 transition-colors hover:border-ink">
+    <Link to={to} className={`${base} block hover:shadow-[var(--a-shadow-lift)]`}>
       {content}
     </Link>
   ) : (
-    <div className="border border-stone-line bg-paper p-5">{content}</div>
+    <div className={base}>{content}</div>
   );
 }
 

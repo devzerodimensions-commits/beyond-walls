@@ -1,5 +1,6 @@
 import {
-  forwardRef, useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes,
+  forwardRef, useEffect, useId, useRef, type ButtonHTMLAttributes, type CSSProperties,
+  type InputHTMLAttributes,
   type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes,
 } from 'react';
 import { Link } from 'react-router-dom';
@@ -47,6 +48,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       disabled={disabled || loading}
+      // The admin restyles these; see `.admin-ui [data-btn]`.
+      data-btn={variant}
       className={clsx(
         'inline-flex items-center justify-center gap-2 font-medium uppercase',
         'transition-all duration-200 ease-architect disabled:cursor-not-allowed',
@@ -88,14 +91,14 @@ export function ButtonLink({
 
   if (external) {
     return (
-      <a href={to} className={classes} target="_blank" rel="noreferrer noopener">
+      <a href={to} data-btn={variant} className={classes} target="_blank" rel="noreferrer noopener">
         {icon}
         {children}
       </a>
     );
   }
   return (
-    <Link to={to} className={classes}>
+    <Link to={to} data-btn={variant} className={classes}>
       {icon}
       {children}
     </Link>
@@ -326,6 +329,8 @@ export function Badge({
 }) {
   return (
     <span
+      // The admin restyles these into rounded pills; see `.admin-ui [data-badge]`.
+      data-badge={tone}
       className={clsx(
         'inline-flex items-center gap-1 border px-2 py-0.5 text-2xs font-medium uppercase tracking-architect',
         TONES[tone],
@@ -623,15 +628,15 @@ export function ConfirmDialog({
 // Icons (inline so there is no icon-font dependency)
 // ---------------------------------------------------------------------------
 
-type IconProps = { size?: number; className?: string };
+type IconProps = { size?: number; className?: string; style?: CSSProperties };
 
 const icon = (path: ReactNode, viewBox = '0 0 24 24') =>
-  function Icon({ size = 18, className }: IconProps) {
+  function Icon({ size = 18, className, style }: IconProps) {
     return (
       <svg
         width={size} height={size} viewBox={viewBox} fill="none"
         stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-        className={className} aria-hidden="true"
+        className={className} style={style} aria-hidden="true"
       >
         {path}
       </svg>
@@ -703,3 +708,63 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
 
   return ref;
 }
+
+// ---------------------------------------------------------------------------
+// Admin navigation icons
+//
+// One per sidebar entry. A list of fifteen text links is hard to scan; a
+// recognisable shape beside each one is what makes it quick.
+// ---------------------------------------------------------------------------
+
+export const DashboardIcon = icon(
+  <><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" />
+    <rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></>,
+);
+export const BoxIcon = icon(
+  <><path d="M21 8 12 3 3 8v8l9 5 9-5Z" /><path d="m3 8 9 5 9-5" /><path d="M12 13v8" /></>,
+);
+export const TagIcon = icon(
+  <><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9Z" /><circle cx="8" cy="8" r="1.4" /></>,
+);
+export const LayersIcon = icon(
+  <><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></>,
+);
+export const TicketIcon = icon(
+  <><path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4Z" /><path d="M13 6v12" /></>,
+);
+export const ReceiptIcon = icon(
+  <><path d="M5 3h14v18l-3-2-3 2-3-2-3 2Z" /><path d="M9 8h6" /><path d="M9 12h6" /></>,
+);
+export const UsersIcon = icon(
+  <><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.2 2.7-5.4 6-5.4s6 2.2 6 5.4" />
+    <path d="M16 5.5a3.2 3.2 0 0 1 0 6" /><path d="M18 14.9c2 .7 3.4 2.5 3.4 5.1" /></>,
+);
+export const InboxIcon = icon(
+  <><path d="M3 13h5l1.5 3h5L16 13h5" /><path d="M5 5h14l2 8v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5Z" /></>,
+);
+export const PagesIcon = icon(
+  <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8" /><path d="M8 12h8" /><path d="M8 16h5" /></>,
+);
+export const ImageIcon = icon(
+  <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="1.6" /><path d="m4 18 5-4.5 4 3.5 3-2.5 4 3.5" /></>,
+);
+export const QuoteIcon = icon(
+  <><path d="M9 7H5.5A1.5 1.5 0 0 0 4 8.5V12h5V7Z" /><path d="M9 12c0 3-1.8 4.6-4 5" />
+    <path d="M20 7h-3.5A1.5 1.5 0 0 0 15 8.5V12h5V7Z" /><path d="M20 12c0 3-1.8 4.6-4 5" /></>,
+);
+export const HelpIcon = icon(
+  <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2-2.5 3.6" /><circle cx="12" cy="17" r="0.6" /></>,
+);
+export const CompassIcon = icon(
+  <><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5Z" /></>,
+);
+export const SettingsIcon = icon(
+  <><circle cx="12" cy="12" r="3" />
+    <path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6" /></>,
+);
+export const SparkIcon = icon(
+  <><path d="M12 3v4M12 17v4M3 12h4M17 12h4" /><path d="M12 8.5 13.6 12 12 15.5 10.4 12Z" /></>,
+);
+export const LogoutIcon = icon(
+  <><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4" /><path d="M10 8 6 12l4 4" /><path d="M6 12h9" /></>,
+);

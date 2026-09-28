@@ -101,7 +101,7 @@ test.describe('Storefront', () => {
     }
 
     // A product with more than one option must make you choose before buying.
-    const options = page.getByRole('radio');
+    const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
     if (await options.count()) await options.first().click();
 
     await page.getByRole('button', { name: /^add to cart$/i }).first().click();
@@ -113,7 +113,7 @@ test.describe('Storefront', () => {
 
   test('cart totals are arithmetically consistent', async ({ page }) => {
     await page.goto('/product/no-smoking-sign');
-    const options = page.getByRole('radio');
+    const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
     if (await options.count()) await options.first().click();
     await page.getByRole('button', { name: /^add to cart$/i }).first().click();
 

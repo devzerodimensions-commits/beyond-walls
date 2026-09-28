@@ -99,10 +99,10 @@ export default function AdminProducts() {
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             aria-label="Filter by status"
             options={[
-              { value: '', label: 'All statuses' },
+              { value: '', label: 'Live and draft' },
               { value: 'PUBLISHED', label: 'Published' },
               { value: 'DRAFT', label: 'Draft' },
-              { value: 'ARCHIVED', label: 'Archived' },
+              { value: 'ARCHIVED', label: 'Archived only' },
             ]}
           />
           <Select

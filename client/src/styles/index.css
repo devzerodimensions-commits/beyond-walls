@@ -156,3 +156,361 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ===========================================================================
+   Admin panel
+   ---------------------------------------------------------------------------
+   The storefront is deliberately sharp, sparse and quiet: square corners, tiny
+   letterspaced capitals, a lot of air. That is right for a shop window and
+   wrong for a tool somebody uses for an hour at a time — small capitals are
+   slow to scan, and hairline borders give the eye nothing to hold on to.
+
+   So the admin has its own voice: larger text, sentence-case labels, softened
+   corners and real surfaces. Everything is scoped under `.admin-ui`, so none
+   of it can reach the storefront.
+   =========================================================================== */
+
+.admin-ui {
+  --a-canvas: #F6F5F2;
+  --a-surface: #FFFFFF;
+  --a-sunken: #FAF9F7;
+  --a-line: #E7E4DE;
+  --a-line-soft: #F0EEE9;
+
+  --a-text: #16150F;
+  --a-muted: #5C5A52;
+  --a-faint: #8C8981;
+
+  /* Dark chrome, so the working area reads as the lit surface. */
+  --a-nav: #17160F;
+  --a-nav-soft: #221F16;
+  --a-nav-text: #EDEAE0;
+  --a-nav-muted: #9C978A;
+
+  /* Brass: the brand makes nameplates, and it is the one warm note
+     in an otherwise neutral palette. Used sparingly, for "you are here". */
+  --a-brass: #C8A961;
+  --a-brass-soft: #F6EFDE;
+
+  --a-radius: 12px;
+  --a-radius-sm: 8px;
+
+  --a-shadow: 0 1px 2px rgba(22, 21, 15, 0.04), 0 1px 3px rgba(22, 21, 15, 0.03);
+  --a-shadow-lift: 0 4px 12px -2px rgba(22, 21, 15, 0.08), 0 12px 32px -12px rgba(22, 21, 15, 0.14);
+
+  background: var(--a-canvas);
+  color: var(--a-text);
+  font-size: 0.9375rem;   /* 15px — up from the storefront's 14 */
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headings inherit the storefront's display face but drop its tight tracking. */
+.admin-ui h1,
+.admin-ui h2,
+.admin-ui h3 {
+  letter-spacing: -0.015em;
+  color: var(--a-text);
+}
+
+/* --- Surfaces ----------------------------------------------------------- */
+
+.admin-ui .a-card {
+  background: var(--a-surface);
+  border: 1px solid var(--a-line);
+  border-radius: var(--a-radius);
+  box-shadow: var(--a-shadow);
+}
+
+.admin-ui .a-card-head {
+  padding: 1.15rem 1.35rem;
+  border-bottom: 1px solid var(--a-line-soft);
+}
+
+.admin-ui .a-card-body {
+  padding: 1.35rem;
+}
+
+/* --- Form controls ------------------------------------------------------ */
+
+/*
+ * Overrides the storefront field styles inside the admin only. Labels become
+ * sentence case at a readable size: a form with twenty fields is unusable when
+ * every label is 11px capitals with 0.18em tracking.
+ */
+.admin-ui .field-label {
+  @apply mb-2 block normal-case;
+  font-size: 0.8125rem;      /* 13px */
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--a-muted);
+}
+
+.admin-ui .field {
+  border-radius: var(--a-radius-sm);
+  border-color: var(--a-line);
+  background: var(--a-surface);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9375rem;
+  color: var(--a-text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-ui .field::placeholder {
+  color: var(--a-faint);
+}
+
+.admin-ui .field:focus {
+  border-color: var(--a-text);
+  box-shadow: 0 0 0 3px rgba(22, 21, 15, 0.07);
+  outline: none;
+}
+
+.admin-ui .field-error {
+  border-color: #9B2C2C;
+}
+.admin-ui .field-error:focus {
+  box-shadow: 0 0 0 3px rgba(155, 44, 44, 0.12);
+}
+
+/* --- Sidebar ------------------------------------------------------------ */
+
+.admin-ui .a-nav-link {
+  @apply flex items-center gap-3 rounded-lg px-3 py-2 transition-colors duration-150;
+  font-size: 0.875rem;
+  color: var(--a-nav-muted);
+}
+
+.admin-ui .a-nav-link:hover {
+  background: var(--a-nav-soft);
+  color: var(--a-nav-text);
+}
+
+.admin-ui .a-nav-link[aria-current='page'] {
+  background: var(--a-nav-soft);
+  color: var(--a-nav-text);
+  font-weight: 500;
+  /* The one place brass appears in navigation: where you are. */
+  box-shadow: inset 2px 0 0 var(--a-brass);
+}
+
+.admin-ui .a-nav-group {
+  @apply mb-2 px-3;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6E6A5E;
+}
+
+/* --- Tables ------------------------------------------------------------- */
+
+.admin-ui .admin-table {
+  font-size: 0.9375rem;
+}
+
+.admin-ui .admin-table th {
+  @apply normal-case;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--a-muted);
+  border-color: var(--a-line);
+  padding: 0.85rem 1rem;
+}
+
+.admin-ui .admin-table td {
+  border-color: var(--a-line-soft);
+  padding: 0.9rem 1rem;
+  color: var(--a-text);
+}
+
+.admin-ui .admin-table tbody tr:hover {
+  background: var(--a-sunken);
+}
+
+/* --- Status pills ------------------------------------------------------- */
+
+.admin-ui .a-pill {
+  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.admin-ui .a-pill-live    { background: #E8F1EC; color: #16543A; }
+.admin-ui .a-pill-draft   { background: #F0EEE9; color: #5C5A52; }
+.admin-ui .a-pill-warn    { background: #FBF1DC; color: #7A5D14; }
+.admin-ui .a-pill-danger  { background: #FBECEC; color: #8A2626; }
+.admin-ui .a-pill-info    { background: #E7EEF4; color: #1F4460; }
+
+/* --- Buttons ------------------------------------------------------------ */
+
+/*
+ * The storefront's buttons are square, capitalised and letterspaced. In the
+ * admin they are ordinary, rounded and sentence case, because they are pressed
+ * constantly rather than admired.
+ */
+.admin-ui .btn,
+.admin-ui button[class*='uppercase'] {
+  letter-spacing: 0;
+}
+
+.admin-ui .a-btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-150;
+  font-size: 0.875rem;
+  padding: 0.55rem 1rem;
+}
+
+.admin-ui .a-btn-primary {
+  background: var(--a-text);
+  color: #FFFFFF;
+}
+.admin-ui .a-btn-primary:hover:not(:disabled) {
+  background: #000000;
+  box-shadow: var(--a-shadow-lift);
+}
+
+.admin-ui .a-btn-secondary {
+  background: var(--a-surface);
+  color: var(--a-text);
+  border: 1px solid var(--a-line);
+}
+.admin-ui .a-btn-secondary:hover:not(:disabled) {
+  border-color: var(--a-faint);
+}
+
+.admin-ui .a-btn-ghost {
+  color: var(--a-muted);
+}
+.admin-ui .a-btn-ghost:hover:not(:disabled) {
+  background: var(--a-sunken);
+  color: var(--a-text);
+}
+
+.admin-ui .a-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- Odds and ends ------------------------------------------------------ */
+
+.admin-ui .a-muted { color: var(--a-muted); }
+.admin-ui .a-faint { color: var(--a-faint); }
+
+.admin-ui .a-divider {
+  height: 1px;
+  background: var(--a-line-soft);
+}
+
+/* Badges become pills in the admin: rounded, sentence case, no letterspacing.
+   A status is scanned, not read, and capitals at 11px slow that down. */
+.admin-ui [data-badge] {
+  @apply rounded-full border-transparent px-2.5 py-1 normal-case;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+.admin-ui [data-badge]::first-letter { text-transform: uppercase; }
+
+.admin-ui [data-badge='neutral'] { background: #F0EEE9; color: #5C5A52; }
+.admin-ui [data-badge='success'] { background: #E8F1EC; color: #16543A; }
+.admin-ui [data-badge='warning'] { background: #FBF1DC; color: #7A5D14; }
+.admin-ui [data-badge='danger']  { background: #FBECEC; color: #8A2626; }
+.admin-ui [data-badge='info']    { background: #E7EEF4; color: #1F4460; }
+.admin-ui [data-badge='dark']    { background: #17160F; color: #FFFFFF; }
+
+/*
+ * Buttons in the admin.
+ *
+ * The storefront's are square, capitalised and widely letterspaced — a
+ * considered look for a shop. In a tool they are pressed dozens of times an
+ * hour, so here they are rounded, sentence case and easier to hit.
+ */
+.admin-ui [data-btn] {
+  @apply rounded-lg normal-case;
+  letter-spacing: 0;
+  font-size: 0.875rem;
+  padding: 0.55rem 1.05rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.admin-ui [data-btn]::first-letter { text-transform: uppercase; }
+
+.admin-ui [data-btn='primary'] {
+  background: var(--a-text);
+  border-color: var(--a-text);
+  color: #FFFFFF;
+}
+.admin-ui [data-btn='primary']:hover:not(:disabled) {
+  background: #000;
+  border-color: #000;
+  box-shadow: var(--a-shadow-lift);
+}
+
+.admin-ui [data-btn='secondary'] {
+  background: var(--a-surface);
+  border-color: var(--a-line);
+  color: var(--a-text);
+}
+.admin-ui [data-btn='secondary']:hover:not(:disabled) {
+  background: var(--a-surface);
+  border-color: var(--a-faint);
+  color: var(--a-text);
+}
+
+.admin-ui [data-btn='ghost'] {
+  color: var(--a-muted);
+}
+.admin-ui [data-btn='ghost']:hover:not(:disabled) {
+  background: var(--a-sunken);
+  color: var(--a-text);
+}
+
+.admin-ui [data-btn='danger'] {
+  background: #9B2C2C;
+  border-color: #9B2C2C;
+}
+
+.admin-ui [data-btn='link'] {
+  border-radius: 0;
+  padding: 0;
+  color: var(--a-text);
+}
+
+/*
+ * Blanket corrections for admin screens.
+ *
+ * The admin screens were built with the storefront's utilities — 11px capitals
+ * at 0.18em tracking, hairline borders. Rather than rewrite every className in
+ * fourteen files (and be inconsistent about it), the three offending utilities
+ * are corrected here, inside the admin scope only.
+ */
+
+/* Extreme tracking is a display effect. At small sizes it just slows reading,
+   so it is softened rather than removed — the character stays, the friction goes. */
+.admin-ui .tracking-architect { letter-spacing: 0.04em; }
+.admin-ui .tracking-wider2    { letter-spacing: 0.08em; }
+
+/* The smallest storefront size is 11px. That is a caption size being used for
+   labels and buttons; 12px is the floor here. */
+.admin-ui .text-2xs { font-size: 0.75rem; line-height: 1.15rem; }
+.admin-ui .text-xs  { font-size: 0.8125rem; line-height: 1.2rem; }
+
+/* One border colour throughout, warmer and slightly stronger than the
+   storefront's hairline so panels actually read as surfaces. */
+.admin-ui .border-stone-line { border-color: var(--a-line); }
+.admin-ui .bg-paper-off  { background-color: var(--a-sunken); }
+.admin-ui .bg-paper-warm { background-color: var(--a-sunken); }
+
+/* Anything the screens draw as a bordered panel gets the softened corner. */
+.admin-ui .border.border-stone-line { border-radius: 10px; }
+
+/* Except inside tables, where a rounded cell border looks like a mistake. */
+.admin-ui table .border-stone-line { border-radius: 0; }
+
+/* Eyebrow labels: keep them as labels, not as decoration. */
+.admin-ui .eyebrow {
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: var(--a-faint);
+}

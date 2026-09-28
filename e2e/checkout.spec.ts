@@ -86,7 +86,7 @@ test('a customer can register, personalise, apply a coupon and pay cash on deliv
   if (await houseNumber.count()) await houseNumber.fill('A 01');
 
   // Options are buttons in a radiogroup, not native radios.
-  const options = page.getByRole('radio');
+  const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
   if (await options.count()) await options.first().click();
 
   await page.getByRole('button', { name: /^add to cart$/i }).first().click();
@@ -173,7 +173,7 @@ test('a customer can register, personalise, apply a coupon and pay cash on deliv
 
 test('checkout refuses an invalid GSTIN', async ({ page }) => {
   await page.goto('/product/no-smoking-sign');
-  const options = page.getByRole('radio');
+  const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
   if (await options.count()) await options.first().click();
   await page.getByRole('button', { name: /^add to cart$/i }).first().click();
 

@@ -24,20 +24,22 @@ export function AdminPageHeader({
   breadcrumb?: { label: string; to: string };
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div>
+    <div className="mb-7 flex flex-wrap items-start justify-between gap-4 sm:items-end">
+      <div className="min-w-0">
         {breadcrumb ? (
           <Link
             to={breadcrumb.to}
-            className="link-underline mb-2 inline-block text-2xs uppercase tracking-architect text-ink-400"
+            className="mb-2.5 inline-flex items-center gap-1.5 text-sm a-muted transition-colors hover:text-ink"
           >
             ← {breadcrumb.label}
           </Link>
         ) : null}
-        <h1 className="text-2xl">{title}</h1>
-        {description ? <p className="mt-1.5 max-w-2xl text-sm text-ink-500">{description}</p> : null}
+        <h1 className="text-[1.65rem] font-medium leading-tight sm:text-[1.85rem]">{title}</h1>
+        {description ? (
+          <p className="mt-2 max-w-2xl text-[0.9375rem] leading-relaxed a-muted">{description}</p>
+        ) : null}
       </div>
-      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
@@ -53,17 +55,19 @@ export function AdminCard({
   id?: string;
 }) {
   return (
-    <section id={id} className={clsx('border border-stone-line bg-paper', className)}>
+    <section id={id} className={clsx('a-card', className)}>
       {title ? (
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-line px-5 py-4">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-architect">{title}</h2>
-            {description ? <p className="mt-1 text-xs text-ink-400">{description}</p> : null}
+        <header className="a-card-head flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base font-medium">{title}</h2>
+            {description ? (
+              <p className="mt-1 text-sm leading-relaxed a-muted">{description}</p>
+            ) : null}
           </div>
-          {actions}
+          {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
         </header>
       ) : null}
-      <div className="p-5">{children}</div>
+      <div className="a-card-body">{children}</div>
     </section>
   );
 }
@@ -82,26 +86,35 @@ export function StatusToggle({
   disabled?: boolean;
 }) {
   return (
-    <div className="inline-flex border border-stone-line">
-      {(['DRAFT', 'PUBLISHED'] as const).map((value) => (
-        <button
-          key={value}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(value)}
-          className={clsx(
-            'px-3 py-1.5 text-[0.6rem] font-medium uppercase tracking-architect transition-colors',
-            status === value
-              ? value === 'PUBLISHED'
-                ? 'bg-state-success text-paper'
-                : 'bg-ink-200 text-ink-700'
-              : 'text-ink-400 hover:text-ink',
-            disabled && 'cursor-not-allowed opacity-50',
-          )}
-        >
-          {value === 'PUBLISHED' ? 'Live' : 'Draft'}
-        </button>
-      ))}
+    <div
+      className="inline-flex rounded-lg p-0.5"
+      style={{ background: 'var(--a-sunken)', border: '1px solid var(--a-line)' }}
+      role="group"
+      aria-label="Publication status"
+    >
+      {(['DRAFT', 'PUBLISHED'] as const).map((value) => {
+        const active = status === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            disabled={disabled}
+            aria-pressed={active}
+            onClick={() => onChange(value)}
+            className={clsx(
+              'rounded-[6px] px-2.5 py-1 text-xs font-medium transition-all duration-150',
+              active
+                ? value === 'PUBLISHED'
+                  ? 'bg-[#E8F1EC] text-[#16543A] shadow-[var(--a-shadow)]'
+                  : 'bg-paper text-ink shadow-[var(--a-shadow)]'
+                : 'text-[color:var(--a-faint)] hover:text-ink',
+              disabled && 'cursor-not-allowed opacity-50',
+            )}
+          >
+            {value === 'PUBLISHED' ? 'Live' : 'Draft'}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -145,30 +158,68 @@ export function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="admin-table">
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column.key} className={column.className} style={column.width ? { width: column.width } : undefined}>
-                {column.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
+    <>
+      {/* Wide screens: an ordinary table. */}
+      <div className="hidden overflow-x-auto md:block">
+        <table className="admin-table">
+          <thead>
+            <tr>
               {columns.map((column) => (
-                <td key={column.key} className={column.className}>
-                  {column.render(row)}
-                </td>
+                <th
+                  key={column.key}
+                  className={column.className}
+                  style={column.width ? { width: column.width } : undefined}
+                >
+                  {column.header}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                {columns.map((column) => (
+                  <td key={column.key} className={column.className}>
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/*
+        Narrow screens: one card per row.
+
+        A table that scrolls sideways on a phone hides the very columns you
+        need — status, total, the action. Stacking each row means nothing is
+        off-screen, and the first column stays prominent because it is almost
+        always the thing being identified.
+      */}
+      <ul className="space-y-3 md:hidden">
+        {rows.map((row) => {
+          const [lead, ...rest] = columns;
+          return (
+            <li
+              key={row.id}
+              className="rounded-[10px] border p-4"
+              style={{ borderColor: 'var(--a-line)', background: 'var(--a-surface)' }}
+            >
+              <div className="mb-3">{lead.render(row)}</div>
+              <dl className="space-y-2">
+                {rest.map((column) => (
+                  <div key={column.key} className="flex items-start justify-between gap-4">
+                    <dt className="shrink-0 text-sm a-faint">{column.header}</dt>
+                    <dd className="min-w-0 text-right text-sm">{column.render(row)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 

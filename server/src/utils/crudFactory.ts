@@ -125,7 +125,19 @@ export function createCrudRouter(opts: CrudOptions): Router {
           [field]: { contains: search, mode: 'insensitive' },
         }));
       }
-      if (status && opts.hasStatus) where.status = status;
+      /*
+       * Archiving is how you get something out of the way without losing it —
+       * a product an order still references cannot be deleted, so it is
+       * archived instead. Listing archived rows alongside live ones defeats
+       * that: a shop with two products would show two dozen. They are hidden
+       * unless asked for by name.
+       */
+      if (opts.hasStatus) {
+        if (status) where.status = status;
+        else if (String(req.query.includeArchived ?? '') !== 'true') {
+          where.status = { not: 'ARCHIVED' };
+        }
+      }
 
       const orderParam = String(req.query.orderBy ?? '').trim();
       const orderDir = String(req.query.order ?? 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc';

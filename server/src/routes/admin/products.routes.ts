@@ -146,7 +146,17 @@ router.get(
         { slug: { contains: search, mode: 'insensitive' } },
       ];
     }
+    /*
+     * Archived products are hidden unless asked for.
+     *
+     * A product an order references cannot be deleted, only archived — so a
+     * shop that has run a few test orders accumulates rows it will never touch
+     * again. Listing them beside live products buries the real catalogue.
+     */
     if (q.status) where.status = String(q.status) as never;
+    else if (String(q.includeArchived ?? '') !== 'true') {
+      where.status = { not: 'ARCHIVED' };
+    }
     if (q.categoryId) where.categoryId = String(q.categoryId);
     if (String(q.featured ?? '') === 'true') where.featured = true;
     if (String(q.lowStock ?? '') === 'true') {

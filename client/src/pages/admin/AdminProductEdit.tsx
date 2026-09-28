@@ -283,7 +283,11 @@ export default function AdminProductEdit() {
       </div>
 
       {/* Tabs */}
-      <div className="no-scrollbar mb-6 flex gap-1 overflow-x-auto border-b border-stone-line">
+      <div
+        className="no-scrollbar mb-6 flex gap-1 overflow-x-auto rounded-xl p-1"
+        style={{ background: 'var(--a-sunken)', border: '1px solid var(--a-line)' }}
+        role="tablist"
+      >
         {TABS.map((item) => {
           const disabled = isNew && !['details', 'pricing', 'organisation', 'seo'].includes(item.id);
           return (
@@ -293,9 +297,15 @@ export default function AdminProductEdit() {
               disabled={disabled}
               onClick={() => setTab(item.id)}
               title={disabled ? 'Save the product first' : undefined}
+              role="tab"
+              id={`producttab-${item.id}`}
+              aria-selected={tab === item.id}
+              aria-controls="producttab-panel"
               className={clsx(
-                'whitespace-nowrap border-b-2 px-4 py-3 text-2xs uppercase tracking-architect transition-colors',
-                tab === item.id ? 'border-ink text-ink' : 'border-transparent text-ink-400 hover:text-ink',
+                'whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition-all duration-150',
+                tab === item.id
+                  ? 'bg-paper text-ink shadow-[var(--a-shadow)]'
+                  : 'text-[color:var(--a-muted)] hover:text-ink',
                 disabled && 'cursor-not-allowed opacity-40',
               )}
             >
@@ -304,6 +314,8 @@ export default function AdminProductEdit() {
           );
         })}
       </div>
+
+      <div id="producttab-panel" role="tabpanel" aria-labelledby={`producttab-${tab}`}>
 
       {/* ---------------- Details ---------------- */}
       {tab === 'details' ? (
@@ -610,6 +622,8 @@ export default function AdminProductEdit() {
           </AdminCard>
         </div>
       ) : null}
+
+      </div>
     </>
   );
 }

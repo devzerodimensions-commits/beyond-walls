@@ -205,12 +205,15 @@ export default function AdminPageBuilder() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-paper-off">
+    <div className="admin-ui flex h-screen flex-col overflow-hidden">
       {/* ---------------- Top bar ---------------- */}
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-stone-line bg-paper px-4 py-3">
+      <header
+        className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-3"
+        style={{ background: 'var(--a-surface)', borderColor: 'var(--a-line)' }}
+      >
         <Link
           to="/admin/design-pages"
-          className="inline-flex items-center gap-1.5 border border-stone-line px-3 py-2 text-2xs uppercase tracking-architect text-ink-600 transition-colors hover:border-ink hover:text-ink"
+          className="a-btn a-btn-secondary"
         >
           ← All pages
         </Link>
@@ -224,15 +227,20 @@ export default function AdminPageBuilder() {
 
         <div className="flex items-center gap-2">
           {layoutMode === 'compact' ? (
-            <div className="flex border border-stone-line">
+            <div
+              className="flex rounded-lg p-0.5"
+              style={{ background: 'var(--a-sunken)', border: '1px solid var(--a-line)' }}
+            >
               {(['blocks', 'fields'] as const).map((which) => (
                 <button
                   key={which}
                   type="button"
                   onClick={() => setPanel(which)}
                   className={clsx(
-                    'px-3 py-2 text-2xs uppercase tracking-architect transition-colors',
-                    panel === which ? 'bg-ink text-paper' : 'text-ink-600 hover:text-ink',
+                    'rounded-[6px] px-3 py-1.5 text-sm font-medium transition-all',
+                    panel === which
+                      ? 'bg-paper text-ink shadow-[var(--a-shadow)]'
+                      : 'text-[color:var(--a-faint)] hover:text-ink',
                   )}
                 >
                   {which === 'blocks' ? 'Blocks' : 'Settings'}
@@ -244,12 +252,7 @@ export default function AdminPageBuilder() {
           <button
             type="button"
             onClick={() => setMobileView((v) => !v)}
-            className={clsx(
-              'border px-3 py-2 text-2xs uppercase tracking-architect transition-colors',
-              mobileView
-                ? 'border-ink bg-ink text-paper'
-                : 'border-stone-line text-ink-600 hover:border-ink hover:text-ink',
-            )}
+            className={clsx('a-btn', mobileView ? 'a-btn-primary' : 'a-btn-secondary')}
           >
             {mobileView ? 'Desktop view' : 'Mobile view'}
           </button>
@@ -258,7 +261,7 @@ export default function AdminPageBuilder() {
             href={page.slug === 'home' ? '/' : `/${page.slug}`}
             target="_blank"
             rel="noreferrer"
-            className="border border-stone-line px-3 py-2 text-2xs uppercase tracking-architect text-ink-600 transition-colors hover:border-ink hover:text-ink"
+            className="a-btn a-btn-secondary"
           >
             Preview
           </a>
@@ -273,11 +276,12 @@ export default function AdminPageBuilder() {
         {/* ---------------- Left: widgets ---------------- */}
         <aside
           className={clsx(
-            'flex w-[17rem] shrink-0 flex-col border-r border-stone-line bg-ink text-paper',
+            'flex w-[17rem] shrink-0 flex-col border-r',
             layoutMode === 'compact' && panel !== 'blocks' && 'hidden',
           )}
+          style={{ background: 'var(--a-nav)', borderColor: 'var(--a-nav-soft)', color: 'var(--a-nav-text)' }}
         >
-          <div className="border-b border-paper/10 p-4">
+          <div className="border-b p-4" style={{ borderColor: 'var(--a-nav-soft)' }}>
             <div className="relative">
               <SearchIcon
                 size={14}
@@ -287,7 +291,8 @@ export default function AdminPageBuilder() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search blocks"
-                className="w-full border border-paper/20 bg-transparent py-2 pl-9 pr-3 text-xs text-paper placeholder:text-paper/40 focus:border-paper/50 focus:outline-none"
+                className="w-full rounded-lg py-2 pl-9 pr-3 text-sm outline-none"
+                style={{ background: 'var(--a-nav-soft)', color: 'var(--a-nav-text)', border: '1px solid transparent' }}
               />
             </div>
           </div>
@@ -361,10 +366,10 @@ export default function AdminPageBuilder() {
         </aside>
 
         {/* ---------------- Middle: the real page ---------------- */}
-        <main className="min-w-0 flex-1 overflow-y-auto bg-stone-100 p-6">
+        <main className="min-w-0 flex-1 overflow-y-auto p-6" style={{ background: 'var(--a-canvas)' }}>
           <div
             className={clsx(
-              'mx-auto bg-paper shadow-lift transition-[max-width] duration-300',
+              'mx-auto overflow-hidden rounded-xl bg-paper shadow-[var(--a-shadow-lift)] transition-[max-width] duration-300',
               mobileView ? 'max-w-[26rem]' : 'max-w-none',
             )}
           >
@@ -397,9 +402,10 @@ export default function AdminPageBuilder() {
         {/* ---------------- Right: fields ---------------- */}
         <aside
           className={clsx(
-            'w-[21rem] shrink-0 overflow-y-auto border-l border-stone-line bg-paper p-6',
+            'w-[21rem] shrink-0 overflow-y-auto border-l p-6',
             layoutMode === 'compact' && panel !== 'fields' && 'hidden',
           )}
+          style={{ background: 'var(--a-surface)', borderColor: 'var(--a-line)' }}
         >
           {selected && selectedWidget ? (
             <SectionFields

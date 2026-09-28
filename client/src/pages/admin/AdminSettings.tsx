@@ -99,18 +99,21 @@ export default function AdminSettings() {
 
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Group nav */}
-        <nav className="lg:col-span-3">
-          <ul className="no-scrollbar -mx-5 flex gap-1 overflow-x-auto px-5 lg:mx-0 lg:flex-col lg:px-0">
+        <nav className="min-w-0 lg:col-span-3">
+          <ul
+            className="no-scrollbar -mx-4 flex max-w-full gap-1 overflow-x-auto px-4 py-1 sm:mx-0 sm:rounded-xl sm:px-1 lg:flex-col lg:px-1"
+            style={{ scrollbarWidth: 'none' }}
+          >
             {GROUPS.map((item) => (
               <li key={item.id}>
                 <button
                   type="button"
                   onClick={() => setGroup(item.id)}
                   className={clsx(
-                    'w-full whitespace-nowrap border-b-2 px-4 py-2.5 text-left text-xs transition-colors lg:border-b-0 lg:border-l-2',
+                    'w-full whitespace-nowrap rounded-lg px-3.5 py-2 text-left text-sm transition-all duration-150',
                     group === item.id
-                      ? 'border-ink bg-paper font-medium text-ink'
-                      : 'border-transparent text-ink-500 hover:text-ink',
+                      ? 'bg-paper font-medium text-ink shadow-[var(--a-shadow)]'
+                      : 'text-[color:var(--a-muted)] hover:text-ink',
                   )}
                 >
                   {item.label}
