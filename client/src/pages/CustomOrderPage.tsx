@@ -243,13 +243,17 @@ export interface CustomSize {
 }
 
 /**
- * Beyond Walls does not take custom work below two feet by two feet.
+ * Beyond Walls does not take custom work below one foot by one foot.
  *
  * Anything smaller is already in the catalogue and is quicker and cheaper to
  * buy there, so the form says so and points the way rather than collecting an
  * enquiry that will only be turned down.
+ *
+ * The studio set this at two feet at first and revised it to one; it is a
+ * single constant so the rule, the warning under the field and the message on
+ * a rejected size can never drift apart.
  */
-const MIN_FEET = 2;
+const MIN_FEET = 1;
 
 const TO_FEET: Record<CustomSize['unit'], number> = {
   ft: 1,
