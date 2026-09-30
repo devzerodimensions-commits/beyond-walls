@@ -289,7 +289,7 @@ function AddPageDialog({
         ) : null}
 
         {error ? (
-          <p className="border border-state-danger/30 bg-[#F9EDED] px-3 py-2.5 text-xs text-state-danger">
+          <p className="border border-state-danger/30 bg-[color:var(--a-danger-soft)] px-3 py-2.5 text-xs text-state-danger">
             {error}
           </p>
         ) : null}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -6,6 +6,8 @@ import { Helmet } from 'react-helmet-async';
 import { api } from '../../lib/api';
 import type { DashboardData } from '../../lib/types';
 import { useAuth, useSettings } from '../../context/StoreProvider';
+import { useAdminTheme } from '../../lib/adminTheme';
+import { ThemeSwitcher } from '../../components/admin/ThemeSwitcher';
 import {
   BoxIcon, CloseIcon, CompassIcon, DashboardIcon, ExternalIcon, HelpIcon, ImageIcon, InboxIcon,
   LayersIcon, LogoutIcon, MenuIcon, PagesIcon, QuoteIcon, ReceiptIcon, SearchIcon, SettingsIcon,
@@ -15,14 +17,19 @@ import {
 /**
  * The admin shell.
  *
- * A dark rail beside a light working area. The rail is the same near-black the
- * storefront uses, so the two still feel like one product, but everything
- * inside the working area is softer and larger than the shop — see the
- * `.admin-ui` block in styles/index.css for why.
+ * Structure, top to bottom: a bar that runs the full width of the window, and
+ * under it a sidebar beside the working area. The bar carries identity, the
+ * search, the theme and the account; the sidebar carries only navigation. The
+ * previous shell put all of that in one dark column down the left, which meant
+ * the search and the account sat as far from the content as it is possible to
+ * put them.
  *
- * Below 1024px the rail becomes a drawer. It is a real drawer, not a squeezed
- * column: on a phone the admin is mostly used to check an order or answer an
- * enquiry, and that needs the full width for content.
+ * The sidebar is a page surface rather than a slab of chrome, so a theme can
+ * repaint the whole panel at once. On desktop it collapses to an icon rail; on
+ * anything narrower it is a drawer, because on a phone the admin is used to
+ * check an order or answer an enquiry and that wants the full width.
+ *
+ * Every colour comes from a token. See `styles/admin.css`.
  */
 
 interface NavItem {
@@ -77,14 +84,37 @@ const NAV: { group: string; items: NavItem[] }[] = [
 /** Flattened once, for the search and the page title. */
 const ALL_ITEMS = NAV.flatMap((group) => group.items);
 
+const COLLAPSE_KEY = 'bw.admin.rail';
+
 export default function AdminLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
   const { settings } = useSettings();
+  const { theme, setTheme, themes } = useAdminTheme();
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return window.localStorage.getItem(COLLAPSE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
 
-  // Counts drive the sidebar badges.
+  const toggleCollapsed = () => {
+    setCollapsed((value) => {
+      const next = !value;
+      try {
+        window.localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0');
+      } catch {
+        // A forgotten rail width is not worth failing the click over.
+      }
+      return next;
+    });
+  };
+
+  // Counts drive the navigation badges.
   const { data: dashboard } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: () => api.get<DashboardData>('/admin/dashboard'),
@@ -100,7 +130,6 @@ export default function AdminLayout() {
   // Navigating on a phone should close the drawer behind you.
   useEffect(() => setDrawerOpen(false), [location.pathname]);
 
-  // Escape closes it too, which people expect of anything that overlays.
   useEffect(() => {
     if (!drawerOpen) return undefined;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawerOpen(false);
@@ -112,86 +141,52 @@ export default function AdminLayout() {
     item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
   );
 
-  const brand = typeof settings['brand.name'] === 'string' ? (settings['brand.name'] as string) : 'Beyond Walls';
+  const group = NAV.find((g) => g.items.some((i) => i === current));
 
-  const filtered = query.trim()
-    ? NAV.map((group) => ({
-        ...group,
-        items: group.items.filter((item) =>
-          item.label.toLowerCase().includes(query.trim().toLowerCase()),
-        ),
-      })).filter((group) => group.items.length)
+  const brand =
+    typeof settings['brand.name'] === 'string' ? (settings['brand.name'] as string) : 'Beyond Walls';
+
+  const trimmed = query.trim().toLowerCase();
+  const filtered = trimmed
+    ? NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(trimmed)) }))
+        .filter((g) => g.items.length)
     : NAV;
 
-  const rail = (
-    <div className="flex h-full flex-col" style={{ background: 'var(--a-nav)' }}>
-      {/* Brand */}
-      <div className="flex items-center justify-between px-5 pb-5 pt-6">
-        <Link to="/admin" className="min-w-0">
-          <span
-            className="block truncate font-display text-base font-medium tracking-tight"
-            style={{ color: 'var(--a-nav-text)' }}
-          >
-            {brand}
-          </span>
-          <span className="mt-0.5 block text-xs" style={{ color: 'var(--a-nav-muted)' }}>
-            Admin panel
-          </span>
-        </Link>
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(false)}
-          aria-label="Close menu"
-          className="-mr-1 rounded-lg p-2 lg:hidden"
-          style={{ color: 'var(--a-nav-muted)' }}
-        >
-          <CloseIcon size={18} />
-        </button>
-      </div>
-
-      {/* Search */}
-      <div className="px-4 pb-4">
-        <div className="relative">
-          <SearchIcon
-            size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: 'var(--a-nav-muted)' }}
-          />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Jump to…"
-            aria-label="Search the admin menu"
-            className="w-full rounded-lg py-2 pl-9 pr-3 text-sm outline-none transition-colors"
-            style={{
-              background: 'var(--a-nav-soft)',
-              color: 'var(--a-nav-text)',
-              border: '1px solid transparent',
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Links */}
-      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4" aria-label="Admin">
-        {filtered.map((group) => (
-          <div key={group.group} className="mb-5">
-            <p className="a-nav-group">{group.group}</p>
+  // The rail collapses only on desktop; inside the drawer it is always full.
+  const sidebar = (full: boolean) => (
+    <div
+      className="flex h-full flex-col border-r"
+      style={{ background: 'var(--a-side)', borderColor: 'var(--a-side-line)' }}
+    >
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label="Admin">
+        {filtered.map((g) => (
+          <div key={g.group} className="mb-5">
+            {full ? <p className="a-nav-group">{g.group}</p> : <div className="mx-2 mb-2 h-px" style={{ background: 'var(--a-side-line)' }} />}
             <ul className="space-y-0.5">
-              {group.items.map((item) => {
+              {g.items.map((item) => {
                 const count = badgeCount(item.badge);
                 const Icon = item.icon;
                 return (
                   <li key={item.to}>
-                    <NavLink to={item.to} end={item.end} className="a-nav-link">
-                      <Icon size={17} className="shrink-0 opacity-80" />
-                      <span className="flex-1 truncate">{item.label}</span>
+                    <NavLink
+                      to={item.to}
+                      end={item.end}
+                      className="a-nav-link"
+                      title={full ? undefined : item.label}
+                      style={full ? undefined : { justifyContent: 'center', padding: '0.55rem' }}
+                    >
+                      <Icon size={18} className="shrink-0" />
+                      {full ? <span className="flex-1 truncate">{item.label}</span> : null}
                       {count > 0 ? (
                         <span
-                          className="rounded-full px-1.5 py-0.5 text-[0.7rem] font-semibold leading-none"
-                          style={{ background: 'var(--a-brass)', color: '#17160F' }}
+                          className={clsx(
+                            'rounded-full text-[0.7rem] font-semibold leading-none',
+                            full ? 'px-1.5 py-0.5' : 'absolute right-1.5 top-1 h-2 w-2',
+                          )}
+                          style={{ background: 'var(--a-accent)', color: 'var(--a-on-accent)' }}
+                          aria-label={full ? undefined : `${count} waiting`}
                         >
-                          {count}
+                          {full ? count : ''}
                         </span>
                       ) : null}
                     </NavLink>
@@ -202,113 +197,238 @@ export default function AdminLayout() {
           </div>
         ))}
 
-        {query.trim() && !filtered.length ? (
-          <p className="px-3 py-4 text-sm" style={{ color: 'var(--a-nav-muted)' }}>
+        {trimmed && !filtered.length ? (
+          <p className="px-3 py-4 text-sm" style={{ color: 'var(--a-side-muted)' }}>
             Nothing in the menu matches “{query.trim()}”.
           </p>
         ) : null}
       </nav>
 
-      {/* Who is signed in */}
-      <div className="border-t px-4 py-4" style={{ borderColor: 'var(--a-nav-soft)' }}>
-        <div className="mb-3 flex items-center gap-3">
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-            style={{ background: 'var(--a-brass)', color: '#17160F' }}
-          >
-            {(user?.name ?? 'A').charAt(0).toUpperCase()}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm" style={{ color: 'var(--a-nav-text)' }}>
-              {user?.name}
-            </span>
-            <span className="block truncate text-xs" style={{ color: 'var(--a-nav-muted)' }}>
-              {user?.email}
-            </span>
-          </span>
-        </div>
-
-        <div className="flex gap-2">
-          <Link
-            to="/"
-            target="_blank"
-            rel="noreferrer"
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs transition-colors"
-            style={{ background: 'var(--a-nav-soft)', color: 'var(--a-nav-muted)' }}
-          >
-            <ExternalIcon size={13} />
-            View site
-          </Link>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs transition-colors"
-            style={{ background: 'var(--a-nav-soft)', color: 'var(--a-nav-muted)' }}
-          >
-            <LogoutIcon size={13} />
-            Sign out
-          </button>
-        </div>
+      <div className="border-t p-3" style={{ borderColor: 'var(--a-side-line)' }}>
+        <Link
+          to="/"
+          target="_blank"
+          rel="noreferrer"
+          className="a-nav-link"
+          title={full ? undefined : 'View the site'}
+          style={full ? undefined : { justifyContent: 'center', padding: '0.55rem' }}
+        >
+          <ExternalIcon size={17} className="shrink-0" />
+          {full ? <span className="flex-1 truncate">View the site</span> : null}
+        </Link>
       </div>
     </div>
   );
 
   return (
-    <div className="admin-ui min-h-screen">
+    <div className="admin-ui min-h-screen" data-admin-theme={theme}>
       <Helmet>
         <title>{current ? `${current.label} · ${brand} admin` : `${brand} admin`}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      {/* Rail — fixed on desktop */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[16.5rem] lg:block">{rail}</aside>
+      {/* ---------------- Top bar ---------------- */}
+      <header
+        className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b px-3 sm:px-5"
+        style={{ background: 'var(--a-surface)', borderColor: 'var(--a-line)' }}
+      >
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open menu"
+          className="a-btn a-btn-ghost px-2 lg:hidden"
+        >
+          <MenuIcon size={20} />
+        </button>
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}
+          aria-pressed={collapsed}
+          className="a-btn a-btn-ghost hidden px-2 lg:inline-flex"
+        >
+          <MenuIcon size={20} />
+        </button>
 
-      {/* Drawer — phones and tablets */}
-      {drawerOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close menu"
-            onClick={() => setDrawerOpen(false)}
-            className="absolute inset-0 animate-fade-in bg-ink/50 backdrop-blur-[2px]"
-          />
-          <div className="absolute inset-y-0 left-0 w-[17rem] max-w-[85%] animate-slide-in-right">
-            {rail}
+        <Link to="/admin" className="flex min-w-0 items-center gap-2.5">
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--a-radius-sm)] text-sm font-semibold"
+            style={{ background: 'var(--a-accent)', color: 'var(--a-on-accent)' }}
+            aria-hidden="true"
+          >
+            {brand.charAt(0)}
+          </span>
+          <span className="hidden min-w-0 sm:block">
+            <span className="block truncate text-sm font-semibold leading-tight" style={{ color: 'var(--a-text)' }}>
+              {brand}
+            </span>
+            <span className="block text-xs leading-tight" style={{ color: 'var(--a-faint)' }}>
+              Admin panel
+            </span>
+          </span>
+        </Link>
+
+        {/* Where you are. Hidden on small screens, where the title carries it. */}
+        <div className="ml-2 hidden min-w-0 items-center gap-2 md:flex">
+          <span aria-hidden="true" style={{ color: 'var(--a-faint)' }}>/</span>
+          {group ? (
+            <>
+              <span className="text-sm" style={{ color: 'var(--a-faint)' }}>{group.group}</span>
+              <span aria-hidden="true" style={{ color: 'var(--a-faint)' }}>/</span>
+            </>
+          ) : null}
+          <span className="truncate text-sm font-medium" style={{ color: 'var(--a-text)' }}>
+            {current?.label ?? 'Admin'}
+          </span>
+        </div>
+
+        <div className="flex-1" />
+
+        <MenuSearch query={query} setQuery={setQuery} />
+
+        <ThemeSwitcher theme={theme} themes={themes} onChange={setTheme} />
+
+        <AccountMenu name={user?.name} email={user?.email} onSignOut={() => void logout()} />
+      </header>
+
+      <div className="flex">
+        {/* ---------------- Sidebar ---------------- */}
+        <aside
+          className={clsx(
+            'sticky top-16 hidden h-[calc(100vh-4rem)] shrink-0 lg:block',
+            collapsed ? 'w-[4.25rem]' : 'w-[15.5rem]',
+          )}
+          style={{ transition: 'width 0.18s ease' }}
+        >
+          {sidebar(!collapsed)}
+        </aside>
+
+        {/* ---------------- Drawer ---------------- */}
+        {drawerOpen ? (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={() => setDrawerOpen(false)}
+              className="absolute inset-0 animate-fade-in"
+              style={{ background: 'rgba(0, 0, 0, 0.45)' }}
+            />
+            <div className="absolute inset-y-0 left-0 w-[16.5rem] max-w-[85%] animate-slide-in-right">
+              <div className="flex h-full flex-col" style={{ background: 'var(--a-side)' }}>
+                <div
+                  className="flex h-16 shrink-0 items-center justify-between border-b px-4"
+                  style={{ borderColor: 'var(--a-side-line)' }}
+                >
+                  <span className="text-sm font-semibold" style={{ color: 'var(--a-side-text)' }}>
+                    {brand}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerOpen(false)}
+                    aria-label="Close menu"
+                    className="a-btn a-btn-ghost px-2"
+                  >
+                    <CloseIcon size={18} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1">{sidebar(true)}</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ---------------- Working area ---------------- */}
+        <main className="min-w-0 flex-1">
+          <div className="mx-auto w-full max-w-[86rem] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/** Filters the sidebar. It lives in the bar because that is where people look. */
+function MenuSearch({ query, setQuery }: { query: string; setQuery: (v: string) => void }) {
+  return (
+    <div className="relative hidden md:block">
+      <SearchIcon
+        size={15}
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+        style={{ color: 'var(--a-faint)' }}
+      />
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Jump to…"
+        aria-label="Search the admin menu"
+        className="field w-56 py-1.5 pl-9 pr-3 text-sm"
+        style={{ background: 'var(--a-sunken)' }}
+      />
+    </div>
+  );
+}
+
+function AccountMenu({
+  name, email, onSignOut,
+}: {
+  name?: string;
+  email?: string;
+  onSignOut: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (event: MouseEvent) => {
+      if (root.current && !root.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={root} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Account: ${name ?? 'signed in'}`}
+        className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold"
+        style={{ background: 'var(--a-accent-soft)', color: 'var(--a-accent-ink)' }}
+      >
+        {(name ?? 'A').charAt(0).toUpperCase()}
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-[var(--a-radius)] border shadow-[var(--a-shadow-lift)]"
+          style={{ borderColor: 'var(--a-line)', background: 'var(--a-surface)' }}
+        >
+          <div className="border-b px-3.5 py-3" style={{ borderColor: 'var(--a-line-soft)' }}>
+            <p className="truncate text-sm font-medium" style={{ color: 'var(--a-text)' }}>{name}</p>
+            <p className="truncate text-xs" style={{ color: 'var(--a-muted)' }}>{email}</p>
+          </div>
+          <div className="p-1.5">
+            <Link to="/" target="_blank" rel="noreferrer" role="menuitem" className="a-nav-link">
+              <ExternalIcon size={16} />
+              <span className="flex-1">View the site</span>
+            </Link>
+            <button type="button" role="menuitem" onClick={onSignOut} className="a-nav-link w-full">
+              <LogoutIcon size={16} />
+              <span className="flex-1 text-left">Sign out</span>
+            </button>
           </div>
         </div>
       ) : null}
-
-      {/* Working area */}
-      <div className="lg:pl-[16.5rem]">
-        {/* Top bar: only on small screens, where the rail is hidden */}
-        <header
-          className="sticky top-0 z-20 flex items-center gap-3 border-b px-4 py-3 lg:hidden"
-          style={{ background: 'var(--a-surface)', borderColor: 'var(--a-line)' }}
-        >
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Open menu"
-            className="a-btn a-btn-ghost -ml-1 px-2"
-          >
-            <MenuIcon size={20} />
-          </button>
-          <span className="min-w-0 flex-1 truncate font-medium">{current?.label ?? 'Admin'}</span>
-          <Link
-            to="/"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="View the site"
-            className="a-btn a-btn-ghost px-2"
-          >
-            <ExternalIcon size={17} />
-          </Link>
-        </header>
-
-        <main className="mx-auto w-full max-w-[86rem] px-4 py-6 sm:px-6 lg:px-8 lg:py-9">
-          <Outlet />
-        </main>
-      </div>
     </div>
   );
 }

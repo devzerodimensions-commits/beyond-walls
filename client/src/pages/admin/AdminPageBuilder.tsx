@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { ApiError, api } from '../../lib/api';
 import type { ContentStatus, HomeSection, SectionType } from '../../lib/types';
 import { useToast } from '../../context/StoreProvider';
+import { useAdminTheme } from '../../lib/adminTheme';
 import { ImageField, ProductPicker } from '../../components/admin/AdminKit';
 import { SectionRenderer } from '../../components/home/Sections';
 import {
@@ -82,6 +83,8 @@ export default function AdminPageBuilder() {
   const pageSlug = params.get('page') ?? 'home';
   const queryClient = useQueryClient();
   const { push } = useToast();
+  // This route sits outside AdminLayout, so it reads the theme for itself.
+  const { theme: adminTheme } = useAdminTheme();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -205,7 +208,7 @@ export default function AdminPageBuilder() {
   }
 
   return (
-    <div className="admin-ui flex h-screen flex-col overflow-hidden">
+    <div className="admin-ui flex h-screen flex-col overflow-hidden" data-admin-theme={adminTheme}>
       {/* ---------------- Top bar ---------------- */}
       <header
         className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-3"
@@ -279,20 +282,20 @@ export default function AdminPageBuilder() {
             'flex w-[17rem] shrink-0 flex-col border-r',
             layoutMode === 'compact' && panel !== 'blocks' && 'hidden',
           )}
-          style={{ background: 'var(--a-nav)', borderColor: 'var(--a-nav-soft)', color: 'var(--a-nav-text)' }}
+          style={{ background: 'var(--a-side)', borderColor: 'var(--a-side-line)', color: 'var(--a-side-text)' }}
         >
-          <div className="border-b p-4" style={{ borderColor: 'var(--a-nav-soft)' }}>
+          <div className="border-b p-4" style={{ borderColor: 'var(--a-side-line)' }}>
             <div className="relative">
               <SearchIcon
                 size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-paper/40"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--a-faint)]"
               />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search blocks"
                 className="w-full rounded-lg py-2 pl-9 pr-3 text-sm outline-none"
-                style={{ background: 'var(--a-nav-soft)', color: 'var(--a-nav-text)', border: '1px solid transparent' }}
+                style={{ background: 'var(--a-sunken)', color: 'var(--a-text)', border: '1px solid var(--a-line)' }}
               />
             </div>
           </div>
@@ -300,10 +303,10 @@ export default function AdminPageBuilder() {
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {!search ? (
               <section className="mb-7">
-                <p className="mb-1 text-[0.6rem] uppercase tracking-architect text-[#C8A961]">
+                <p className="mb-1 text-[0.6rem] uppercase tracking-architect text-[color:var(--a-accent-ink)]">
                   Ready-made layouts
                 </p>
-                <p className="mb-3 text-[0.65rem] leading-relaxed text-paper/45">
+                <p className="mb-3 text-[0.65rem] leading-relaxed text-[color:var(--a-muted)]">
                   One click adds all the usual blocks for that kind of page.
                 </p>
                 <ul className="space-y-2">
@@ -315,10 +318,10 @@ export default function AdminPageBuilder() {
                         onClick={() =>
                           useLayout.mutate({ layout: layout.key, replace: false })
                         }
-                        className="w-full border border-paper/15 p-3 text-left transition-colors hover:border-paper/40 disabled:opacity-50"
+                        className="w-full rounded-[var(--a-radius-sm)] border border-[color:var(--a-line)] p-3 text-left transition-colors hover:border-[color:var(--a-accent)] disabled:opacity-50"
                       >
                         <span className="block text-xs font-medium">{layout.name}</span>
-                        <span className="mt-0.5 block text-[0.65rem] leading-relaxed text-paper/45">
+                        <span className="mt-0.5 block text-[0.65rem] leading-relaxed text-[color:var(--a-muted)]">
                           {layout.description}
                         </span>
                       </button>
@@ -328,7 +331,7 @@ export default function AdminPageBuilder() {
               </section>
             ) : null}
 
-            <p className="mb-3 text-[0.6rem] uppercase tracking-architect text-[#C8A961]">
+            <p className="mb-3 text-[0.6rem] uppercase tracking-architect text-[color:var(--a-accent-ink)]">
               {search ? 'Matching blocks' : 'Add a block'}
             </p>
 
@@ -337,7 +340,7 @@ export default function AdminPageBuilder() {
               if (!inGroup.length) return null;
               return (
                 <section key={group} className="mb-6">
-                  <p className="mb-2 text-[0.6rem] uppercase tracking-architect text-paper/35">
+                  <p className="mb-2 text-[0.6rem] uppercase tracking-architect text-[color:var(--a-faint)]">
                     {group}
                   </p>
                   <div className="grid grid-cols-2 gap-2">
@@ -348,9 +351,9 @@ export default function AdminPageBuilder() {
                         title={widget.description}
                         disabled={addWidget.isPending}
                         onClick={() => addWidget.mutate(widget.type)}
-                        className="flex flex-col items-center gap-1.5 border border-paper/15 px-2 py-4 text-center transition-colors hover:border-paper/50 disabled:opacity-50"
+                        className="flex flex-col items-center gap-1.5 rounded-[var(--a-radius-sm)] border border-[color:var(--a-line)] px-2 py-4 text-center transition-colors hover:border-[color:var(--a-accent)] disabled:opacity-50"
                       >
-                        <PlusIcon size={15} className="text-paper/50" />
+                        <PlusIcon size={15} className="text-[color:var(--a-muted)]" />
                         <span className="text-[0.65rem] leading-tight">{widget.name}</span>
                       </button>
                     ))}
@@ -360,7 +363,7 @@ export default function AdminPageBuilder() {
             })}
 
             {search && !filteredWidgets.length ? (
-              <p className="text-xs text-paper/45">Nothing matches “{search}”.</p>
+              <p className="text-xs text-[color:var(--a-muted)]">Nothing matches “{search}”.</p>
             ) : null}
           </div>
         </aside>
@@ -510,7 +513,7 @@ function SectionFrame({
     <div
       className={clsx(
         'group relative border-2 transition-colors',
-        selected ? 'border-[#C8A961]' : 'border-transparent hover:border-[#C8A961]/40',
+        selected ? 'border-[color:var(--a-accent)]' : 'border-transparent hover:border-[color:var(--a-line)]',
       )}
     >
       {/* Block name */}
@@ -518,7 +521,7 @@ function SectionFrame({
         className={clsx(
           'absolute left-0 top-0 z-20 px-2.5 py-1 text-[0.6rem] uppercase tracking-architect transition-opacity',
           selected
-            ? 'bg-[#C8A961] text-ink opacity-100'
+            ? 'bg-[color:var(--a-accent)] text-[color:var(--a-on-accent)] opacity-100'
             : 'bg-ink text-paper opacity-0 group-hover:opacity-100',
         )}
       >

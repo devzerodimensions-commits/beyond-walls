@@ -1,0 +1,579 @@
+/* ===========================================================================
+   Admin panel
+   ---------------------------------------------------------------------------
+   The storefront is deliberately sharp, sparse and quiet: square corners, tiny
+   letterspaced capitals, a lot of air. That is right for a shop window and
+   wrong for a tool somebody uses for an hour at a time.
+
+   Everything here is scoped under `.admin-ui`, so none of it reaches the shop.
+
+   THEMES
+   ------
+   Every colour is a token on `.admin-ui`, and a theme is nothing but a
+   different set of values for those tokens, selected by `data-admin-theme` on
+   the same element. Adding a theme means adding one block to the token section
+   below -- no component knows or cares which theme is running.
+
+   The screens were built with the storefront's utilities (bg-paper, text-ink,
+   border-stone-line and so on), which are baked light. Those utilities are
+   remapped to tokens further down, inside the admin scope only. That is what
+   makes a dark theme possible without rewriting eight thousand lines of
+   className, and it is why no admin screen should introduce a raw hex.
+
+   This file is plain CSS on purpose: it defines `.admin-ui .bg-paper`, and an
+   `@apply bg-paper` anywhere inside the same scope would be a circular
+   dependency PostCSS refuses to resolve.
+   =========================================================================== */
+
+.admin-ui {
+  /* --- Studio (light, neutral) -- the default --------------------------- */
+  --a-canvas: #F4F3F0;
+  --a-surface: #FFFFFF;
+  --a-sunken: #FAF9F7;
+  --a-line: #E4E1DB;
+  --a-line-soft: #EFEDE8;
+
+  --a-text: #1A1915;
+  --a-muted: #5F5C54;
+  --a-faint: #716E65;
+
+  --a-accent: #1C1B18;
+  --a-accent-hover: #000000;
+  --a-accent-soft: #EFEEEA;
+  --a-accent-ink: #1C1B18;      /* the accent as a readable text colour */
+  --a-on-accent: #FFFFFF;
+
+  /* The sidebar is part of the page surface now, not a dark slab bolted on. */
+  --a-side: #FFFFFF;
+  --a-side-text: #1A1915;
+  --a-side-muted: #6E6B62;
+  --a-side-line: #EBE8E2;
+  --a-side-hover: #F4F3F0;
+  --a-side-active: #EFEEEA;
+  --a-side-active-text: #1A1915;
+
+  --a-success: #1B6B4A;
+  --a-success-soft: #E6F1EC;
+  --a-warning: #8A6516;
+  --a-warning-soft: #FAF1DC;
+  --a-danger: #A02B22;
+  --a-danger-soft: #FBEBEA;
+  --a-info: #275A80;
+  --a-info-soft: #E8EFF5;
+
+  --a-radius: 14px;
+  --a-radius-sm: 9px;
+  --a-radius-lg: 20px;
+
+  --a-shadow: 0 1px 2px rgba(20, 18, 14, 0.04), 0 1px 3px rgba(20, 18, 14, 0.03);
+  --a-shadow-lift: 0 4px 12px -2px rgba(20, 18, 14, 0.08), 0 14px 34px -14px rgba(20, 18, 14, 0.16);
+  --a-ring: rgba(26, 25, 21, 0.10);
+
+  background: var(--a-canvas);
+  color: var(--a-text);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* --- Midnight ----------------------------------------------------------- */
+.admin-ui[data-admin-theme='dark'] {
+  --a-canvas: #0D0F13;
+  --a-surface: #15181E;
+  --a-sunken: #1A1E25;
+  --a-line: #262C36;
+  --a-line-soft: #1F242C;
+
+  --a-text: #E9EBEF;
+  --a-muted: #9AA3B2;
+  --a-faint: #7D8696;
+
+  --a-accent: #6C8CFF;
+  --a-accent-hover: #8AA3FF;
+  --a-accent-soft: #1B2436;
+  --a-accent-ink: #9DB2FF;
+  --a-on-accent: #0D0F13;
+
+  --a-side: #11141A;
+  --a-side-text: #E9EBEF;
+  --a-side-muted: #8A93A3;
+  --a-side-line: #212731;
+  --a-side-hover: #1A1E25;
+  --a-side-active: #1B2436;
+  --a-side-active-text: #FFFFFF;
+
+  --a-success: #4ADE9B;
+  --a-success-soft: #10241C;
+  --a-warning: #F0C26B;
+  --a-warning-soft: #2A2113;
+  --a-danger: #FF8A80;
+  --a-danger-soft: #2C1614;
+  --a-info: #7FC2F0;
+  --a-info-soft: #122430;
+
+  --a-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --a-shadow-lift: 0 6px 16px -4px rgba(0, 0, 0, 0.6), 0 18px 40px -16px rgba(0, 0, 0, 0.7);
+  --a-ring: rgba(108, 140, 255, 0.28);
+}
+
+/* --- Crimson ------------------------------------------------------------ */
+.admin-ui[data-admin-theme='crimson'] {
+  --a-canvas: #FAF5F4;
+  --a-surface: #FFFFFF;
+  --a-sunken: #FDF7F6;
+  --a-line: #EBDCDA;
+  --a-line-soft: #F5E9E7;
+
+  --a-text: #241615;
+  --a-muted: #6B5250;
+  --a-faint: #826966;
+
+  --a-accent: #BE2C21;
+  --a-accent-hover: #9C2118;
+  --a-accent-soft: #FBEAE8;
+  --a-accent-ink: #A8251C;
+  --a-on-accent: #FFFFFF;
+
+  --a-side: #FFFFFF;
+  --a-side-text: #241615;
+  --a-side-muted: #7A5F5C;
+  --a-side-line: #F0E2E0;
+  --a-side-hover: #FBF3F2;
+  --a-side-active: #FBEAE8;
+  --a-side-active-text: #A8251C;
+
+  --a-ring: rgba(190, 44, 33, 0.16);
+}
+
+/* --- Indigo ------------------------------------------------------------- */
+.admin-ui[data-admin-theme='indigo'] {
+  --a-canvas: #F3F5FB;
+  --a-surface: #FFFFFF;
+  --a-sunken: #F7F9FD;
+  --a-line: #DFE4F1;
+  --a-line-soft: #ECEFF8;
+
+  --a-text: #151A2B;
+  --a-muted: #515B78;
+  --a-faint: #656E88;
+
+  --a-accent: #3050C8;
+  --a-accent-hover: #2440A8;
+  --a-accent-soft: #E9EEFC;
+  --a-accent-ink: #2B49B8;
+  --a-on-accent: #FFFFFF;
+
+  --a-side: #FFFFFF;
+  --a-side-text: #151A2B;
+  --a-side-muted: #5C6584;
+  --a-side-line: #E6EAF5;
+  --a-side-hover: #F4F6FC;
+  --a-side-active: #E9EEFC;
+  --a-side-active-text: #2B49B8;
+
+  --a-ring: rgba(48, 80, 200, 0.16);
+}
+
+/* --- Emerald ------------------------------------------------------------ */
+.admin-ui[data-admin-theme='emerald'] {
+  --a-canvas: #F2F7F4;
+  --a-surface: #FFFFFF;
+  --a-sunken: #F7FBF9;
+  --a-line: #DCE8E1;
+  --a-line-soft: #EAF2ED;
+
+  --a-text: #12201A;
+  --a-muted: #4C6158;
+  --a-faint: #60756B;
+
+  --a-accent: #0E7A57;
+  --a-accent-hover: #0A6147;
+  --a-accent-soft: #E4F3EC;
+  --a-accent-ink: #0C6A4B;
+  --a-on-accent: #FFFFFF;
+
+  --a-side: #FFFFFF;
+  --a-side-text: #12201A;
+  --a-side-muted: #56695F;
+  --a-side-line: #E3EDE7;
+  --a-side-hover: #F4F9F6;
+  --a-side-active: #E4F3EC;
+  --a-side-active-text: #0C6A4B;
+
+  --a-ring: rgba(14, 122, 87, 0.18);
+}
+
+/* ---------------------------------------------------------------------------
+   Typography
+   --------------------------------------------------------------------------- */
+
+.admin-ui h1,
+.admin-ui h2,
+.admin-ui h3,
+.admin-ui h4 {
+  letter-spacing: -0.018em;
+  color: var(--a-text);
+}
+
+.admin-ui ::selection {
+  background: var(--a-accent-soft);
+  color: var(--a-accent-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   Surfaces
+   --------------------------------------------------------------------------- */
+
+.admin-ui .a-card {
+  background: var(--a-surface);
+  border: 1px solid var(--a-line);
+  border-radius: var(--a-radius);
+  box-shadow: var(--a-shadow);
+}
+
+.admin-ui .a-card-head {
+  padding: 1.15rem 1.35rem;
+  border-bottom: 1px solid var(--a-line-soft);
+}
+
+.admin-ui .a-card-body {
+  padding: 1.35rem;
+}
+
+.admin-ui .a-divider {
+  height: 1px;
+  background: var(--a-line-soft);
+}
+
+.admin-ui .a-muted { color: var(--a-muted); }
+.admin-ui .a-faint { color: var(--a-faint); }
+.admin-ui .a-accent { color: var(--a-accent-ink); }
+
+/* ---------------------------------------------------------------------------
+   Form controls
+   --------------------------------------------------------------------------- */
+
+.admin-ui .field-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  text-transform: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--a-muted);
+}
+
+.admin-ui .field {
+  /* Stated rather than inherited: a native date input keeps a wide intrinsic
+     size otherwise, and pushes filter rows off the side of the page. */
+  width: 100%;
+  min-width: 0;
+  border-radius: var(--a-radius-sm);
+  border: 1px solid var(--a-line);
+  background: var(--a-surface);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9375rem;
+  color: var(--a-text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+}
+
+.admin-ui .field::placeholder { color: var(--a-faint); }
+
+.admin-ui .field:focus {
+  border-color: var(--a-accent);
+  box-shadow: 0 0 0 3px var(--a-ring);
+  outline: none;
+}
+
+.admin-ui .field-error { border-color: var(--a-danger); }
+.admin-ui .field-error:focus {
+  border-color: var(--a-danger);
+  box-shadow: 0 0 0 3px var(--a-danger-soft);
+}
+
+/* A native dropdown paints its list from the element's own colours. Without
+   this the menu stays white-on-white under the dark theme. */
+.admin-ui select.field option {
+  background: var(--a-surface);
+  color: var(--a-text);
+}
+
+/* ---------------------------------------------------------------------------
+   Navigation
+   --------------------------------------------------------------------------- */
+
+/*
+ * The base rules below are wrapped in :where() so they carry NO specificity.
+ *
+ * They set `display`, and `.admin-ui .a-btn` would otherwise outrank a plain
+ * utility like `lg:hidden` -- which silently broke every responsive show/hide
+ * on an admin button. Zero specificity means any utility on the element wins,
+ * while the themed rules further down (.admin-ui .a-btn-primary and friends)
+ * still apply normally.
+ */
+:where(.admin-ui) :where(.a-nav-link) {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: var(--a-radius-sm);
+  padding: 0.5rem 0.7rem;
+  font-size: 0.875rem;
+  color: var(--a-side-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-ui .a-nav-link:hover {
+  background: var(--a-side-hover);
+  color: var(--a-side-text);
+}
+
+.admin-ui .a-nav-link[aria-current='page'] {
+  background: var(--a-side-active);
+  color: var(--a-side-active-text);
+  font-weight: 500;
+}
+
+.admin-ui .a-nav-group {
+  margin-bottom: 0.4rem;
+  padding: 0 0.7rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--a-faint);
+}
+
+/* ---------------------------------------------------------------------------
+   Tables
+   --------------------------------------------------------------------------- */
+
+.admin-ui .admin-table { font-size: 0.9375rem; }
+
+.admin-ui .admin-table th {
+  text-transform: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--a-muted);
+  background: var(--a-sunken);
+  border-color: var(--a-line);
+  padding: 0.8rem 1rem;
+}
+
+.admin-ui .admin-table td {
+  border-color: var(--a-line-soft);
+  padding: 0.9rem 1rem;
+  color: var(--a-text);
+}
+
+.admin-ui .admin-table tbody tr:hover { background: var(--a-sunken); }
+
+/* ---------------------------------------------------------------------------
+   Pills and badges
+   --------------------------------------------------------------------------- */
+
+:where(.admin-ui) :where(.a-pill, [data-badge]) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.admin-ui [data-badge]::first-letter { text-transform: uppercase; }
+
+.admin-ui .a-pill-live,
+.admin-ui [data-badge='success'] { background: var(--a-success-soft); color: var(--a-success); }
+.admin-ui .a-pill-draft,
+.admin-ui [data-badge='neutral'] { background: var(--a-sunken); color: var(--a-muted); border-color: var(--a-line); }
+.admin-ui .a-pill-warn,
+.admin-ui [data-badge='warning'] { background: var(--a-warning-soft); color: var(--a-warning); }
+.admin-ui .a-pill-danger,
+.admin-ui [data-badge='danger']  { background: var(--a-danger-soft); color: var(--a-danger); }
+.admin-ui .a-pill-info,
+.admin-ui [data-badge='info']    { background: var(--a-info-soft); color: var(--a-info); }
+.admin-ui [data-badge='dark']    { background: var(--a-accent); color: var(--a-on-accent); }
+
+/* ---------------------------------------------------------------------------
+   Buttons
+   ---------------------------------------------------------------------------
+   The storefront's are square, capitalised and widely letterspaced -- right
+   for a shop, wrong for a control pressed dozens of times an hour.
+   --------------------------------------------------------------------------- */
+
+.admin-ui .btn,
+.admin-ui button[class*='uppercase'] { letter-spacing: 0; }
+
+:where(.admin-ui) :where(.a-btn, [data-btn]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--a-radius-sm);
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 0.55rem 1.05rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+.admin-ui [data-btn]::first-letter { text-transform: uppercase; }
+
+.admin-ui .a-btn-primary,
+.admin-ui [data-btn='primary'] {
+  background: var(--a-accent);
+  border-color: var(--a-accent);
+  color: var(--a-on-accent);
+}
+.admin-ui .a-btn-primary:hover:not(:disabled),
+.admin-ui [data-btn='primary']:hover:not(:disabled) {
+  background: var(--a-accent-hover);
+  border-color: var(--a-accent-hover);
+  box-shadow: var(--a-shadow-lift);
+}
+
+.admin-ui .a-btn-secondary,
+.admin-ui [data-btn='secondary'] {
+  background: var(--a-surface);
+  border-color: var(--a-line);
+  color: var(--a-text);
+}
+.admin-ui .a-btn-secondary:hover:not(:disabled),
+.admin-ui [data-btn='secondary']:hover:not(:disabled) {
+  background: var(--a-sunken);
+  border-color: var(--a-faint);
+  color: var(--a-text);
+}
+
+.admin-ui .a-btn-ghost,
+.admin-ui [data-btn='ghost'] {
+  background: transparent;
+  color: var(--a-muted);
+}
+.admin-ui .a-btn-ghost:hover:not(:disabled),
+.admin-ui [data-btn='ghost']:hover:not(:disabled) {
+  background: var(--a-sunken);
+  color: var(--a-text);
+}
+
+.admin-ui [data-btn='danger'] {
+  background: var(--a-danger);
+  border-color: var(--a-danger);
+  color: #FFFFFF;
+}
+
+.admin-ui [data-btn='link'] {
+  border-radius: 0;
+  border-color: transparent;
+  padding: 0;
+  background: transparent;
+  color: var(--a-accent-ink);
+}
+
+.admin-ui .a-btn:disabled,
+.admin-ui [data-btn]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.admin-ui :focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Remapping the storefront's utilities
+   ---------------------------------------------------------------------------
+   These utilities are baked light. Inside the admin they resolve to tokens
+   instead, which is what makes a dark theme possible without touching the
+   screens themselves. No `!important` anywhere: the selector carries one extra
+   class, which is already more specific than the utility it replaces.
+   --------------------------------------------------------------------------- */
+
+.admin-ui .bg-paper       { background-color: var(--a-surface); }
+.admin-ui .bg-paper-off,
+.admin-ui .bg-paper-warm,
+.admin-ui .bg-paper-sand,
+.admin-ui .bg-stone-50    { background-color: var(--a-sunken); }
+.admin-ui .bg-ink         { background-color: var(--a-text); }
+.admin-ui .bg-ink-700     { background-color: var(--a-muted); }
+.admin-ui .bg-ink-300,
+.admin-ui .bg-ink-200     { background-color: var(--a-line); }
+
+.admin-ui .text-ink,
+.admin-ui .text-ink-700,
+.admin-ui .text-ink-600   { color: var(--a-text); }
+.admin-ui .text-ink-500   { color: var(--a-muted); }
+.admin-ui .text-ink-400,
+.admin-ui .text-ink-300,
+.admin-ui .text-ink-200   { color: var(--a-faint); }
+/* Paired with bg-ink above, so the two invert together under a dark theme. */
+.admin-ui .text-paper     { color: var(--a-surface); }
+
+.admin-ui .border-stone-line,
+.admin-ui .border-stone-mute,
+.admin-ui .border-ink-300,
+.admin-ui .border-ink-100 { border-color: var(--a-line); }
+.admin-ui .border-ink     { border-color: var(--a-text); }
+.admin-ui .border-paper   { border-color: var(--a-surface); }
+
+.admin-ui .divide-stone-line > :not([hidden]) ~ :not([hidden]) { border-color: var(--a-line-soft); }
+
+.admin-ui .text-state-danger  { color: var(--a-danger); }
+.admin-ui .text-state-warning { color: var(--a-warning); }
+.admin-ui .text-state-success { color: var(--a-success); }
+.admin-ui .bg-state-danger    { background-color: var(--a-danger); }
+.admin-ui .bg-state-warning   { background-color: var(--a-warning); }
+.admin-ui .bg-state-success   { background-color: var(--a-success); }
+
+/* ---------------------------------------------------------------------------
+   Blanket corrections
+   ---------------------------------------------------------------------------
+   The screens were written with the storefront's display typography: 11px
+   capitals at 0.18em tracking, hairline borders. Rather than rewrite every
+   className across seventeen files, the offending utilities are corrected here
+   inside the admin scope.
+   --------------------------------------------------------------------------- */
+
+.admin-ui .tracking-architect { letter-spacing: 0.04em; }
+.admin-ui .tracking-wider2    { letter-spacing: 0.08em; }
+
+.admin-ui .text-2xs { font-size: 0.75rem; line-height: 1.15rem; }
+.admin-ui .text-xs  { font-size: 0.8125rem; line-height: 1.2rem; }
+
+.admin-ui .border.border-stone-line { border-radius: var(--a-radius-sm); }
+.admin-ui table .border-stone-line  { border-radius: 0; }
+
+.admin-ui .eyebrow {
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: var(--a-faint);
+}
+
+/* Scrollbars, or a dark theme gets light gutters cut through it. */
+.admin-ui *,
+.admin-ui *::before,
+.admin-ui *::after {
+  scrollbar-color: var(--a-line) transparent;
+}
+.admin-ui *::-webkit-scrollbar { width: 10px; height: 10px; }
+.admin-ui *::-webkit-scrollbar-track { background: transparent; }
+.admin-ui *::-webkit-scrollbar-thumb {
+  background-color: var(--a-line);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.admin-ui *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--a-faint);
+  background-clip: content-box;
+}

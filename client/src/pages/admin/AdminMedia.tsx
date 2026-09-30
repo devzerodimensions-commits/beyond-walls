@@ -166,8 +166,8 @@ export default function AdminMedia() {
                   )}
                 </button>
 
-                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-paper/95 px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-                  <span className="truncate text-[0.6rem] text-ink-400">{asset.folder}</span>
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-[color:var(--a-surface)] px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <span className="truncate text-[0.6rem] text-ink-500">{asset.folder}</span>
                   <div className="flex gap-1">
                     <button
                       type="button"

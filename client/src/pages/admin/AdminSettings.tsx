@@ -351,7 +351,7 @@ export default function AdminSettings() {
                 </div>
 
                 {!bool('payment.razorpayEnabled') && !bool('payment.codEnabled') ? (
-                  <p className="mt-5 flex items-start gap-2 border border-state-warning/40 bg-[#F8F3E6] p-3 text-xs text-state-warning">
+                  <p className="mt-5 flex items-start gap-2 border border-state-warning/40 bg-[color:var(--a-warning-soft)] p-3 text-xs text-state-warning">
                     <AlertIcon size={15} className="mt-0.5 shrink-0" />
                     Both payment methods are off, so customers cannot complete an order.
                   </p>
@@ -468,7 +468,7 @@ export default function AdminSettings() {
                     onChange={(e) => set('seo.siteUrl', e.target.value)}
                   />
                   {!values['seo.domainConfirmed'] ? (
-                    <div className="mt-3 border border-state-warning/40 bg-[#F8F3E6] p-4">
+                    <div className="mt-3 border border-state-warning/40 bg-[color:var(--a-warning-soft)] p-4">
                       <p className="text-xs font-medium text-ink">This domain has not been confirmed</p>
                       <p className="mt-1.5 text-xs leading-relaxed text-ink-600">
                         It was taken from the business email address, not supplied by you. Every
@@ -614,18 +614,18 @@ function SearchPreview({
 
       <div className="space-y-5">
         {rows.map((row) => (
-          <div key={row.label} className="border border-stone-line bg-paper-off p-4">
-            <p className="mb-2 text-[0.6rem] uppercase tracking-architect text-ink-400">{row.label}</p>
-            <p className="font-mono text-xs text-ink-500">
+          <div key={row.label} className="rounded-[var(--a-radius-sm)] border border-[#DADCE0] bg-white p-4">
+            <p className="mb-2 text-[0.6rem] uppercase tracking-architect text-[#70757A]">{row.label}</p>
+            <p className="font-mono text-xs text-[#202124]">
               {host || 'your-domain.com'}
-              <span className="text-ink-300">
+              <span className="text-[#5F6368]">
                 {row.path ? ` › ${row.path.replace(/^\//, '').replace(/\//g, ' › ')}` : ''}
               </span>
             </p>
             <p className="mt-1 text-base leading-snug text-[#1a0dab]">
               {row.text || 'No title set'}
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-600">
+            <p className="mt-1 text-xs leading-relaxed text-[#4D5156]">
               {description || 'No description set — search engines will pick their own text.'}
             </p>
             <div className="mt-3 flex flex-wrap gap-4 text-[0.6rem] uppercase tracking-architect">

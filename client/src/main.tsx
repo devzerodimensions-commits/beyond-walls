@@ -6,6 +6,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { StoreProvider } from './context/StoreProvider';
 import './styles/index.css';
+// The admin's own design layer, scoped to `.admin-ui`. Loaded second so its
+// token remappings sit after Tailwind's utilities in the sheet.
+import './styles/admin.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -105,7 +105,7 @@ export function StatusToggle({
               'rounded-[6px] px-2.5 py-1 text-xs font-medium transition-all duration-150',
               active
                 ? value === 'PUBLISHED'
-                  ? 'bg-[#E8F1EC] text-[#16543A] shadow-[var(--a-shadow)]'
+                  ? 'bg-[color:var(--a-success-soft)] text-[color:var(--a-success)] shadow-[var(--a-shadow)]'
                   : 'bg-paper text-ink shadow-[var(--a-shadow)]'
                 : 'text-[color:var(--a-faint)] hover:text-ink',
               disabled && 'cursor-not-allowed opacity-50',
