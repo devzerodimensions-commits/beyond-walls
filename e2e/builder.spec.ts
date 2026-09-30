@@ -255,6 +255,56 @@ test('the page can be edited at phone and tablet width', async ({ page }, testIn
   await expect.poll(async () => (await frame.boundingBox())!.width).toBeGreaterThan(900);
 });
 
+test('a list field edits as rows, not as text', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'the editor requires a wider screen');
+
+  const made = await adminFetch('/admin/builder/pages', {
+    method: 'POST',
+    body: JSON.stringify({ title: `E2E List ${Date.now().toString(36).slice(-4)}`, layout: 'home' }),
+  });
+  created.push(made.body.data.id);
+
+  await signIn(page);
+  await page.goto(`/admin/builder?page=${made.body.data.slug}`);
+  await page.getByRole('button', { name: 'Edit Benefits' }).click();
+
+  const panel = page.locator('aside').last();
+
+  /*
+   * The benefits are records, not lines of text. Declared as a textarea they
+   * rendered as '[object Object]' and, on the first keystroke, replaced the
+   * whole array with a flat string -- which emptied the strip on the live page
+   * with nothing to say it had.
+   */
+  await expect(panel).not.toContainText('[object Object]');
+
+  // A page built from the layout starts with an empty list, which is the state
+  // that used to be unreachable: the block drew nothing, so it could not be
+  // clicked to fill in.
+  const headings = panel.getByLabel('Short heading');
+  await expect(headings).toHaveCount(0);
+  await panel.getByRole('button', { name: /add another/i }).click();
+  await expect(headings).toHaveCount(1);
+  const rows = 1;
+
+  await panel.getByLabel('One line about it').first().fill('A line about it');
+  await headings.first().fill('Written by the browser test');
+  await headings.first().blur();
+  await expect(page.locator('[data-editor-frame]')).toContainText(/written by the browser test/i, {
+    timeout: 15_000,
+  });
+
+  // The shape has to survive the edit, or the storefront stops rendering it.
+  await expect.poll(async () => {
+    const live = await adminFetch(`/admin/builder/pages/${made.body.data.slug}`);
+    const strip = live.body.data.sections.find((x: { type: string }) => x.type === 'USP_STRIP');
+    return Array.isArray(strip?.config?.items) && typeof strip.config.items[0] === 'object';
+  }).toBe(true);
+
+  await panel.getByRole('button', { name: /add another/i }).click();
+  await expect(headings).toHaveCount(rows + 1);
+});
+
 test('on a phone the editor explains itself instead of rendering unusably', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'this is the phone behaviour');
 

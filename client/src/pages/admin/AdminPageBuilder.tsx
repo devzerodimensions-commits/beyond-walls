@@ -56,7 +56,11 @@ const ArrowLeft = ({ size = 18 }: { size?: number }) => (
 interface WidgetField {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'image' | 'number' | 'link' | 'select' | 'products' | 'categories';
+  /** For 'items': the shape of one row in the repeating list. */
+  itemFields?: { key: string; label: string; type: 'text' | 'textarea' }[];
+  type:
+    | 'text' | 'textarea' | 'image' | 'number' | 'link' | 'select' | 'products' | 'categories'
+    | 'items';
   hint?: string;
   placeholder?: string;
   options?: { value: string; label: string }[];
@@ -69,6 +73,8 @@ interface Widget {
   description: string;
   group: 'Layout' | 'Catalogue' | 'Content' | 'Trust';
   fields: WidgetField[];
+  /** Blocks that draw their content from a collection of their own. */
+  manages?: 'faqs' | 'testimonials' | 'gallery';
 }
 
 interface Layout {
@@ -619,6 +625,24 @@ function SectionFrame({
   const hidden = section.status !== 'PUBLISHED';
   const name = widget?.name ?? section.type;
 
+  /*
+   * A block with nothing in it yet draws nothing at all -- the benefits strip
+   * returns null until it has benefits -- so it had no height, could not be
+   * clicked, and there was no way to reach the fields that would fill it. The
+   * rendered height is measured and a placeholder stands in when it is zero.
+   */
+  const body = useRef<HTMLDivElement>(null);
+  const [empty, setEmpty] = useState(false);
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return undefined;
+    const check = () => setEmpty(el.offsetHeight < 4);
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [section]);
+
   return (
     <>
       <div
@@ -702,9 +726,21 @@ function SectionFrame({
           aria-label={'Edit ' + name}
           className={clsx('block w-full cursor-pointer text-left', hidden && 'opacity-45 grayscale')}
         >
-          <div className="pointer-events-none">
+          <div ref={body} className="pointer-events-none">
             <SectionRenderer section={section} />
           </div>
+
+          {empty ? (
+            <span
+              className="flex min-h-[5.5rem] flex-col items-center justify-center gap-1 border border-dashed px-4 py-6 text-center"
+              style={{ borderColor: 'var(--a-line)', background: 'var(--a-sunken)' }}
+            >
+              <span className="text-sm font-medium text-ink">{name} — nothing in it yet</span>
+              <span className="text-xs text-ink-500">
+                Click to fill it in. It stays off the live page until it has something to show.
+              </span>
+            </span>
+          ) : null}
         </button>
       </div>
 
@@ -862,8 +898,18 @@ function SectionFields({
     const current = field.inConfig
       ? config[field.key]
       : (section as unknown as Record<string, unknown>)[field.key];
-    // Nothing changed — do not write.
-    if (String(current ?? '') === String(value ?? '')) return;
+    /*
+     * Nothing changed -- do not write.
+     *
+     * Compared as JSON rather than with String(): a list of records stringifies
+     * to "[object Object]" whatever is in it, so every edit to one looked
+     * identical to the last and was silently dropped.
+     */
+    const same =
+      typeof value === 'object' || typeof current === 'object'
+        ? JSON.stringify(current ?? null) === JSON.stringify(value ?? null)
+        : String(current ?? '') === String(value ?? '');
+    if (same) return;
 
     onChange(
       field.inConfig
@@ -963,6 +1009,18 @@ function SectionFields({
                 />
               );
 
+            case 'items':
+              return (
+                <ItemsEditor
+                  key={field.key}
+                  label={field.label}
+                  hint={field.hint}
+                  fields={field.itemFields ?? [{ key: 'title', label: 'Text', type: 'text' }]}
+                  value={Array.isArray(value) ? (value as Record<string, string>[]) : []}
+                  onChange={(rows) => commit(field, rows)}
+                />
+              );
+
             default:
               return (
                 <Input
@@ -978,6 +1036,10 @@ function SectionFields({
           }
         })}
       </div>
+
+      {widget.manages === 'faqs' ? <FaqEditor /> : null}
+      {widget.manages === 'testimonials' ? <CollectionLink kind="testimonials" /> : null}
+      {widget.manages === 'gallery' ? <CollectionLink kind="gallery" /> : null}
 
       <Button fullWidth className="mt-8" onClick={onDone}>
         Done editing
@@ -1180,6 +1242,304 @@ function TooNarrow({ page }: { page: BuilderPage }) {
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A repeating list of small records, stored as an array on the block's config.
+ *
+ * This replaces a plain textarea, which rendered the array as
+ * "[object Object],[object Object]" and — far worse — replaced the whole array
+ * with a flat string the moment anyone typed into it. Nothing warned you; the
+ * strip simply emptied on the live page.
+ */
+function ItemsEditor({
+  label, hint, fields, value, onChange,
+}: {
+  label: string;
+  hint?: string;
+  fields: { key: string; label: string; type: 'text' | 'textarea' }[];
+  value: Record<string, string>[];
+  onChange: (rows: Record<string, string>[]) => void;
+}) {
+  // Rows are held locally while they are being typed and written on blur, so a
+  // save is not fired on every keystroke.
+  const [rows, setRows] = useState<Record<string, string>[]>(value);
+  const sameAsSaved = useRef(JSON.stringify(value));
+
+  useEffect(() => {
+    const incoming = JSON.stringify(value);
+    if (incoming !== sameAsSaved.current) {
+      sameAsSaved.current = incoming;
+      setRows(value);
+    }
+  }, [value]);
+
+  const write = (next: Record<string, string>[]) => {
+    setRows(next);
+    sameAsSaved.current = JSON.stringify(next);
+    onChange(next);
+  };
+
+  const setCell = (index: number, key: string, cell: string) =>
+    setRows(rows.map((row, i) => (i === index ? { ...row, [key]: cell } : row)));
+
+  const commit = () => {
+    // Blank rows are dropped rather than saved as empty entries on the page.
+    const cleaned = rows.filter((row) => fields.some((f) => String(row[f.key] ?? '').trim()));
+    write(cleaned);
+  };
+
+  const move = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= rows.length) return;
+    const next = [...rows];
+    [next[index], next[target]] = [next[target], next[index]];
+    write(next);
+  };
+
+  return (
+    <div>
+      <span className="field-label">{label}</span>
+      {hint ? <p className="-mt-1 mb-2 text-xs text-ink-400">{hint}</p> : null}
+
+      <div className="space-y-3">
+        {rows.map((row, index) => (
+          // eslint-disable-next-line react/no-array-index-key
+          <div key={index} className="rounded-[var(--a-radius-sm)] border border-stone-line p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-2xs font-medium text-ink-400">{index + 1}</span>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button" aria-label={`Move item ${index + 1} up`} disabled={index === 0}
+                  onClick={() => move(index, -1)}
+                  className="flex h-6 w-6 items-center justify-center rounded text-ink-400 hover:text-ink disabled:opacity-30"
+                >
+                  <ChevronDown size={13} className="rotate-180" />
+                </button>
+                <button
+                  type="button" aria-label={`Move item ${index + 1} down`} disabled={index === rows.length - 1}
+                  onClick={() => move(index, 1)}
+                  className="flex h-6 w-6 items-center justify-center rounded text-ink-400 hover:text-ink disabled:opacity-30"
+                >
+                  <ChevronDown size={13} />
+                </button>
+                <button
+                  type="button" aria-label={`Remove item ${index + 1}`}
+                  onClick={() => write(rows.filter((_, i) => i !== index))}
+                  className="flex h-6 w-6 items-center justify-center rounded text-ink-400 hover:text-state-danger"
+                >
+                  <TrashIcon size={13} />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {fields.map((f) =>
+                f.type === 'textarea' ? (
+                  <Textarea
+                    key={f.key}
+                    label={f.label}
+                    rows={2}
+                    value={String(row[f.key] ?? '')}
+                    onChange={(e) => setCell(index, f.key, e.target.value)}
+                    onBlur={commit}
+                  />
+                ) : (
+                  <Input
+                    key={f.key}
+                    label={f.label}
+                    value={String(row[f.key] ?? '')}
+                    onChange={(e) => setCell(index, f.key, e.target.value)}
+                    onBlur={commit}
+                  />
+                ),
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => write([...rows, Object.fromEntries(fields.map((f) => [f.key, '']))])}
+        className="a-btn a-btn-secondary mt-3 w-full"
+      >
+        <PlusIcon size={14} />
+        Add another
+      </button>
+
+      {!rows.length ? (
+        <p className="mt-2 text-center text-2xs text-ink-400">
+          Nothing here yet, so this block stays off the page.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Blocks whose content lives in a collection of its own
+   --------------------------------------------------------------------------- */
+
+const COLLECTIONS = {
+  faqs: { label: 'question', plural: 'Questions', screen: '/admin/faqs' },
+  testimonials: { label: 'review', plural: 'Reviews', screen: '/admin/testimonials' },
+  gallery: { label: 'photo', plural: 'Photos', screen: '/admin/gallery' },
+} as const;
+
+interface FaqRow {
+  id: string;
+  question: string;
+  answer: string;
+  status: string;
+}
+
+/**
+ * The questions themselves, edited where the block is.
+ *
+ * FAQs are their own records, shared by every page that shows them, so the
+ * block used to say "manage them in FAQs" and leave it there — which meant
+ * leaving the editor to add a question. They are managed here instead, against
+ * the same endpoints the FAQs screen uses.
+ */
+function FaqEditor() {
+  const queryClient = useQueryClient();
+  const { push } = useToast();
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+
+  const key = ['builder-faqs'];
+  const { data, isLoading } = useQuery({
+    queryKey: key,
+    queryFn: () => api.list<FaqRow[]>('/admin/faqs', { perPage: 100 }),
+  });
+
+  const rows = data?.data ?? [];
+  const refresh = () => queryClient.invalidateQueries({ queryKey: key });
+
+  const add = useMutation({
+    mutationFn: () => api.post('/admin/faqs', { question, answer, status: 'PUBLISHED' }),
+    onSuccess: async () => {
+      setQuestion('');
+      setAnswer('');
+      await refresh();
+      push('Question added', 'success');
+    },
+    onError: () => push('That did not save. Please try again.', 'error'),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.delete(`/admin/faqs/${id}`),
+    onSuccess: async () => {
+      await refresh();
+      push('Question removed', 'info');
+    },
+    onError: () => push('That did not save. Please try again.', 'error'),
+  });
+
+  const edit = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Record<string, unknown> }) =>
+      api.patch(`/admin/faqs/${id}`, patch),
+    onSuccess: refresh,
+    onError: () => push('That did not save. Please try again.', 'error'),
+  });
+
+  return (
+    <div className="mt-6 border-t border-stone-line pt-5">
+      <span className="field-label">Questions and answers</span>
+      <p className="-mt-1 mb-3 text-xs text-ink-400">
+        Shared by every page that shows this block.
+      </p>
+
+      {isLoading ? <p className="text-xs text-ink-400">Loading…</p> : null}
+
+      <div className="space-y-2">
+        {rows.map((row) => (
+          <details key={row.id} className="rounded-[var(--a-radius-sm)] border border-stone-line">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-ink">
+              {row.question || 'Untitled question'}
+            </summary>
+            <div className="space-y-2.5 border-t border-stone-line p-3">
+              <Input
+                label="Question"
+                defaultValue={row.question}
+                onBlur={(e) =>
+                  e.target.value !== row.question &&
+                  edit.mutate({ id: row.id, patch: { question: e.target.value } })
+                }
+              />
+              <Textarea
+                label="Answer"
+                rows={3}
+                defaultValue={row.answer}
+                onBlur={(e) =>
+                  e.target.value !== row.answer &&
+                  edit.mutate({ id: row.id, patch: { answer: e.target.value } })
+                }
+              />
+              <button
+                type="button"
+                onClick={() => remove.mutate(row.id)}
+                className="a-btn a-btn-ghost w-full text-state-danger"
+              >
+                <TrashIcon size={13} />
+                Remove this question
+              </button>
+            </div>
+          </details>
+        ))}
+      </div>
+
+      <div className="mt-4 rounded-[var(--a-radius-sm)] border border-stone-line p-3">
+        <p className="mb-2.5 text-xs font-medium text-ink">Add a question</p>
+        <div className="space-y-2.5">
+          <Input
+            label="Question"
+            placeholder="How long does an order take?"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+          />
+          <Textarea
+            label="Answer"
+            rows={3}
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+          />
+          <Button
+            fullWidth
+            size="sm"
+            loading={add.isPending}
+            disabled={!question.trim() || !answer.trim()}
+            onClick={() => add.mutate()}
+          >
+            Add question
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** For collections that are not text: a way through to the screen that edits them. */
+function CollectionLink({ kind }: { kind: 'testimonials' | 'gallery' }) {
+  const meta = COLLECTIONS[kind];
+  return (
+    <div className="mt-6 border-t border-stone-line pt-5">
+      <span className="field-label">{meta.plural}</span>
+      <p className="-mt-1 mb-3 text-xs text-ink-400">
+        This block shows whatever is in {meta.plural.toLowerCase()}, on every page that uses it.
+      </p>
+      <a
+        href={meta.screen}
+        target="_blank"
+        rel="noreferrer"
+        className="a-btn a-btn-secondary w-full"
+      >
+        Add or edit {meta.plural.toLowerCase()}
+        <ArrowRight size={14} />
+      </a>
     </div>
   );
 }

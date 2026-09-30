@@ -30,18 +30,34 @@ export type ResolvedSection = PageSection & { items: unknown[] };
 export interface WidgetField {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'image' | 'number' | 'link' | 'select' | 'products' | 'categories';
+  type:
+    | 'text' | 'textarea' | 'image' | 'number' | 'link' | 'select' | 'products' | 'categories'
+    /*
+     * A repeating list of small records -- see `itemFields`. It was a textarea
+     * once, which showed "[object Object]" and, worse, replaced the whole array
+     * with a plain string the moment anyone typed in it.
+     */
+    | 'items';
   hint?: string;
   placeholder?: string;
   options?: { value: string; label: string }[];
   /** Fields under `config` rather than on the section row itself. */
   inConfig?: boolean;
+  /** For `items`: the shape of one row in the list. */
+  itemFields?: { key: string; label: string; type: 'text' | 'textarea' }[];
 }
 
 export interface WidgetDefinition {
   type: PageSection['type'];
   name: string;
   description: string;
+  /*
+   * Some blocks draw their content from a collection of their own rather than
+   * from fields on the section: the FAQ block shows whatever is in FAQs. The
+   * editor uses this to offer that collection where the block is, instead of
+   * telling the reader to go and find another screen.
+   */
+  manages?: 'faqs' | 'testimonials' | 'gallery';
   /** Grouping in the widget picker. */
   group: 'Layout' | 'Catalogue' | 'Content' | 'Trust';
   fields: WidgetField[];
@@ -239,7 +255,8 @@ export const WIDGETS: WidgetDefinition[] = [
   {
     type: 'GALLERY',
     name: 'Gallery',
-    description: 'Photos of finished work. Manage the images in Gallery.',
+    description: 'Photos of finished work.',
+    manages: 'gallery',
     group: 'Content',
     fields: [...HEADED, LIMIT, ...CTA],
     defaults: { title: 'Recent work', ctaLabel: 'See the gallery', ctaLink: '/gallery' },
@@ -282,10 +299,14 @@ export const WIDGETS: WidgetDefinition[] = [
       TITLE,
       {
         key: 'items',
-        label: 'One benefit per line',
-        type: 'textarea',
+        label: 'Benefits',
+        type: 'items',
         inConfig: true,
-        hint: 'For example: Made in Ahmedabad',
+        hint: 'Three reads best. Each one gets a number on the strip.',
+        itemFields: [
+          { key: 'title', label: 'Short heading', type: 'text' },
+          { key: 'text', label: 'One line about it', type: 'textarea' },
+        ],
       },
     ],
     defaults: { config: { items: [] } },
@@ -293,7 +314,8 @@ export const WIDGETS: WidgetDefinition[] = [
   {
     type: 'TESTIMONIALS',
     name: 'Reviews',
-    description: 'Customer quotes. Manage them in Testimonials.',
+    description: 'Customer quotes.',
+    manages: 'testimonials',
     group: 'Trust',
     fields: [...HEADED, LIMIT],
     defaults: { title: 'What our customers say' },
@@ -301,7 +323,8 @@ export const WIDGETS: WidgetDefinition[] = [
   {
     type: 'FAQ',
     name: 'Questions',
-    description: 'Frequently asked questions. Manage them in FAQs.',
+    description: 'Frequently asked questions.',
+    manages: 'faqs',
     group: 'Trust',
     fields: [
       ...HEADED,
