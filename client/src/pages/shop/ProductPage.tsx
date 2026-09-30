@@ -727,26 +727,34 @@ export default function ProductPage() {
             </Button>
           }
         >
-          <p className="mb-5 text-xs leading-relaxed text-ink-500">
-            Your details are attached to the order and used for production.
-          </p>
+          {/*
+            The drawer body is deliberately unpadded so a caller can run rows
+            edge to edge -- the cart does. This one is a form, so it supplies
+            its own gutter; without it the labels and counters sat against both
+            sides of the screen.
+          */}
+          <div className="p-5">
+            <p className="mb-5 text-xs leading-relaxed text-ink-500">
+              Your details are attached to the order and used for production.
+            </p>
 
-          {/* The plate updates as they type, which is the whole point. */}
-          {product.livePreviewEnabled ? (
-            <LivePreview
-              template={product.livePreviewTemplate}
-              config={product.livePreviewConfig}
-              slots={previewSlots}
-              className="mb-6 border border-stone-line"
+            {/* The plate updates as they type, which is the whole point. */}
+            {product.livePreviewEnabled ? (
+              <LivePreview
+                template={product.livePreviewTemplate}
+                config={product.livePreviewConfig}
+                slots={previewSlots}
+                className="mb-6 border border-stone-line"
+              />
+            ) : null}
+
+            <PersonalizationForm
+              fields={fields}
+              values={values}
+              errors={errors}
+              onChange={setField}
             />
-          ) : null}
-
-          <PersonalizationForm
-            fields={fields}
-            values={values}
-            errors={errors}
-            onChange={setField}
-          />
+          </div>
         </Drawer>
       ) : null}
 
