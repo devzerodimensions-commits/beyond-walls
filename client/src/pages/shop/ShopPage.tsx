@@ -221,8 +221,8 @@ export default function ShopPage() {
 
           <div className="lg:col-span-9">
             {/* Toolbar */}
-            <div className="mb-8 flex items-center justify-between gap-4 border-b border-stone-line pb-4">
-              <div className="flex items-center gap-3">
+            <div className="mb-8 flex items-center justify-between gap-3 border-b border-stone-line pb-4">
+              <div className="flex min-w-0 items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setFiltersOpen(true)}
@@ -247,7 +247,8 @@ export default function ShopPage() {
                 aria-label="Sort products"
                 value={sort}
                 onChange={(e) => update((next) => next.set('sort', e.target.value))}
-                className="w-auto min-w-[180px] py-2 text-xs"
+                wrapClassName="min-w-0 shrink"
+                className="w-full min-w-0 py-2 text-xs sm:min-w-[180px]"
                 options={filters?.sortOptions ?? [{ value: 'featured', label: 'Featured' }]}
               />
             </div>

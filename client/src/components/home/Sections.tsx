@@ -363,50 +363,34 @@ export function PersonalisationDemo({ section }: { section: HomeSection }) {
   return (
     <section className="border-y border-stone-line bg-ink py-14 text-paper lg:py-20">
       <div className="container-site">
-        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-          <div>
-            <p className="eyebrow mb-5 text-paper/50">Personalise</p>
-            <h2 className="text-balance text-2xl leading-tight sm:text-3xl lg:text-[2.5rem]">
+        {/*
+          Three parts, side by side on a laptop: the plate, the fields that
+          change it, and the explanation. The document order puts the heading
+          first so the section still reads top-to-bottom when it stacks on a
+          phone; `order` only moves it on the wide layout.
+        */}
+        <div className="grid items-center gap-8 lg:grid-cols-12 lg:gap-10">
+          <div className="lg:order-3 lg:col-span-4">
+            <p className="eyebrow mb-4 text-paper/50">Personalise</p>
+            <h2 className="text-balance text-2xl leading-tight sm:text-3xl lg:text-[2rem]">
               {section.title}
             </h2>
             {section.subtitle ? (
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-paper/65">
-                {section.subtitle}
-              </p>
+              <p className="mt-4 text-sm leading-relaxed text-paper/65">{section.subtitle}</p>
             ) : null}
-
-            <div className="mt-8 space-y-4">
-              {textFields.map((field) => (
-                <div key={field.id}>
-                  <label
-                    htmlFor={`demo-${field.key}`}
-                    className="mb-1.5 block text-2xs font-medium uppercase tracking-architect text-paper/50"
-                  >
-                    {field.label}
-                  </label>
-                  <input
-                    id={`demo-${field.key}`}
-                    value={values[field.key] ?? ''}
-                    maxLength={field.maxLength ?? undefined}
-                    placeholder={field.placeholder ?? ''}
-                    onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-                    className="w-full border border-paper/25 bg-transparent px-3.5 py-2.5 text-sm text-paper transition-colors placeholder:text-paper/30 focus:border-paper focus:outline-none"
-                  />
-                </div>
-              ))}
-            </div>
 
             <ButtonLink
               to={`/product/${product.slug}`}
+              variant="inverse"
               size="lg"
-              className="mt-8 border-paper bg-paper text-ink hover:bg-paper-warm"
+              className="mt-7"
             >
               {section.ctaLabel ?? 'Personalise this plate'}
             </ButtonLink>
           </div>
 
-          {/* Preview panel */}
-          <div className="bg-paper-warm p-4 sm:p-8">
+          {/* The plate itself. */}
+          <div className="bg-paper-warm p-4 sm:p-6 lg:order-1 lg:col-span-5">
             <LivePreview
               template={product.livePreviewTemplate}
               config={product.livePreviewConfig}
@@ -414,6 +398,28 @@ export function PersonalisationDemo({ section }: { section: HomeSection }) {
               placeholders={placeholders}
               className="bg-transparent p-0"
             />
+          </div>
+
+          {/* What changes it. */}
+          <div className="space-y-4 lg:order-2 lg:col-span-3">
+            {textFields.map((field) => (
+              <div key={field.id}>
+                <label
+                  htmlFor={`demo-${field.key}`}
+                  className="mb-1.5 block text-2xs font-medium uppercase tracking-architect text-paper/50"
+                >
+                  {field.label}
+                </label>
+                <input
+                  id={`demo-${field.key}`}
+                  value={values[field.key] ?? ''}
+                  maxLength={field.maxLength ?? undefined}
+                  placeholder={field.placeholder ?? ''}
+                  onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                  className="w-full border border-paper/25 bg-transparent px-3.5 py-2.5 text-sm text-paper transition-colors placeholder:text-paper/30 focus:border-paper focus:outline-none"
+                />
+              </div>
+            ))}
           </div>
         </div>
       </div>

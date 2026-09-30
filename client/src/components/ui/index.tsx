@@ -11,7 +11,7 @@ import { useToast } from '../../context/StoreProvider';
 // Button
 // ---------------------------------------------------------------------------
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link' | 'inverse';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<ButtonVariant, string> = {
@@ -24,6 +24,14 @@ const VARIANTS: Record<ButtonVariant, string> = {
   danger:
     'bg-state-danger text-paper border border-state-danger hover:bg-[#7f2222] disabled:opacity-50',
   link: 'bg-transparent border-none p-0 text-ink underline-offset-4 hover:underline disabled:text-ink-300',
+  /*
+   * For dark panels. This has to be a variant rather than a className on
+   * `primary`: clsx concatenates, it does not resolve Tailwind conflicts, so
+   * the element kept both `text-paper` and `text-ink` and the browser picked
+   * whichever Tailwind emitted last -- white text on a white button.
+   */
+  inverse:
+    'bg-paper text-ink border border-paper hover:bg-paper-warm hover:border-paper-warm disabled:bg-paper/60 disabled:text-ink-300',
 };
 
 const SIZES: Record<ButtonSize, string> = {

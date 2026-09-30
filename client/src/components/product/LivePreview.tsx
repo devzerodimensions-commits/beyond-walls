@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import clsx from 'clsx';
 import type { PersonalizationField } from '../../lib/types';
 import { assetUrl } from '../../lib/api';
@@ -246,6 +246,9 @@ interface LivePreviewProps {
 }
 
 export function LivePreview({ template, slots, className, placeholders, config }: LivePreviewProps) {
+  // Namespaces this instance's SVG defs so two previews on one page cannot
+  // steal each other's filters and gradients.
+  const uid = useId().replace(/:/g, '');
   const resolved = useMemo(() => resolvePreviewConfig(template, config), [template, config]);
 
   const merged = useMemo<PreviewSlots>(() => {
@@ -269,7 +272,7 @@ export function LivePreview({ template, slots, className, placeholders, config }
   // A light plate needs a visible edge against the light backdrop.
   const isLightPlate = resolved.plate.borderOnLight && isLight(plate);
 
-  const shared = { slots: merged, plate, text, font, config: resolved };
+  const shared = { slots: merged, plate, text, font, config: resolved, uid };
 
   const body = (() => {
     switch (template) {
@@ -317,10 +320,21 @@ interface TemplateProps {
   font: string;
   config: PreviewConfig;
   isLight?: boolean;
+  /**
+   * Unique per rendered preview.
+   *
+   * More than one preview can share a page: the product page has one beside
+   * the photograph and another inside the phone sheet. SVG ids are global, so
+   * fixed ids made every url(#...) resolve to the FIRST definition in the
+   * document. That first copy sat in a display:none container, so it had no
+   * size, its filter region collapsed, and every filtered shape vanished --
+   * the plate disappeared and only the unfiltered screws were left showing.
+   */
+  uid: string;
 }
 
 /** Matches the supplied product: number top-right, rule, name lines below. */
-function NameplateMinimal({ slots, plate, text, font, config, isLight }: TemplateProps) {
+function NameplateMinimal({ slots, plate, text, font, config, isLight, uid }: TemplateProps) {
   const hasNumber = Boolean(slots.number);
   const name = (slots.line1 ?? '').toUpperCase();
   const family = (slots.line2 ?? '').toUpperCase();
@@ -338,12 +352,12 @@ function NameplateMinimal({ slots, plate, text, font, config, isLight }: Templat
   return (
     <svg viewBox={`0 0 ${vw} ${vh}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
       <defs>
-        <linearGradient id="plate-sheen" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={`sheen-${uid}`} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="0.10" />
           <stop offset="45%" stopColor="#ffffff" stopOpacity="0.02" />
           <stop offset="100%" stopColor="#000000" stopOpacity="0.06" />
         </linearGradient>
-        <filter id="plate-shadow" x="-10%" y="-10%" width="120%" height="130%">
+        <filter id={`shadow-${uid}`} x="-10%" y="-10%" width="120%" height="130%">
           <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#111111" floodOpacity="0.18" />
         </filter>
       </defs>
@@ -353,11 +367,11 @@ function NameplateMinimal({ slots, plate, text, font, config, isLight }: Templat
         fill={plate}
         stroke={isLight ? '#D9D6D0' : 'none'}
         strokeWidth={isLight ? 1 : 0}
-        filter="url(#plate-shadow)"
+        filter={`url(#shadow-${uid})`}
       />
       <rect
         x={inset} y={inset} width={plateW} height={plateH} rx={config.plate.radius}
-        fill="url(#plate-sheen)"
+        fill={`url(#sheen-${uid})`}
       />
 
       {config.plate.showScrews ? (
@@ -409,15 +423,15 @@ function NameplateMinimal({ slots, plate, text, font, config, isLight }: Templat
   );
 }
 
-function NameplateClassic({ slots, plate, text, font, config }: TemplateProps) {
+function NameplateClassic({ slots, plate, text, font, config, uid }: TemplateProps) {
   return (
     <svg viewBox="0 0 600 300" className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
       <defs>
-        <filter id="plate-shadow-2" x="-10%" y="-10%" width="120%" height="130%">
+        <filter id={`shadow-${uid}`} x="-10%" y="-10%" width="120%" height="130%">
           <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#111111" floodOpacity="0.18" />
         </filter>
       </defs>
-      <rect x="30" y="40" width="540" height="220" rx={config.plate.radius} fill={plate} filter="url(#plate-shadow-2)" />
+      <rect x="30" y="40" width="540" height="220" rx={config.plate.radius} fill={plate} filter={`url(#shadow-${uid})`} />
       <rect x="48" y="58" width="504" height="184" rx="2" fill="none" stroke={text} strokeWidth="1.5" opacity="0.5" />
 
       {slots.number ? (
@@ -445,17 +459,17 @@ function NameplateClassic({ slots, plate, text, font, config }: TemplateProps) {
   );
 }
 
-function DeskPlate({ slots, plate, text, font, config }: TemplateProps) {
+function DeskPlate({ slots, plate, text, font, config, uid }: TemplateProps) {
   return (
     <svg viewBox="0 0 600 300" className="mx-auto block w-full max-w-lg" role="img" aria-label="Desk plate preview">
       <defs>
-        <filter id="desk-shadow" x="-10%" y="-10%" width="120%" height="140%">
+        <filter id={`shadow-${uid}`} x="-10%" y="-10%" width="120%" height="140%">
           <feDropShadow dx="0" dy="8" stdDeviation="12" floodColor="#111111" floodOpacity="0.2" />
         </filter>
       </defs>
       {/* Wedge base */}
       <path d="M60 240 L540 240 L560 268 L40 268 Z" fill="#8A8A8A" />
-      <rect x="70" y="80" width="460" height="160" rx={config.plate.radius} fill={plate} filter="url(#desk-shadow)" />
+      <rect x="70" y="80" width="460" height="160" rx={config.plate.radius} fill={plate} filter={`url(#shadow-${uid})`} />
 
       <text
         x="300" y="150" textAnchor="middle"
@@ -477,15 +491,15 @@ function DeskPlate({ slots, plate, text, font, config }: TemplateProps) {
   );
 }
 
-function SignSquare({ slots, plate, text, font, config }: TemplateProps) {
+function SignSquare({ slots, plate, text, font, config, uid }: TemplateProps) {
   return (
     <svg viewBox="0 0 400 420" className="mx-auto block w-full max-w-xs" role="img" aria-label="Sign preview">
       <defs>
-        <filter id="sign-shadow" x="-10%" y="-10%" width="120%" height="125%">
+        <filter id={`shadow-${uid}`} x="-10%" y="-10%" width="120%" height="125%">
           <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#111111" floodOpacity="0.18" />
         </filter>
       </defs>
-      <rect x="30" y="20" width="340" height="380" rx={config.plate.radius} fill="#FFFFFF" filter="url(#sign-shadow)" />
+      <rect x="30" y="20" width="340" height="380" rx={config.plate.radius} fill="#FFFFFF" filter={`url(#shadow-${uid})`} />
       <path d="M30 28a8 8 0 0 1 8-8h324a8 8 0 0 1 8 8v272H30Z" fill={plate} />
 
       {slots.logo ? (

@@ -87,14 +87,14 @@ function PersonalizationInput({
     case 'RADIO':
       return (
         <FieldWrap label={label} required={field.required} error={error} hint={field.helpText ?? undefined}>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {field.options.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => onChange(opt.value)}
                 className={clsx(
-                  'border px-4 py-2 text-xs transition-colors',
+                  'flex min-h-[2.5rem] items-center justify-center border px-3 py-2 text-center text-xs leading-tight transition-colors',
                   value === opt.value ? 'border-ink bg-ink text-paper' : 'border-stone-line hover:border-ink',
                 )}
               >
@@ -156,14 +156,14 @@ function PersonalizationInput({
     case 'FONT':
       return (
         <FieldWrap label={label} required={field.required} error={error} hint={field.helpText ?? undefined}>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {field.options.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => onChange(opt.value)}
                 className={clsx(
-                  'border px-4 py-2 text-sm transition-colors',
+                  'flex min-h-[2.5rem] items-center justify-center border px-2 py-2 text-center text-sm leading-tight transition-colors',
                   value === opt.value ? 'border-ink bg-ink text-paper' : 'border-stone-line hover:border-ink',
                 )}
                 // Each choice is set in the face it produces, so the customer

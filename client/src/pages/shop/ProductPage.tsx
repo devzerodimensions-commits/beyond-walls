@@ -701,7 +701,7 @@ export default function ProductPage() {
         {recent.length ? (
           <section className="mt-14 border-t border-stone-line pt-12">
             <h2 className="mb-7 text-xl lg:text-2xl">Recently viewed</h2>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
+            <div className="grid items-stretch grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
               {recent.slice(0, 4).map((item) => (
                 <ProductCard key={item.id} product={item} />
               ))}

@@ -69,10 +69,10 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
   };
 
   return (
-    <article className={clsx('group relative flex flex-col', className)}>
+    <article className={clsx('group relative flex h-full flex-col', className)}>
       <Link
         to={`/product/${product.slug}`}
-        className="relative block aspect-square overflow-hidden bg-paper-warm"
+        className="relative block aspect-square w-full shrink-0 overflow-hidden bg-paper-warm"
         aria-label={product.name}
       >
         {image ? (
@@ -150,9 +150,16 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
       ) : null}
 
       <div className="flex flex-1 flex-col pt-3.5">
-        {product.category ? <span className="eyebrow mb-1.5">{product.category.name}</span> : null}
+        <span className="eyebrow mb-1.5 block min-h-[0.875rem] truncate">
+          {product.category?.name ?? ' '}
+        </span>
 
-        <h3 className="text-sm font-medium leading-snug text-ink">
+        {/*
+          Two lines, always. Without a fixed height a one-line name and a
+          two-line name push the price and the button to different heights and
+          the grid stops reading as a grid.
+        */}
+        <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-snug text-ink">
           <Link to={`/product/${product.slug}`} className="link-underline">
             {product.name}
           </Link>
@@ -188,7 +195,7 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
           onClick={handleAction}
           disabled={action.disabled}
           className={clsx(
-            'mt-3 flex w-full items-center justify-center gap-2 py-2.5 text-2xs font-medium uppercase tracking-architect transition-colors lg:hidden',
+            'mt-auto flex w-full items-center justify-center gap-2 py-2.5 text-2xs font-medium uppercase tracking-architect transition-colors lg:hidden',
             action.disabled
               ? 'cursor-not-allowed border border-stone-line text-ink-300'
               : action.kind === 'add'
@@ -206,10 +213,11 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
 
 export function ProductCardSkeleton() {
   return (
-    <div className="flex flex-col">
-      <Skeleton className="aspect-square w-full" />
+    <div className="flex h-full flex-col">
+      <Skeleton className="aspect-square w-full shrink-0" />
       <Skeleton className="mt-3.5 h-2.5 w-20" />
       <Skeleton className="mt-2.5 h-3.5 w-3/4" />
+      <Skeleton className="mt-2.5 h-3.5 w-1/2" />
       <Skeleton className="mt-2.5 h-4 w-24" />
     </div>
   );
@@ -231,7 +239,7 @@ export function ProductGrid({
   }[columns];
 
   return (
-    <div className={clsx('grid gap-x-4 gap-y-8 sm:gap-x-5 sm:gap-y-10', cols, className)}>
+    <div className={clsx('grid items-stretch gap-x-4 gap-y-8 sm:gap-x-5 sm:gap-y-10', cols, className)}>
       {loading
         ? Array.from({ length: skeletonCount }).map((_, i) => (
             // eslint-disable-next-line react/no-array-index-key
