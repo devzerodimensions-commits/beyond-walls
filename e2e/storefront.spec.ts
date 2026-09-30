@@ -137,6 +137,45 @@ test.describe('Storefront', () => {
     await expect(page.getByRole('button', { name: /add to cart|buy now/i })).toHaveCount(0);
   });
 
+  /*
+   * The studio makes nothing at a foot square or under, and the threshold has
+   * already moved twice. Every other required field is filled first, so the
+   * only thing that can stop the form is the size itself -- otherwise this
+   * would pass on the browser's own "this field is required" and prove
+   * nothing.
+   */
+  test('custom order refuses a size of one foot or under', async ({ page }) => {
+    await page.goto('/custom-order');
+
+    await page.getByLabel('Your name').fill('Size Rule Test');
+    await page.getByLabel('Email').fill('size.rule@example.com');
+    await page.getByLabel('Phone').fill('9876543210');
+    await page.locator('select[name="requirement"]').selectOption({ index: 1 });
+    await page.locator('textarea[name="details"]').fill('Checking the minimum size rule.');
+    await page.getByLabel('Unit').selectOption('ft');
+
+    const width = page.getByLabel('Width');
+    const height = page.getByLabel('Height');
+    const main = page.locator('main');
+
+    // Exactly one foot square is refused, not accepted as the minimum.
+    await width.fill('1');
+    await height.fill('1');
+    await expect(main).toContainText(/larger than 1 ft/i);
+
+    await page.getByRole('button', { name: /send request/i }).click();
+    await expect(main).not.toContainText(/request received/i);
+    await expect(main).toContainText(/larger than 1 ft/i);
+
+    // One side over is still not enough — both have to clear it.
+    await width.fill('3');
+    await expect(main).toContainText(/larger than 1 ft/i);
+
+    // Over on both sides, and the warning goes.
+    await height.fill('1.5');
+    await expect(main).not.toContainText(/larger than 1 ft/i);
+  });
+
   test('a page has one brand in its title, not two', async ({ page }) => {
     await page.goto('/shop');
     const title = await page.title();

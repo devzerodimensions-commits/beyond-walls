@@ -243,17 +243,18 @@ export interface CustomSize {
 }
 
 /**
- * Beyond Walls does not take custom work below one foot by one foot.
+ * Custom work has to be LARGER than a foot on both sides.
  *
- * Anything smaller is already in the catalogue and is quicker and cheaper to
- * buy there, so the form says so and points the way rather than collecting an
- * enquiry that will only be turned down.
+ * One foot by one foot is itself refused -- the studio makes nothing at that
+ * size or under, and anything that small is already in the catalogue, where it
+ * is quicker and cheaper to buy. The form says so and points the way rather
+ * than collecting an enquiry that will only be turned down.
  *
- * The studio set this at two feet at first and revised it to one; it is a
- * single constant so the rule, the warning under the field and the message on
- * a rejected size can never drift apart.
+ * The threshold moved from two feet to one, and from "at least" to "more
+ * than", so the comparison lives in isTooSmall() and every message is built
+ * from the same constant. Nothing here can disagree with anything else.
  */
-const MIN_FEET = 1;
+const MUST_EXCEED_FEET = 1;
 
 const TO_FEET: Record<CustomSize['unit'], number> = {
   ft: 1,
@@ -267,20 +268,27 @@ export function toFeet(value: string, unit: CustomSize['unit']): number | null {
   return n * TO_FEET[unit];
 }
 
-/** Returns the reason a size cannot be accepted, or null when it is fine. */
-export function validateSize(size: CustomSize): string | null {
+/** The one place the rule is applied. Null means the size was not readable. */
+export function isTooSmall(size: CustomSize): boolean | null {
   const w = toFeet(size.width, size.unit);
   const h = toFeet(size.height, size.unit);
+  if (w === null || h === null) return null;
 
-  if (w === null || h === null) {
-    return 'Enter the width and height you need.';
-  }
-  // Rounded, so 23.9 inches does not fail on a floating-point hair.
+  // Rounded to the centimetre, so 12.001 inches is treated as the foot it is
+  // rather than passing on a floating-point hair.
   const round = (n: number) => Math.round(n * 100) / 100;
-  if (round(w) < MIN_FEET || round(h) < MIN_FEET) {
-    return `Custom orders start at ${MIN_FEET} ft × ${MIN_FEET} ft. For anything smaller, the ready-made range is quicker and costs less.`;
-  }
-  return null;
+  return round(w) <= MUST_EXCEED_FEET || round(h) <= MUST_EXCEED_FEET;
+}
+
+const TOO_SMALL_MESSAGE =
+  `Custom orders have to be larger than ${MUST_EXCEED_FEET} ft × ${MUST_EXCEED_FEET} ft on both sides. ` +
+  'At that size or under, the ready-made range is quicker and costs less.';
+
+/** Returns the reason a size cannot be accepted, or null when it is fine. */
+export function validateSize(size: CustomSize): string | null {
+  const small = isTooSmall(size);
+  if (small === null) return 'Enter the width and height you need.';
+  return small ? TOO_SMALL_MESSAGE : null;
 }
 
 export function describeSize(size: CustomSize): string {
@@ -295,10 +303,17 @@ function SizeFields({
   error?: string;
   className?: string;
 }) {
-  const w = toFeet(value.width, value.unit);
-  const h = toFeet(value.height, value.unit);
-  const belowMinimum =
-    w !== null && h !== null && (Math.round(w * 100) / 100 < MIN_FEET || Math.round(h * 100) / 100 < MIN_FEET);
+  /*
+   * Same rule the submit handler uses, so the field cannot warn about a size
+   * the form would accept, or accept one it warned about.
+   *
+   * `error` is set by a rejected submit and survives until the next one, so it
+   * is only shown while the size is still wrong. Without that, correcting the
+   * size left the warning on screen and the customer had no way to tell they
+   * had fixed it.
+   */
+  const tooSmall = isTooSmall(value);
+  const showWarning = tooSmall === true || (Boolean(error) && tooSmall !== false);
 
   return (
     <div id="custom-size" className={className}>
@@ -318,7 +333,7 @@ function SizeFields({
           value={value.width}
           onChange={(e) => onChange({ ...value, width: e.target.value })}
           wrapClassName="flex-1"
-          className={belowMinimum ? 'field-error' : undefined}
+          className={tooSmall === true ? 'field-error' : undefined}
         />
         <span className="pt-2.5 text-sm text-ink-400">×</span>
         <Input
@@ -332,7 +347,7 @@ function SizeFields({
           value={value.height}
           onChange={(e) => onChange({ ...value, height: e.target.value })}
           wrapClassName="flex-1"
-          className={belowMinimum ? 'field-error' : undefined}
+          className={tooSmall === true ? 'field-error' : undefined}
         />
         <Select
           aria-label="Unit"
@@ -347,9 +362,9 @@ function SizeFields({
         />
       </div>
 
-      {error || belowMinimum ? (
+      {showWarning ? (
         <p className="mt-2 border border-state-warning/40 bg-[#F8F3E6] px-3 py-2.5 text-xs leading-relaxed text-ink-700" role="alert">
-          {error ?? `Custom orders start at ${MIN_FEET} ft × ${MIN_FEET} ft.`}{' '}
+          {error ?? TOO_SMALL_MESSAGE}{' '}
           <Link to="/shop" className="link-underline font-medium text-ink">
             Browse the ready-made range
           </Link>
@@ -357,7 +372,8 @@ function SizeFields({
         </p>
       ) : (
         <p className="mt-1.5 text-xs text-ink-400">
-          Minimum {MIN_FEET} ft × {MIN_FEET} ft. Smaller pieces are in the ready-made range.
+          Both sides must be over {MUST_EXCEED_FEET} ft. Anything {MUST_EXCEED_FEET} ft or under is
+          in the ready-made range.
         </p>
       )}
     </div>
