@@ -82,18 +82,20 @@ export async function persistUpload(
   );
 
   /*
-   * Catalogue images are normalised to WebP; customer artwork is not.
+   * Every raster image becomes WebP, wherever it was uploaded from -- the
+   * admin panel, or the artwork a customer attaches to a custom order.
    *
-   * A product photo exists to be served, so one format and a sane ceiling on
-   * its dimensions is all upside. Artwork attached to a custom order is the
-   * file the piece gets made from, and re-encoding a 300 DPI original as lossy
-   * WebP would hand the studio something it cannot print. That stays exactly
-   * as the customer sent it.
+   * The two use different profiles. A catalogue photograph is capped at a size
+   * no layout can use and compressed for the wire. Artwork keeps every pixel it
+   * arrived with and is compressed far more gently, because the piece is made
+   * from it rather than looked at on a screen. A PDF is not a raster image and
+   * passes straight through.
    */
-  const optimized =
-    kind === 'image'
-      ? await optimizeImage(file.buffer, validated.mimeType)
-      : null;
+  const optimized = await optimizeImage(
+    file.buffer,
+    validated.mimeType,
+    kind === 'image' ? 'catalogue' : 'original',
+  );
 
   const buffer = optimized?.converted ? optimized.buffer : file.buffer;
   const mimeType = optimized?.converted ? optimized.mimeType : validated.mimeType;

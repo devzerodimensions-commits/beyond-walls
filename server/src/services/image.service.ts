@@ -2,22 +2,33 @@ import sharp from 'sharp';
 import { env } from '../config/env';
 
 /**
- * Every raster image that reaches the catalogue is re-encoded as WebP.
+ * Every raster image uploaded anywhere is re-encoded as WebP.
  *
- * Uploads arrive as whatever the studio happens to have — a 6MB JPEG straight
+ * Uploads arrive as whatever the sender happens to have -- a 6MB JPEG straight
  * off a phone, a screenshot PNG, an AVIF someone exported. Storing them as-is
- * means the storefront serves them as-is, so this normalises the lot: one
- * format, one sensible ceiling on dimensions, no embedded metadata.
+ * means serving them as-is, so this normalises the lot: one format, no
+ * embedded metadata, and a single file rather than an original plus a copy.
  *
  * It runs after validation, so the bytes have already been proven to be the
  * format they claim. Nothing here is a security control.
  */
 
-/** Longest edge, in pixels. Enough for a full-bleed banner on a retina screen. */
-const MAX_EDGE = 2400;
+/**
+ * Two profiles, because the two kinds of upload want opposite things.
+ *
+ * A catalogue photograph exists to be downloaded by a browser, so it is capped
+ * at a size no layout can actually use and compressed for the wire. Artwork
+ * attached to a custom order is what the piece gets made from: it keeps every
+ * pixel it arrived with and is compressed far more gently, because a plate is
+ * cut from it rather than looked at on a screen.
+ */
+export type ImageProfile = 'catalogue' | 'original';
 
-/** WebP quality. 82 is the point where artefacts stop being visible on photographs. */
-const QUALITY = 82;
+const PROFILES: Record<ImageProfile, { maxEdge: number | null; quality: number }> = {
+  // 2400 is past the point any layout here can show, retina included.
+  catalogue: { maxEdge: 2400, quality: 82 },
+  original: { maxEdge: null, quality: 95 },
+};
 
 /** Formats sharp can re-encode. PDFs and anything else pass through untouched. */
 const CONVERTIBLE = new Set([
@@ -41,15 +52,17 @@ export function isConvertible(mimeType: string): boolean {
 }
 
 /**
- * Re-encodes an image as WebP, scaled down to fit MAX_EDGE.
+ * Re-encodes an image as WebP.
  *
- * Returns the original untouched when the type is not a raster image, when the
- * conversion would make the file bigger, or when sharp cannot read it. An
- * upload is the studio's work — a failure to optimise must never lose it.
+ * Returns the original untouched when the type is not a raster image (a PDF
+ * attached to an order, say), when the conversion would make the file bigger,
+ * or when sharp cannot read it. An upload is somebody's work -- a failure to
+ * optimise must never lose it.
  */
 export async function optimizeImage(
   buffer: Buffer,
   mimeType: string,
+  profile: ImageProfile = 'catalogue',
 ): Promise<OptimizedImage> {
   const unchanged: OptimizedImage = {
     buffer,
@@ -71,21 +84,28 @@ export async function optimizeImage(
     // out on their side.
     const pipeline = input.rotate();
 
+    const { maxEdge, quality } = PROFILES[profile];
+
+    // Dimensions are left alone unless the profile asks for a ceiling, and
+    // even then only when the image is actually above it -- nothing is ever
+    // enlarged.
     const longest = Math.max(meta.width ?? 0, meta.pageHeight ?? meta.height ?? 0);
-    if (longest > MAX_EDGE) {
+    if (maxEdge && longest > maxEdge) {
       pipeline.resize({
-        width: MAX_EDGE,
-        height: MAX_EDGE,
+        width: maxEdge,
+        height: maxEdge,
         fit: 'inside',
         withoutEnlargement: true,
       });
     }
 
-    const out = await pipeline.webp({ quality: QUALITY, effort: 4 }).toBuffer();
+    const out = await pipeline.webp({ quality, effort: 4 }).toBuffer();
 
-    // Re-encoding an already-tight WebP or a flat PNG can cost bytes rather
-    // than save them. Keep whichever is smaller.
-    if (out.length >= buffer.length && mimeType === 'image/webp') return unchanged;
+    // Re-encoding an already-tight WebP, or a flat PNG at high quality, can
+    // cost bytes rather than save them. Keep whichever is smaller, unless a
+    // resize means the larger file is genuinely a different image.
+    const resized = Boolean(maxEdge) && longest > (maxEdge ?? Infinity);
+    if (!resized && out.length >= buffer.length && mimeType === 'image/webp') return unchanged;
 
     return { buffer: out, mimeType: 'image/webp', extension: '.webp', converted: true };
   } catch {
