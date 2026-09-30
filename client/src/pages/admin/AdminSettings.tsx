@@ -6,6 +6,7 @@ import { ApiError, api } from '../../lib/api';
 import type { BusinessHour, CheckoutConfig, SettingsMap } from '../../lib/types';
 import { useToast } from '../../context/StoreProvider';
 import { AdminCard, AdminPageHeader, ImageField, StringListEditor } from '../../components/admin/AdminKit';
+import { BrandColorField } from '../../components/admin/BrandColorField';
 import {
   AlertIcon, Badge, Button, Checkbox, Input, PageLoader, Select, Textarea, TrashIcon,
 } from '../../components/ui';
@@ -158,6 +159,11 @@ export default function AdminSettings() {
                   value={values['brand.favicon'] as string | null}
                   folder="logo"
                   onChange={(url) => set('brand.favicon', url)}
+                />
+
+                <BrandColorField
+                  value={str('brand.color')}
+                  onChange={(hex) => set('brand.color', hex)}
                 />
               </div>
             </AdminCard>

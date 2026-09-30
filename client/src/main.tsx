@@ -9,6 +9,9 @@ import './styles/index.css';
 // The admin's own design layer, scoped to `.admin-ui`. Loaded second so its
 // token remappings sit after Tailwind's utilities in the sheet.
 import './styles/admin.css';
+// The chosen brand colour, reaching both. Loaded last so it can take over the
+// admin's accent tokens, which the theme blocks would otherwise win.
+import './styles/brand.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

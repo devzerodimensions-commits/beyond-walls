@@ -5,6 +5,9 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, clearCartSession, tokenStore } from '../lib/api';
 import type { Cart, SiteSettings, User } from '../lib/types';
+import {
+  DEFAULT_BRAND_COLOR, applyBrandPalette, buildBrandPalette, isHexColor,
+} from '../lib/brandColor';
 
 // ---------------------------------------------------------------------------
 // Toasts
@@ -135,6 +138,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }),
     [settingsQuery.data, settingsQuery.isLoading, settingsQuery.isError],
   );
+
+  /*
+   * The brand colour, applied the moment the settings arrive.
+   *
+   * It is set on <html>, so the shop and the admin read the same values: one
+   * setting, one palette, no way for the two to disagree. Everything
+   * downstream of the chosen colour is derived -- see lib/brandColor.ts.
+   */
+  const brandColor = settingsQuery.data?.settings?.['brand.color'];
+  useEffect(() => {
+    const chosen = isHexColor(brandColor) ? brandColor : DEFAULT_BRAND_COLOR;
+    applyBrandPalette(buildBrandPalette(chosen), document.documentElement);
+  }, [brandColor]);
 
   // --- Auth ----------------------------------------------------------------
   const [user, setUser] = useState<User | null>(null);

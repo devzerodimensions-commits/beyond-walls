@@ -1,0 +1,140 @@
+/* ===========================================================================
+   The brand colour, applied
+   ---------------------------------------------------------------------------
+   One colour is chosen in Admin → Settings → Brand. StoreProvider derives the
+   whole palette from it and writes these custom properties onto <html>; this
+   file is where they actually reach the pixels, on the shop and in the admin
+   alike.
+
+   The values below are only fallbacks, for the moment before the settings
+   request lands and for anything rendered without the provider. They are the
+   default emerald, so a cold page never flashes an unstyled accent.
+
+   Loaded last, on purpose: the admin's accent tokens are redefined here, and
+   the per-theme blocks in admin.css carry an attribute selector, so these have
+   to match that weight and come after it to win.
+   =========================================================================== */
+
+:root {
+  --brand: #0E7A57;
+  --brand-hover: #0B6347;
+  --brand-active: #094F39;
+  --brand-ink: #FFFFFF;
+  --brand-strong: #0C6A4B;
+  --brand-on-dark: #43BC90;
+  --brand-soft: #E4F3EC;
+  --brand-subtle: #F2F9F5;
+  --brand-soft-ink: #0C6A4B;
+  --brand-soft-dark: #10382A;
+  --brand-soft-dark-ink: #56C99D;
+  --brand-border: #A9D9C4;
+  --brand-ring: rgba(14, 122, 87, 0.28);
+}
+
+/* ---------------------------------------------------------------------------
+   Storefront
+   ---------------------------------------------------------------------------
+   The shop is deliberately black on off-white; colour is what tells you that
+   something is interactive or selected. These are the places that carry it.
+   --------------------------------------------------------------------------- */
+
+/* Keyboard focus, everywhere. */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--brand), 0 0 0 5px var(--brand-ring);
+}
+
+/* Form fields: the border and the ring both follow the brand. */
+.focus-brand:focus-visible,
+.field:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-ring);
+  outline: none;
+}
+
+::selection {
+  background: var(--brand-soft);
+  color: var(--brand-soft-ink);
+}
+
+/* Primary actions: add to cart, buy now, submit, the hero call to action. */
+[data-btn='primary'] {
+  background-color: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+}
+[data-btn='primary']:hover:not(:disabled) {
+  background-color: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+[data-btn='primary']:active:not(:disabled) {
+  background-color: var(--brand-active);
+  border-color: var(--brand-active);
+}
+
+/* Outlined actions fill with the brand rather than with black. */
+[data-btn='secondary']:hover:not(:disabled) {
+  background-color: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+}
+
+/* Links, and the small capitalised labels that head a section. */
+a.link-underline:hover,
+.text-brand {
+  color: var(--brand-strong);
+}
+
+.eyebrow-accent {
+  color: var(--brand-strong);
+}
+
+/* Anything marked as the accent: highlights, section rules, active states. */
+.brand-fill { background-color: var(--brand); color: var(--brand-ink); }
+.brand-soft { background-color: var(--brand-soft); color: var(--brand-soft-ink); }
+.brand-border { border-color: var(--brand-border); }
+
+/* The header's current page, and the mega menu's previewed category. */
+[aria-current='page'] > .nav-mark,
+.nav-active {
+  color: var(--brand-strong);
+}
+
+/* ---------------------------------------------------------------------------
+   Admin
+   ---------------------------------------------------------------------------
+   The admin keeps its five surface palettes -- the page, panels, borders and
+   text are the theme's. Only the accent is taken over by the brand colour, so
+   the tool and the shop it edits are unmistakably the same product.
+
+   The attribute selector matches the weight of the per-theme blocks in
+   admin.css; without it a theme's own accent would win.
+   --------------------------------------------------------------------------- */
+
+.admin-ui[data-admin-theme] {
+  --a-accent: var(--brand);
+  --a-accent-hover: var(--brand-hover);
+  --a-accent-soft: var(--brand-soft);
+  /* Readable on the tint AND on the panel: the tint is the harder of the two,
+     so satisfying it satisfies both. Using --brand-strong here put a colour
+     chosen for white onto a tinted chip, and it failed. */
+  --a-accent-ink: var(--brand-soft-ink);
+  --a-on-accent: var(--brand-ink);
+
+  --a-side-active: var(--brand-soft);
+  --a-side-active-text: var(--brand-soft-ink);
+
+  --a-ring: var(--brand-ring);
+}
+
+/*
+ * Midnight needs the other end of the scale. A pale wash reads as a bright
+ * block on a dark panel, and the raw brand colour is rarely legible as text
+ * against one, so both are swapped for the dark-surface pair.
+ */
+.admin-ui[data-admin-theme='dark'] {
+  --a-accent-soft: var(--brand-soft-dark);
+  --a-accent-ink: var(--brand-soft-dark-ink);
+  --a-side-active: var(--brand-soft-dark);
+  --a-side-active-text: var(--brand-soft-dark-ink);
+}

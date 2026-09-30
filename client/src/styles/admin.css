@@ -221,6 +221,60 @@
   color: var(--a-accent-ink);
 }
 
+/*
+ * The utility remap comes FIRST, before any component rule.
+ *
+ * Both are one class more specific than a bare utility, so order decides.
+ * With this block last, `.admin-ui .bg-ink` beat `.admin-ui [data-btn=primary]`
+ * and the primary button was painted by the utility instead of by its variant.
+ * That went unnoticed while the accent and the ink were near enough the same
+ * colour; it stopped being invisible the moment the accent became the brand.
+ */
+/* ---------------------------------------------------------------------------
+   Remapping the storefront's utilities
+   ---------------------------------------------------------------------------
+   These utilities are baked light. Inside the admin they resolve to tokens
+   instead, which is what makes a dark theme possible without touching the
+   screens themselves. No `!important` anywhere: the selector carries one extra
+   class, which is already more specific than the utility it replaces.
+   --------------------------------------------------------------------------- */
+
+.admin-ui .bg-paper       { background-color: var(--a-surface); }
+.admin-ui .bg-paper-off,
+.admin-ui .bg-paper-warm,
+.admin-ui .bg-paper-sand,
+.admin-ui .bg-stone-50    { background-color: var(--a-sunken); }
+.admin-ui .bg-ink         { background-color: var(--a-text); }
+.admin-ui .bg-ink-700     { background-color: var(--a-muted); }
+.admin-ui .bg-ink-300,
+.admin-ui .bg-ink-200     { background-color: var(--a-line); }
+
+.admin-ui .text-ink,
+.admin-ui .text-ink-700,
+.admin-ui .text-ink-600   { color: var(--a-text); }
+.admin-ui .text-ink-500   { color: var(--a-muted); }
+.admin-ui .text-ink-400,
+.admin-ui .text-ink-300,
+.admin-ui .text-ink-200   { color: var(--a-faint); }
+/* Paired with bg-ink above, so the two invert together under a dark theme. */
+.admin-ui .text-paper     { color: var(--a-surface); }
+
+.admin-ui .border-stone-line,
+.admin-ui .border-stone-mute,
+.admin-ui .border-ink-300,
+.admin-ui .border-ink-100 { border-color: var(--a-line); }
+.admin-ui .border-ink     { border-color: var(--a-text); }
+.admin-ui .border-paper   { border-color: var(--a-surface); }
+
+.admin-ui .divide-stone-line > :not([hidden]) ~ :not([hidden]) { border-color: var(--a-line-soft); }
+
+.admin-ui .text-state-danger  { color: var(--a-danger); }
+.admin-ui .text-state-warning { color: var(--a-warning); }
+.admin-ui .text-state-success { color: var(--a-success); }
+.admin-ui .bg-state-danger    { background-color: var(--a-danger); }
+.admin-ui .bg-state-warning   { background-color: var(--a-warning); }
+.admin-ui .bg-state-success   { background-color: var(--a-success); }
+
 /* ---------------------------------------------------------------------------
    Surfaces
    --------------------------------------------------------------------------- */
@@ -489,51 +543,6 @@
   outline: 2px solid var(--a-accent);
   outline-offset: 2px;
 }
-
-/* ---------------------------------------------------------------------------
-   Remapping the storefront's utilities
-   ---------------------------------------------------------------------------
-   These utilities are baked light. Inside the admin they resolve to tokens
-   instead, which is what makes a dark theme possible without touching the
-   screens themselves. No `!important` anywhere: the selector carries one extra
-   class, which is already more specific than the utility it replaces.
-   --------------------------------------------------------------------------- */
-
-.admin-ui .bg-paper       { background-color: var(--a-surface); }
-.admin-ui .bg-paper-off,
-.admin-ui .bg-paper-warm,
-.admin-ui .bg-paper-sand,
-.admin-ui .bg-stone-50    { background-color: var(--a-sunken); }
-.admin-ui .bg-ink         { background-color: var(--a-text); }
-.admin-ui .bg-ink-700     { background-color: var(--a-muted); }
-.admin-ui .bg-ink-300,
-.admin-ui .bg-ink-200     { background-color: var(--a-line); }
-
-.admin-ui .text-ink,
-.admin-ui .text-ink-700,
-.admin-ui .text-ink-600   { color: var(--a-text); }
-.admin-ui .text-ink-500   { color: var(--a-muted); }
-.admin-ui .text-ink-400,
-.admin-ui .text-ink-300,
-.admin-ui .text-ink-200   { color: var(--a-faint); }
-/* Paired with bg-ink above, so the two invert together under a dark theme. */
-.admin-ui .text-paper     { color: var(--a-surface); }
-
-.admin-ui .border-stone-line,
-.admin-ui .border-stone-mute,
-.admin-ui .border-ink-300,
-.admin-ui .border-ink-100 { border-color: var(--a-line); }
-.admin-ui .border-ink     { border-color: var(--a-text); }
-.admin-ui .border-paper   { border-color: var(--a-surface); }
-
-.admin-ui .divide-stone-line > :not([hidden]) ~ :not([hidden]) { border-color: var(--a-line-soft); }
-
-.admin-ui .text-state-danger  { color: var(--a-danger); }
-.admin-ui .text-state-warning { color: var(--a-warning); }
-.admin-ui .text-state-success { color: var(--a-success); }
-.admin-ui .bg-state-danger    { background-color: var(--a-danger); }
-.admin-ui .bg-state-warning   { background-color: var(--a-warning); }
-.admin-ui .bg-state-success   { background-color: var(--a-success); }
 
 /* ---------------------------------------------------------------------------
    Blanket corrections

@@ -24,6 +24,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'brand.logoImage', group: 'brand', label: 'Logo image (light background)', value: null },
   { key: 'brand.logoImageDark', group: 'brand', label: 'Logo image (dark background)', value: null },
   { key: 'brand.favicon', group: 'brand', label: 'Favicon', value: null },
+  /*
+   * One colour, applied to the shop and the admin alike. Everything derived
+   * from it -- hover, tints, borders, focus rings and the text that sits on
+   * each -- is computed in client/src/lib/brandColor.ts, so this stays a
+   * single hex rather than a dozen settings that could disagree.
+   */
+  { key: 'brand.color', group: 'brand', label: 'Brand colour', value: '#0E7A57' },
 
   // --- Contact ---------------------------------------------------------------
   { key: 'contact.phone', group: 'contact', label: 'Phone', value: '+91 7600738785' },
