@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid';
 import { env } from '../config/env';
 import { ApiError } from '../utils/http';
 import { validateUpload, type UploadKind } from '../services/fileValidation.service';
+import { optimizeImage } from '../services/image.service';
 import { getStorage, localStorage } from '../services/storage.service';
 
 export const UPLOAD_FOLDERS = [
@@ -80,14 +81,32 @@ export async function persistUpload(
     maxBytes,
   );
 
+  /*
+   * Catalogue images are normalised to WebP; customer artwork is not.
+   *
+   * A product photo exists to be served, so one format and a sane ceiling on
+   * its dimensions is all upside. Artwork attached to a custom order is the
+   * file the piece gets made from, and re-encoding a 300 DPI original as lossy
+   * WebP would hand the studio something it cannot print. That stays exactly
+   * as the customer sent it.
+   */
+  const optimized =
+    kind === 'image'
+      ? await optimizeImage(file.buffer, validated.mimeType)
+      : null;
+
+  const buffer = optimized?.converted ? optimized.buffer : file.buffer;
+  const mimeType = optimized?.converted ? optimized.mimeType : validated.mimeType;
+  const extension = optimized?.converted ? optimized.extension : validated.extension;
+
   // The stored name never reuses the caller's string, so a crafted filename
   // cannot traverse directories or introduce a second extension.
-  const filename = `${validated.safeBaseName}-${nanoid(10)}${validated.extension}`;
+  const filename = `${validated.safeBaseName}-${nanoid(10)}${extension}`;
 
   const stored = await getStorage().put({
-    buffer: file.buffer,
+    buffer,
     filename,
-    mimeType: validated.mimeType,
+    mimeType,
     folder,
   });
 
@@ -95,8 +114,10 @@ export async function persistUpload(
     url: stored.url,
     key: stored.key,
     filename,
-    mimeType: validated.mimeType,
-    size: file.size,
+    mimeType,
+    // The stored size, not the uploaded one — this is what the media library
+    // reports and what a quota would be counted against.
+    size: buffer.length,
     originalName: file.originalname,
   };
 }

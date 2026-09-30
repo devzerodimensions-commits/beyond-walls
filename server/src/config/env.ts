@@ -74,6 +74,11 @@ export const env = {
    */
   clientDist: optional('CLIENT_DIST', path.resolve(process.cwd(), '..', 'client', 'dist')),
   maxUploadMb: num('MAX_UPLOAD_MB', 10),
+  /*
+   * Re-encode uploaded images as WebP and cap their dimensions. On by default;
+   * turn it off only to store exactly what was sent, byte for byte.
+   */
+  optimizeUploads: bool('OPTIMIZE_UPLOADS', true),
 
   // Razorpay — the secret NEVER leaves the server.
   razorpayKeyId: optional('RAZORPAY_KEY_ID'),
