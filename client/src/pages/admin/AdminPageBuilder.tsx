@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -9,9 +9,33 @@ import { useAdminTheme } from '../../lib/adminTheme';
 import { ImageField, ProductPicker } from '../../components/admin/AdminKit';
 import { SectionRenderer } from '../../components/home/Sections';
 import {
-  ArrowRight, Badge, Button, ConfirmDialog, Input, PageLoader, PlusIcon, SearchIcon, Select,
-  Textarea, TrashIcon,
+  ArrowRight, Badge, Button, ChevronDown, CloseIcon, ConfirmDialog, CopyIcon, DragIcon, EyeIcon,
+  Input, PageLoader, PlusIcon, SearchIcon, Select, Textarea, TrashIcon,
 } from '../../components/ui';
+
+/*
+ * Three shapes the shared kit has no use for. They are outlines of a screen, a
+ * tablet and a phone, drawn to the same 24px grid and stroke as everything in
+ * components/ui so the toolbar stays of a piece.
+ */
+const deviceIcon = (body: ReactNode) =>
+  function DeviceIcon({ size = 16 }: { size?: number }) {
+    return (
+      <svg
+        width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+      >
+        {body}
+      </svg>
+    );
+  };
+
+const MonitorIcon = deviceIcon(<><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></>);
+const TabletIcon = deviceIcon(<><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /></>);
+const PhoneFrameIcon = deviceIcon(<><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M12 18h.01" /></>);
+const ArrowLeft = ({ size = 18 }: { size?: number }) => (
+  <ArrowRight size={size} className="rotate-180" />
+);
 
 /**
  * The visual page builder.
@@ -65,6 +89,20 @@ interface BuilderPage {
 
 const GROUP_ORDER: Widget['group'][] = ['Layout', 'Catalogue', 'Content', 'Trust'];
 
+/**
+ * The widths the page can be edited at.
+ *
+ * The frame is the real storefront at that width, not a scaled screenshot, so
+ * what the phone column does here is what it does on a phone.
+ */
+type DeviceKey = 'desktop' | 'tablet' | 'phone';
+
+const DEVICES: Record<DeviceKey, { label: string; width: string; icon: ReactNode }> = {
+  desktop: { label: 'Desktop', width: '100%', icon: <MonitorIcon size={15} /> },
+  tablet: { label: 'Tablet', width: '834px', icon: <TabletIcon size={15} /> },
+  phone: { label: 'Phone', width: '430px', icon: <PhoneFrameIcon size={15} /> },
+};
+
 /** The window's width, kept current as it changes. */
 function useViewportWidth(): number {
   const [width, setWidth] = useState(() =>
@@ -88,8 +126,20 @@ export default function AdminPageBuilder() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [mobileView, setMobileView] = useState(false);
+  const [device, setDevice] = useState<DeviceKey>('desktop');
   const [deleting, setDeleting] = useState<HomeSection | null>(null);
+  /** Where a newly picked block will land. null means the picker is closed. */
+  const [insertAt, setInsertAt] = useState<number | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  /*
+   * The last block removed, kept so it can be put back.
+   *
+   * Deleting is the one action here with no natural way back -- the row is
+   * gone from the database -- so its type, fields and position are held on to
+   * and replayed if the offer in the bar is taken.
+   */
+  const [lastDeleted, setLastDeleted] = useState<{ section: HomeSection; index: number } | null>(null);
   /*
    * Which panels fit alongside the preview.
    *
@@ -100,7 +150,6 @@ export default function AdminPageBuilder() {
    */
   const width = useViewportWidth();
   const layoutMode = width >= 1100 ? 'full' : width >= 700 ? 'compact' : 'phone';
-  const [panel, setPanel] = useState<'blocks' | 'fields'>('blocks');
 
   const pageKey = ['builder-page', pageSlug];
 
@@ -133,7 +182,8 @@ export default function AdminPageBuilder() {
     onSuccess: async (section) => {
       await refresh();
       setSelectedId(section.id);
-      setPanel('fields');
+      setInsertAt(null);
+      setSearch('');
       push('Block added', 'success');
     },
     onError: fail,
@@ -148,6 +198,11 @@ export default function AdminPageBuilder() {
 
   const removeSection = useMutation({
     mutationFn: (id: string) => api.delete(`/admin/builder/pages/${page!.id}/sections/${id}`),
+    onMutate: (id: string) => {
+      const index = sections.findIndex((s) => s.id === id);
+      const section = sections.find((s) => s.id === id);
+      if (section) setLastDeleted({ section, index: Math.max(0, index) });
+    },
     onSuccess: async () => {
       await refresh();
       setSelectedId(null);
@@ -184,6 +239,81 @@ export default function AdminPageBuilder() {
     onError: fail,
   });
 
+  const openPalette = (at: number) => { setInsertAt(at); setSearch(''); };
+
+  /** Drops the dragged block above the block it was released on. */
+  const dropOn = (index: number) => {
+    if (!dragId) return;
+    const from = sections.findIndex((s) => s.id === dragId);
+    setDragId(null);
+    setOverIndex(null);
+    if (from < 0 || from === index) return;
+    const next = [...sections];
+    const [moved] = next.splice(from, 1);
+    next.splice(from < index ? index - 1 : index, 0, moved);
+    reorder.mutate(next.map((s) => s.id));
+  };
+
+  /*
+   * Copies a block by making a new one of the same type and replaying its
+   * fields onto it. There is no duplicate endpoint, and adding one would put
+   * the same logic on the server for the sake of one button.
+   */
+  const duplicate = async (source: HomeSection) => {
+    try {
+      const made = await api.post<HomeSection>(`/admin/builder/pages/${page!.id}/sections`, {
+        type: source.type,
+      });
+      await api.patch(`/admin/builder/pages/${page!.id}/sections/${made.id}`, {
+        title: source.title,
+        subtitle: source.subtitle,
+        bodyText: source.bodyText,
+        ctaLabel: source.ctaLabel,
+        ctaLink: source.ctaLink,
+        config: source.config ?? {},
+        status: source.status,
+      });
+      const at = sections.findIndex((s) => s.id === source.id);
+      const ids = sections.map((s) => s.id);
+      ids.splice(at + 1, 0, made.id);
+      await api.post(`/admin/builder/pages/${page!.id}/sections/reorder`, { ids });
+      await refresh();
+      push('Block duplicated', 'success');
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  /** Puts back the block the bar is offering to restore. */
+  const restoreDeleted = async () => {
+    if (!lastDeleted) return;
+    const { section, index } = lastDeleted;
+    setLastDeleted(null);
+    try {
+      const made = await api.post<HomeSection>(`/admin/builder/pages/${page!.id}/sections`, {
+        type: section.type,
+      });
+      await api.patch(`/admin/builder/pages/${page!.id}/sections/${made.id}`, {
+        title: section.title,
+        subtitle: section.subtitle,
+        bodyText: section.bodyText,
+        ctaLabel: section.ctaLabel,
+        ctaLink: section.ctaLink,
+        config: section.config ?? {},
+        status: section.status,
+      });
+      const ids = sections.filter((s) => s.id !== made.id).map((s) => s.id);
+      ids.splice(Math.min(index, ids.length), 0, made.id);
+      await api.post(`/admin/builder/pages/${page!.id}/sections/reorder`, { ids });
+      await refresh();
+      push('Block restored', 'success');
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  const busy = updateSection.isPending || reorder.isPending || addWidget.isPending;
+
   const move = (id: string, delta: -1 | 1) => {
     const index = sections.findIndex((s) => s.id === id);
     const target = index + delta;
@@ -207,210 +337,138 @@ export default function AdminPageBuilder() {
     return <TooNarrow page={page} />;
   }
 
+  const frameWidth = DEVICES[device].width;
+
   return (
     <div className="admin-ui flex h-screen flex-col overflow-hidden" data-admin-theme={adminTheme}>
       {/* ---------------- Top bar ---------------- */}
       <header
-        className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-3"
+        className="flex shrink-0 items-center gap-3 border-b px-4 py-2.5"
         style={{ background: 'var(--a-surface)', borderColor: 'var(--a-line)' }}
       >
-        <Link
-          to="/admin/design-pages"
-          className="a-btn a-btn-secondary"
-        >
-          ← All pages
+        <Link to="/admin/design-pages" className="a-btn a-btn-ghost px-2" aria-label="Back to all pages">
+          <ArrowLeft size={18} />
         </Link>
 
-        <div className="min-w-0 text-center">
+        <div className="min-w-0">
           <p className="truncate text-sm font-medium text-ink">{page.title}</p>
-          <p className="text-[0.6rem] uppercase tracking-architect text-ink-400">
-            Visual page editor
+          <p className="text-[0.65rem] text-ink-400">
+            {page.status === 'PUBLISHED' ? 'Live' : 'Draft'}
+            {' · '}
+            {sections.length} {sections.length === 1 ? 'block' : 'blocks'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {layoutMode === 'compact' ? (
-            <div
-              className="flex rounded-lg p-0.5"
-              style={{ background: 'var(--a-sunken)', border: '1px solid var(--a-line)' }}
+        <div className="flex-1" />
+
+        {/* Which width the page is being edited at. */}
+        <div
+          className="hidden rounded-[var(--a-radius-sm)] p-0.5 sm:flex"
+          style={{ background: 'var(--a-sunken)', border: '1px solid var(--a-line)' }}
+        >
+          {(Object.keys(DEVICES) as DeviceKey[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setDevice(key)}
+              aria-pressed={device === key}
+              title={DEVICES[key].label}
+              className={clsx(
+                'rounded-[6px] px-2.5 py-1.5 transition-all',
+                device === key
+                  ? 'bg-paper text-ink shadow-[var(--a-shadow)]'
+                  : 'text-[color:var(--a-faint)] hover:text-ink',
+              )}
             >
-              {(['blocks', 'fields'] as const).map((which) => (
-                <button
-                  key={which}
-                  type="button"
-                  onClick={() => setPanel(which)}
-                  className={clsx(
-                    'rounded-[6px] px-3 py-1.5 text-sm font-medium transition-all',
-                    panel === which
-                      ? 'bg-paper text-ink shadow-[var(--a-shadow)]'
-                      : 'text-[color:var(--a-faint)] hover:text-ink',
-                  )}
-                >
-                  {which === 'blocks' ? 'Blocks' : 'Settings'}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={() => setMobileView((v) => !v)}
-            className={clsx('a-btn', mobileView ? 'a-btn-primary' : 'a-btn-secondary')}
-          >
-            {mobileView ? 'Desktop view' : 'Mobile view'}
-          </button>
-
-          <a
-            href={page.slug === 'home' ? '/' : `/${page.slug}`}
-            target="_blank"
-            rel="noreferrer"
-            className="a-btn a-btn-secondary"
-          >
-            Preview
-          </a>
-
-          <Button size="sm" loading={publish.isPending} onClick={() => publish.mutate(page.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED')}>
-            {page.status === 'PUBLISHED' ? 'Unpublish' : 'Publish page'}
-          </Button>
+              {DEVICES[key].icon}
+              <span className="sr-only">{DEVICES[key].label}</span>
+            </button>
+          ))}
         </div>
+
+        {lastDeleted ? (
+          <button type="button" className="a-btn a-btn-secondary" onClick={restoreDeleted}>
+            Undo delete
+          </button>
+        ) : null}
+
+        <span className="hidden text-xs md:inline" style={{ color: 'var(--a-faint)' }}>
+          {busy ? 'Saving…' : 'All changes saved'}
+        </span>
+
+        <a
+          href={page.slug === 'home' ? '/' : '/' + page.slug}
+          target="_blank"
+          rel="noreferrer"
+          className="a-btn a-btn-secondary"
+        >
+          View
+        </a>
+
+        <Button
+          size="sm"
+          loading={publish.isPending}
+          onClick={() => publish.mutate(page.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED')}
+        >
+          {page.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
+        </Button>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {/* ---------------- Left: widgets ---------------- */}
-        <aside
-          className={clsx(
-            'flex w-[17rem] shrink-0 flex-col border-r',
-            layoutMode === 'compact' && panel !== 'blocks' && 'hidden',
-          )}
-          style={{ background: 'var(--a-side)', borderColor: 'var(--a-side-line)', color: 'var(--a-side-text)' }}
-        >
-          <div className="border-b p-4" style={{ borderColor: 'var(--a-side-line)' }}>
-            <div className="relative">
-              <SearchIcon
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--a-faint)]"
-              />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search blocks"
-                className="w-full rounded-lg py-2 pl-9 pr-3 text-sm outline-none"
-                style={{ background: 'var(--a-sunken)', color: 'var(--a-text)', border: '1px solid var(--a-line)' }}
-              />
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {!search ? (
-              <section className="mb-7">
-                <p className="mb-1 text-[0.6rem] uppercase tracking-architect text-[color:var(--a-accent-ink)]">
-                  Ready-made layouts
-                </p>
-                <p className="mb-3 text-[0.65rem] leading-relaxed text-[color:var(--a-muted)]">
-                  One click adds all the usual blocks for that kind of page.
-                </p>
-                <ul className="space-y-2">
-                  {layouts.map((layout) => (
-                    <li key={layout.key}>
-                      <button
-                        type="button"
-                        disabled={useLayout.isPending}
-                        onClick={() =>
-                          useLayout.mutate({ layout: layout.key, replace: false })
-                        }
-                        className="w-full rounded-[var(--a-radius-sm)] border border-[color:var(--a-line)] p-3 text-left transition-colors hover:border-[color:var(--a-accent)] disabled:opacity-50"
-                      >
-                        <span className="block text-xs font-medium">{layout.name}</span>
-                        <span className="mt-0.5 block text-[0.65rem] leading-relaxed text-[color:var(--a-muted)]">
-                          {layout.description}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            <p className="mb-3 text-[0.6rem] uppercase tracking-architect text-[color:var(--a-accent-ink)]">
-              {search ? 'Matching blocks' : 'Add a block'}
-            </p>
-
-            {GROUP_ORDER.map((group) => {
-              const inGroup = filteredWidgets.filter((w) => w.group === group);
-              if (!inGroup.length) return null;
-              return (
-                <section key={group} className="mb-6">
-                  <p className="mb-2 text-[0.6rem] uppercase tracking-architect text-[color:var(--a-faint)]">
-                    {group}
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {inGroup.map((widget) => (
-                      <button
-                        key={widget.type}
-                        type="button"
-                        title={widget.description}
-                        disabled={addWidget.isPending}
-                        onClick={() => addWidget.mutate(widget.type)}
-                        className="flex flex-col items-center gap-1.5 rounded-[var(--a-radius-sm)] border border-[color:var(--a-line)] px-2 py-4 text-center transition-colors hover:border-[color:var(--a-accent)] disabled:opacity-50"
-                      >
-                        <PlusIcon size={15} className="text-[color:var(--a-muted)]" />
-                        <span className="text-[0.65rem] leading-tight">{widget.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-
-            {search && !filteredWidgets.length ? (
-              <p className="text-xs text-[color:var(--a-muted)]">Nothing matches “{search}”.</p>
-            ) : null}
-          </div>
-        </aside>
-
-        {/* ---------------- Middle: the real page ---------------- */}
-        <main className="min-w-0 flex-1 overflow-y-auto p-6" style={{ background: 'var(--a-canvas)' }}>
+        {/* ---------------- The page itself ---------------- */}
+        <main className="min-w-0 flex-1 overflow-y-auto" style={{ background: 'var(--a-canvas)' }}>
           <div
-            className={clsx(
-              'mx-auto overflow-hidden rounded-xl bg-paper shadow-[var(--a-shadow-lift)] transition-[max-width] duration-300',
-              mobileView ? 'max-w-[26rem]' : 'max-w-none',
-            )}
+            data-editor-frame=""
+            className="mx-auto min-h-full bg-paper shadow-[var(--a-shadow-lift)] transition-[max-width] duration-200"
+            style={{ maxWidth: frameWidth, width: '100%' }}
           >
-            {sections.length === 0 ? (
-              <EmptyCanvas layouts={layouts} onApply={(key) => useLayout.mutate({ layout: key, replace: false })} />
+            {!sections.length ? (
+              <EmptyCanvas
+                layouts={layouts}
+                onApply={(key) => useLayout.mutate({ layout: key, replace: false })}
+                onAdd={() => openPalette(0)}
+              />
             ) : (
-              sections.map((section, index) => (
-                <SectionFrame
-                  key={section.id}
-                  index={index}
-                  total={sections.length}
-                  section={section}
-                  widget={widgets.find((w) => w.type === section.type)}
-                  selected={section.id === selectedId}
-                  onSelect={() => { setSelectedId(section.id); setPanel('fields'); }}
-                  onMove={(delta) => move(section.id, delta)}
-                  onDelete={() => setDeleting(section)}
-                  onToggleVisible={() =>
-                    updateSection.mutate({
-                      id: section.id,
-                      patch: { status: section.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED' },
-                    })
-                  }
-                />
-              ))
+              <>
+                <InsertLine onClick={() => openPalette(0)} />
+                {sections.map((section, index) => (
+                  <SectionFrame
+                    key={section.id}
+                    index={index}
+                    total={sections.length}
+                    section={section}
+                    widget={widgets.find((w) => w.type === section.type)}
+                    selected={section.id === selectedId}
+                    dragging={dragId === section.id}
+                    dropTarget={overIndex === index}
+                    onSelect={() => setSelectedId(section.id)}
+                    onMove={(delta) => move(section.id, delta)}
+                    onDuplicate={() => duplicate(section)}
+                    onDelete={() => setDeleting(section)}
+                    onToggleVisible={() =>
+                      updateSection.mutate({
+                        id: section.id,
+                        patch: { status: section.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED' },
+                      })
+                    }
+                    onDragStart={() => setDragId(section.id)}
+                    onDragOver={() => setOverIndex(index)}
+                    onDrop={() => dropOn(index)}
+                    onDragEnd={() => { setDragId(null); setOverIndex(null); }}
+                    onInsertAfter={() => openPalette(index + 1)}
+                  />
+                ))}
+              </>
             )}
           </div>
         </main>
 
-        {/* ---------------- Right: fields ---------------- */}
-        <aside
-          className={clsx(
-            'w-[21rem] shrink-0 overflow-y-auto border-l p-6',
-            layoutMode === 'compact' && panel !== 'fields' && 'hidden',
-          )}
-          style={{ background: 'var(--a-surface)', borderColor: 'var(--a-line)' }}
-        >
-          {selected && selectedWidget ? (
+        {/* ---------------- Editing panel, only while editing ---------------- */}
+        {selected && selectedWidget ? (
+          <aside
+            className="w-[22rem] shrink-0 overflow-y-auto border-l p-5"
+            style={{ background: 'var(--a-surface)', borderColor: 'var(--a-line)' }}
+          >
             <SectionFields
               key={selected.id}
               section={selected}
@@ -419,33 +477,26 @@ export default function AdminPageBuilder() {
               onChange={(patch) => updateSection.mutate({ id: selected.id, patch })}
               onDone={() => setSelectedId(null)}
             />
-          ) : (
-            <div className="pt-10 text-center">
-              <span className="mx-auto mb-5 flex h-11 w-11 items-center justify-center border border-stone-line text-ink-300">
-                <ArrowRight size={18} />
-              </span>
-              <h2 className="text-lg">Click a block to edit it</h2>
-              <p className="mx-auto mt-3 max-w-[15rem] text-xs leading-relaxed text-ink-500">
-                Select any block in the preview and its editing fields appear here.
-              </p>
-              <ol className="mx-auto mt-6 max-w-[15rem] space-y-2 text-left text-xs text-ink-500">
-                <li>1. Add a block, or start from a layout</li>
-                <li>2. Click it in the preview</li>
-                <li>3. Change the words or the picture</li>
-                <li>4. Publish when you are happy</li>
-              </ol>
-              <p className="mt-6 text-2xs leading-relaxed text-ink-400">
-                Every change saves as you make it.
-              </p>
-            </div>
-          )}
-        </aside>
+          </aside>
+        ) : null}
       </div>
+
+      {/* ---------------- Block picker ---------------- */}
+      {insertAt !== null ? (
+        <BlockPalette
+          widgets={filteredWidgets}
+          search={search}
+          onSearch={setSearch}
+          adding={addWidget.isPending}
+          onPick={(type) => addWidget.mutate(type)}
+          onClose={() => { setInsertAt(null); setSearch(''); }}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={Boolean(deleting)}
         title="Remove this block?"
-        message="It will be taken off the page. You can add it again afterwards, but its words and settings are not kept."
+        message="It comes off the page straight away. Undo is offered in the bar afterwards if you change your mind."
         confirmLabel="Remove block"
         tone="danger"
         loading={removeSection.isPending}
@@ -456,16 +507,54 @@ export default function AdminPageBuilder() {
   );
 }
 
+/* ---------------------------------------------------------------------------
+   The thin line between two blocks that adds another one.
+   --------------------------------------------------------------------------- */
+
+function InsertLine({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="group/insert relative z-30 h-0">
+      <div className="absolute inset-x-0 -top-3 flex h-6 items-center justify-center opacity-0 transition-opacity focus-within:opacity-100 hover:opacity-100 group-hover/insert:opacity-100">
+        <span className="h-px flex-1" style={{ background: 'var(--a-accent)' }} />
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label="Add a block here"
+          className="mx-2 flex h-6 items-center gap-1 rounded-full px-2.5 text-[0.65rem] font-medium shadow-[var(--a-shadow)]"
+          style={{ background: 'var(--a-accent)', color: 'var(--a-on-accent)' }}
+        >
+          <PlusIcon size={12} />
+          Add block
+        </button>
+        <span className="h-px flex-1" style={{ background: 'var(--a-accent)' }} />
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // The canvas
 // ---------------------------------------------------------------------------
 
-function EmptyCanvas({ layouts, onApply }: { layouts: Layout[]; onApply: (key: string) => void }) {
+function EmptyCanvas({
+  layouts, onApply, onAdd,
+}: {
+  layouts: Layout[];
+  onApply: (key: string) => void;
+  onAdd: () => void;
+}) {
   return (
     <div className="flex min-h-[28rem] flex-col items-center justify-center px-8 py-20 text-center">
       <h2 className="text-2xl">This page is empty</h2>
       <p className="mt-3 max-w-md text-sm leading-relaxed text-ink-500">
-        Start from a ready-made layout, or add blocks one at a time from the left.
+        Start from a ready-made layout, or add one block at a time.
+      </p>
+      <button type="button" onClick={onAdd} className="a-btn a-btn-primary mt-6">
+        <PlusIcon size={15} />
+        Add your first block
+      </button>
+      <p className="mt-8 text-[0.65rem] uppercase tracking-architect text-ink-400">
+        or start from a layout
       </p>
       <div className="mt-8 grid w-full max-w-lg gap-2 sm:grid-cols-2">
         {layouts.map((layout) => (
@@ -493,117 +582,156 @@ function EmptyCanvas({ layouts, onApply }: { layouts: Layout[]; onApply: (key: s
  * preview is the page. The chrome sits on top and only appears on hover or when
  * the block is selected.
  */
+/**
+ * One block, on the page.
+ *
+ * The controls live on the block rather than in a column somewhere else: hover
+ * it and the toolbar is right there, against the thing it acts on. The frame
+ * itself is the drag handle's payload, so reordering is a drag down the page
+ * rather than a pair of arrow buttons.
+ */
 function SectionFrame({
-  index, total, section, widget, selected, onSelect, onMove, onDelete, onToggleVisible,
+  index, total, section, widget, selected, dragging, dropTarget,
+  onSelect, onMove, onDuplicate, onDelete, onToggleVisible,
+  onDragStart, onDragOver, onDrop, onDragEnd, onInsertAfter,
 }: {
   index: number;
   total: number;
   section: HomeSection;
   widget?: Widget;
   selected: boolean;
+  dragging: boolean;
+  dropTarget: boolean;
   onSelect: () => void;
   onMove: (delta: -1 | 1) => void;
+  onDuplicate: () => void;
   onDelete: () => void;
   onToggleVisible: () => void;
+  onDragStart: () => void;
+  onDragOver: () => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
+  onInsertAfter: () => void;
 }) {
+  // draggable is switched on only while the handle is held, or every text
+  // selection inside the preview would start a drag.
+  const [byHandle, setByHandle] = useState(false);
   const hidden = section.status !== 'PUBLISHED';
   const name = widget?.name ?? section.type;
 
   return (
-    <div
-      className={clsx(
-        'group relative border-2 transition-colors',
-        selected ? 'border-[color:var(--a-accent)]' : 'border-transparent hover:border-[color:var(--a-line)]',
-      )}
-    >
-      {/* Block name */}
-      <span
-        className={clsx(
-          'absolute left-0 top-0 z-20 px-2.5 py-1 text-[0.6rem] uppercase tracking-architect transition-opacity',
-          selected
-            ? 'bg-[color:var(--a-accent)] text-[color:var(--a-on-accent)] opacity-100'
-            : 'bg-ink text-paper opacity-0 group-hover:opacity-100',
-        )}
-      >
-        {index + 1}. {name}
-      </span>
-
-      {/* Controls */}
+    <>
       <div
+        draggable={byHandle}
+        onDragStart={onDragStart}
+        onDragEnd={() => { setByHandle(false); onDragEnd(); }}
+        onDragOver={(e) => { e.preventDefault(); onDragOver(); }}
+        onDrop={(e) => { e.preventDefault(); onDrop(); }}
         className={clsx(
-          'absolute right-0 top-0 z-20 flex transition-opacity',
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          'group/block relative transition-[outline-color,opacity] duration-150',
+          'outline outline-2 -outline-offset-2',
+          dragging && 'opacity-40',
+          selected
+            ? 'outline-[color:var(--a-accent)]'
+            : 'outline-transparent hover:outline-[color:var(--a-border,var(--a-line))]',
         )}
       >
-        <ChromeButton
-          disabled={index === 0}
-          label={`Move ${name} up`}
-          onClick={() => onMove(-1)}
-        >
-          Move up
-        </ChromeButton>
-        <ChromeButton
-          disabled={index === total - 1}
-          label={`Move ${name} down`}
-          onClick={() => onMove(1)}
-        >
-          Move down
-        </ChromeButton>
-        <ChromeButton
-          label={hidden ? `Show ${name}` : `Hide ${name}`}
-          onClick={onToggleVisible}
-        >
-          {hidden ? 'Show' : 'Hide'}
-        </ChromeButton>
-        <ChromeButton destructive label={`Delete ${name}`} onClick={onDelete}>
-          Delete
-        </ChromeButton>
-      </div>
+        {dropTarget && !dragging ? (
+          <span className="absolute inset-x-0 top-0 z-40 h-1" style={{ background: 'var(--a-accent)' }} />
+        ) : null}
 
-      {hidden ? (
-        <span className="absolute left-1/2 top-0 z-20 -translate-x-1/2 bg-state-warning px-2.5 py-1 text-[0.6rem] uppercase tracking-architect text-ink">
-          Hidden from visitors
+        {/* Name, top left. */}
+        <span
+          className={clsx(
+            'pointer-events-none absolute left-0 top-0 z-30 px-2 py-1 text-[0.6rem] font-medium transition-opacity',
+            selected ? 'opacity-100' : 'opacity-0 group-hover/block:opacity-100',
+          )}
+          style={{ background: 'var(--a-accent)', color: 'var(--a-on-accent)' }}
+        >
+          {index + 1}. {name}{hidden ? ' · hidden' : ''}
         </span>
-      ) : null}
 
-      {/*
-        Clicking selects the block. The overlay sits above the real content so a
-        link inside a hero cannot navigate the admin away from the editor.
-      */}
-      <button
-        type="button"
-        aria-label={`Edit ${name}`}
-        onClick={onSelect}
-        className="absolute inset-0 z-10 cursor-pointer"
-      />
+        {/* Toolbar, top right, against the block it acts on. */}
+        <div
+          className={clsx(
+            'absolute right-2 top-2 z-30 flex items-center gap-0.5 rounded-[var(--a-radius-sm)] p-1 shadow-[var(--a-shadow-lift)] transition-opacity',
+            selected ? 'opacity-100' : 'opacity-0 group-hover/block:opacity-100 focus-within:opacity-100',
+          )}
+          style={{ background: 'var(--a-surface)', border: '1px solid var(--a-line)' }}
+        >
+          <span
+            onMouseDown={() => setByHandle(true)}
+            onMouseUp={() => setByHandle(false)}
+            role="button"
+            tabIndex={-1}
+            aria-label={'Drag ' + name + ' to reorder'}
+            title="Drag to reorder"
+            className="flex h-7 w-7 cursor-grab items-center justify-center rounded text-ink-400 hover:text-ink active:cursor-grabbing"
+          >
+            <DragIcon size={14} />
+          </span>
+          <Tool label={'Move ' + name + ' up'} disabled={index === 0} onClick={() => onMove(-1)}>
+            <ChevronDown size={14} className="rotate-180" />
+          </Tool>
+          <Tool label={'Move ' + name + ' down'} disabled={index === total - 1} onClick={() => onMove(1)}>
+            <ChevronDown size={14} />
+          </Tool>
+          <Tool label={'Duplicate ' + name} onClick={onDuplicate}>
+            <CopyIcon size={14} />
+          </Tool>
+          <Tool label={hidden ? 'Show ' + name : 'Hide ' + name} onClick={onToggleVisible}>
+            <EyeIcon size={14} />
+          </Tool>
+          <Tool label={'Remove ' + name} destructive onClick={onDelete}>
+            <TrashIcon size={14} />
+          </Tool>
+          <button
+            type="button"
+            onClick={onSelect}
+            className="ml-0.5 rounded px-2 py-1 text-[0.7rem] font-medium"
+            style={{ background: 'var(--a-accent)', color: 'var(--a-on-accent)' }}
+          >
+            Edit
+          </button>
+        </div>
 
-      <div className={clsx('pointer-events-none', hidden && 'opacity-40 grayscale')}>
-        <SectionRenderer section={section} />
+        {/* The block as the visitor sees it. Clicking anywhere on it edits it. */}
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-label={'Edit ' + name}
+          className={clsx('block w-full cursor-pointer text-left', hidden && 'opacity-45 grayscale')}
+        >
+          <div className="pointer-events-none">
+            <SectionRenderer section={section} />
+          </div>
+        </button>
       </div>
-    </div>
+
+      <InsertLine onClick={onInsertAfter} />
+    </>
   );
 }
 
-function ChromeButton({
-  children, onClick, disabled, destructive, label,
+function Tool({
+  label, children, onClick, disabled, destructive,
 }: {
-  children: React.ReactNode;
+  label: string;
+  children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   destructive?: boolean;
-  /** Says which block this acts on; the visible text alone does not. */
-  label?: string;
 }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      onClick={onClick}
+      title={label}
       className={clsx(
-        'px-2.5 py-1 text-[0.6rem] uppercase tracking-architect transition-colors',
-        destructive ? 'bg-state-danger text-paper hover:opacity-85' : 'bg-ink text-paper hover:bg-ink-700',
-        disabled && 'cursor-not-allowed opacity-30',
+        'flex h-7 w-7 items-center justify-center rounded transition-colors disabled:opacity-30',
+        destructive ? 'text-ink-400 hover:text-state-danger' : 'text-ink-400 hover:text-ink',
       )}
     >
       {children}
@@ -611,17 +739,100 @@ function ChromeButton({
   );
 }
 
-// ---------------------------------------------------------------------------
-// The field panel
-// ---------------------------------------------------------------------------
-
 /**
- * Fields for the selected block, built from the widget's own definition.
+ * The block picker.
  *
- * Text is held locally while it is being typed and saved when the field loses
- * focus, so a save does not fire on every keystroke. Pickers and dropdowns save
- * immediately, because there is nothing to finish typing.
+ * Opened from the line between two blocks, so the choice and the place it will
+ * land are the same gesture. It replaces the column of blocks that used to sit
+ * on the left whether or not anything was being added.
  */
+function BlockPalette({
+  widgets, search, onSearch, adding, onPick, onClose,
+}: {
+  widgets: Widget[];
+  search: string;
+  onSearch: (v: string) => void;
+  adding: boolean;
+  onPick: (type: SectionType) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-start justify-center p-4 pt-[10vh]">
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0"
+        style={{ background: 'rgba(0,0,0,0.45)' }}
+      />
+      <div
+        role="dialog"
+        aria-label="Add a block"
+        className="relative flex max-h-[70vh] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--a-radius)] shadow-[var(--a-shadow-lift)]"
+        style={{ background: 'var(--a-surface)', border: '1px solid var(--a-line)' }}
+      >
+        <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--a-line-soft)' }}>
+          <SearchIcon size={16} style={{ color: 'var(--a-faint)' }} />
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Search blocks…"
+            aria-label="Search blocks"
+            className="w-full bg-transparent text-sm outline-none"
+            style={{ color: 'var(--a-text)' }}
+          />
+          <button type="button" onClick={onClose} aria-label="Close" className="a-btn a-btn-ghost px-2">
+            <CloseIcon size={16} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          {GROUP_ORDER.map((group) => {
+            const inGroup = widgets.filter((w) => w.group === group);
+            if (!inGroup.length) return null;
+            return (
+              <section key={group} className="mb-4">
+                <p className="mb-2 px-1 text-[0.65rem] font-semibold uppercase tracking-wider" style={{ color: 'var(--a-faint)' }}>
+                  {group}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {inGroup.map((w) => (
+                    <button
+                      key={w.type}
+                      type="button"
+                      disabled={adding}
+                      // Named for the block alone; the description stays visible beside
+                      // it but would otherwise be read out as part of the name.
+                      aria-label={w.name}
+                      onClick={() => onPick(w.type)}
+                      className="rounded-[var(--a-radius-sm)] border p-3 text-left transition-colors hover:border-[color:var(--a-accent)] disabled:opacity-50"
+                      style={{ borderColor: 'var(--a-line)' }}
+                    >
+                      <span className="block text-sm font-medium text-ink">{w.name}</span>
+                      <span className="mt-0.5 block text-xs leading-snug text-ink-500">{w.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+
+          {!widgets.length ? (
+            <p className="px-2 py-8 text-center text-sm text-ink-500">Nothing matches that.</p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SectionFields({
   section, widget, saving, onChange, onDone,
 }: {

@@ -110,7 +110,12 @@ test('a page can be built, edited and reordered, and the storefront follows', as
   });
 
   // ---- Add a block --------------------------------------------------------
-  await page.getByRole('button', { name: 'Questions', exact: true }).click();
+  // The "+" between two blocks opens the picker, so choosing what to add and
+  // choosing where it lands are the same gesture.
+  await page.getByRole('button', { name: 'Add a block here' }).first().click();
+  const palette = page.getByRole('dialog', { name: 'Add a block' });
+  await expect(palette).toBeVisible();
+  await palette.getByRole('button', { name: 'Questions', exact: true }).click();
   await expect(labels).toHaveCount(initialCount + 1, { timeout: 15_000 });
 
   // ---- Reorder ------------------------------------------------------------
@@ -122,7 +127,7 @@ test('a page can be built, edited and reordered, and the storefront follows', as
   expect(await labels.first().textContent()).not.toBe(firstLabelBefore);
 
   // ---- Publish, then check the storefront ---------------------------------
-  await page.getByRole('button', { name: /publish page/i }).click();
+  await page.getByRole('button', { name: /^publish$/i }).click();
   await expect(page.getByRole('button', { name: /unpublish/i })).toBeVisible({ timeout: 15_000 });
 
   await page.goto(`/${slug}`);
@@ -177,14 +182,77 @@ test('hiding a block keeps it off the live page but visible in the editor', asyn
 
   const firstName = (await labels.first().textContent())!.replace(/^\d+\.\s*/, '');
   await page.getByRole('button', { name: `Hide ${firstName}` }).click();
-  await expect(page.getByText(/hidden from visitors/i)).toBeVisible({ timeout: 15_000 });
 
-  // Still shown in the editor, so it can be brought back.
+  // Still in the editor, marked as hidden, so it can be brought back.
+  await expect(labels.first()).toContainText('hidden', { timeout: 15_000 });
   await expect(labels).toHaveCount(total);
 
   // The public page serves one block fewer.
   const live = await fetch(`${API}/pages/${slug}/sections`).then((r) => r.json());
   expect(live.data.sections.length).toBe(total - 1);
+});
+
+test('a block can be duplicated, removed, and put back', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'the editor requires a wider screen');
+
+  const made = await adminFetch('/admin/builder/pages', {
+    method: 'POST',
+    body: JSON.stringify({ title: `E2E Copy ${Date.now().toString(36).slice(-4)}`, layout: 'policy' }),
+  });
+  created.push(made.body.data.id);
+
+  await signIn(page);
+  await page.goto(`/admin/builder?page=${made.body.data.slug}`);
+
+  const labels = page.locator('main span').filter({ hasText: /^\d+\./ });
+  await expect(labels.first()).toBeVisible({ timeout: 20_000 });
+  const total = await labels.count();
+  const firstName = (await labels.first().textContent())!.replace(/^\d+\.\s*/, '');
+
+  // ---- Duplicate ----------------------------------------------------------
+  await page.getByRole('button', { name: `Duplicate ${firstName}` }).click();
+  await expect(labels).toHaveCount(total + 1, { timeout: 15_000 });
+
+  // ---- Remove, and change your mind ---------------------------------------
+  await page.getByRole('button', { name: `Remove ${firstName}` }).first().click();
+  await page.getByRole('button', { name: /remove block/i }).click();
+  await expect(labels).toHaveCount(total, { timeout: 15_000 });
+
+  // Deleting is the one action with no way back on its own, so the bar offers
+  // one. It has to actually put the block back.
+  await page.getByRole('button', { name: /undo delete/i }).click();
+  await expect(labels).toHaveCount(total + 1, { timeout: 15_000 });
+});
+
+test('the page can be edited at phone and tablet width', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'the editor requires a wider screen');
+
+  const made = await adminFetch('/admin/builder/pages', {
+    method: 'POST',
+    body: JSON.stringify({ title: `E2E Widths ${Date.now().toString(36).slice(-4)}`, layout: 'policy' }),
+  });
+  created.push(made.body.data.id);
+
+  await signIn(page);
+  await page.goto(`/admin/builder?page=${made.body.data.slug}`);
+  await expect(page.locator('main span').filter({ hasText: /^\d+\./ }).first()).toBeVisible({ timeout: 20_000 });
+
+  const frame = page.locator('[data-editor-frame]');
+  const wide = (await frame.boundingBox())!.width;
+
+  expect(wide).toBeGreaterThan(900);
+
+  // The frame is the real storefront at that width, not a scaled picture of it,
+  // so it has to actually reach the phone width. Polled rather than read once:
+  // the frame animates between widths and a single read lands mid-transition.
+  await page.getByRole('button', { name: 'Phone' }).click();
+  await expect.poll(async () => (await frame.boundingBox())!.width).toBeLessThanOrEqual(431);
+
+  await page.getByRole('button', { name: 'Tablet' }).click();
+  await expect.poll(async () => (await frame.boundingBox())!.width).toBeGreaterThan(600);
+
+  await page.getByRole('button', { name: 'Desktop' }).click();
+  await expect.poll(async () => (await frame.boundingBox())!.width).toBeGreaterThan(900);
 });
 
 test('on a phone the editor explains itself instead of rendering unusably', async ({ page }, testInfo) => {
