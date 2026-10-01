@@ -1266,41 +1266,59 @@ function ItemsEditor({
   // Rows are held locally while they are being typed and written on blur, so a
   // save is not fired on every keystroke.
   const [rows, setRows] = useState<Record<string, string>[]>(value);
+  const rowsRef = useRef(value);
   const sameAsSaved = useRef(JSON.stringify(value));
 
   useEffect(() => {
     const incoming = JSON.stringify(value);
     if (incoming !== sameAsSaved.current) {
       sameAsSaved.current = incoming;
+      rowsRef.current = value;
       setRows(value);
     }
   }, [value]);
 
   const write = (next: Record<string, string>[]) => {
+    rowsRef.current = next;
     setRows(next);
     sameAsSaved.current = JSON.stringify(next);
     onChange(next);
   };
 
-  const setCell = (index: number, key: string, cell: string) =>
-    setRows(rows.map((row, i) => (i === index ? { ...row, [key]: cell } : row)));
+  const setCell = (index: number, key: string, cell: string) => {
+    const next = rowsRef.current.map((row, i) => (i === index ? { ...row, [key]: cell } : row));
+    rowsRef.current = next;
+    setRows(next);
+  };
 
   const commit = () => {
     // Blank rows are dropped rather than saved as empty entries on the page.
-    const cleaned = rows.filter((row) => fields.some((f) => String(row[f.key] ?? '').trim()));
+    // The ref is deliberate: blur can fire before React has rendered the final
+    // input event, so the state captured by this handler can be one character
+    // (or an entire fast fill) behind what is visible in the field.
+    const cleaned = rowsRef.current.filter((row) =>
+      fields.some((f) => String(row[f.key] ?? '').trim()),
+    );
     write(cleaned);
   };
 
   const move = (index: number, delta: -1 | 1) => {
     const target = index + delta;
-    if (target < 0 || target >= rows.length) return;
-    const next = [...rows];
+    if (target < 0 || target >= rowsRef.current.length) return;
+    const next = [...rowsRef.current];
     [next[index], next[target]] = [next[target], next[index]];
     write(next);
   };
 
   return (
-    <div>
+    <div
+      onBlur={(event) => {
+        // Moving between cells in one row must not save midway through the
+        // edit. That refresh can otherwise replace the next focused cell
+        // while it is being typed. Commit once focus leaves this editor.
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) commit();
+      }}
+    >
       <span className="field-label">{label}</span>
       {hint ? <p className="-mt-1 mb-2 text-xs text-ink-400">{hint}</p> : null}
 
@@ -1327,7 +1345,7 @@ function ItemsEditor({
                 </button>
                 <button
                   type="button" aria-label={`Remove item ${index + 1}`}
-                  onClick={() => write(rows.filter((_, i) => i !== index))}
+                  onClick={() => write(rowsRef.current.filter((_, i) => i !== index))}
                   className="flex h-6 w-6 items-center justify-center rounded text-ink-400 hover:text-state-danger"
                 >
                   <TrashIcon size={13} />
@@ -1344,7 +1362,6 @@ function ItemsEditor({
                     rows={2}
                     value={String(row[f.key] ?? '')}
                     onChange={(e) => setCell(index, f.key, e.target.value)}
-                    onBlur={commit}
                   />
                 ) : (
                   <Input
@@ -1352,7 +1369,6 @@ function ItemsEditor({
                     label={f.label}
                     value={String(row[f.key] ?? '')}
                     onChange={(e) => setCell(index, f.key, e.target.value)}
-                    onBlur={commit}
                   />
                 ),
               )}
@@ -1363,7 +1379,17 @@ function ItemsEditor({
 
       <button
         type="button"
-        onClick={() => write([...rows, Object.fromEntries(fields.map((f) => [f.key, '']))])}
+        // A new row is only a local draft until the editor leaves one of its
+        // fields. Persisting the empty row here starts a save that can finish
+        // after the first real edit and replace what the user just typed.
+        onClick={() => {
+          const next = [
+            ...rowsRef.current,
+            Object.fromEntries(fields.map((f) => [f.key, ''])),
+          ];
+          rowsRef.current = next;
+          setRows(next);
+        }}
         className="a-btn a-btn-secondary mt-3 w-full"
       >
         <PlusIcon size={14} />
