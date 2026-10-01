@@ -8,6 +8,7 @@ import type {
   Product, ProductImage, ProductVariant,
 } from '../../lib/types';
 import { slugify, toNumber } from '../../lib/format';
+import { VIDEO_HELP, resolveVideo } from '../../lib/video';
 import { useToast } from '../../context/StoreProvider';
 import {
   AdminCard, AdminPageHeader, MultiImageUpload, SortableList, StringListEditor,
@@ -71,6 +72,8 @@ interface ProductForm {
   livePreviewTemplate: string;
   livePreviewConfig: Record<string, unknown>;
   productionDays: number | null;
+  /** Optional gallery video: a YouTube or Vimeo link, or an mp4. */
+  videoUrl: string | null;
   seoTitle: string;
   seoDescription: string;
   seoKeywords: string;
@@ -87,7 +90,7 @@ const EMPTY_FORM: ProductForm = {
   trackInventory: false, stock: 0, lowStockAlert: 5, minOrderQty: 1, maxOrderQty: null,
   widthInches: null, heightInches: null, depthMm: null, weightGrams: null,
   status: 'DRAFT', featured: false, isNew: false, badge: '', sortOrder: 0,
-  livePreviewEnabled: false, livePreviewTemplate: '', livePreviewConfig: {}, productionDays: null,
+  livePreviewEnabled: false, livePreviewTemplate: '', livePreviewConfig: {}, productionDays: null, videoUrl: null,
   seoTitle: '', seoDescription: '', seoKeywords: '',
   attributeValueIds: [],
 };
@@ -131,6 +134,7 @@ function toForm(product: Product): ProductForm {
     livePreviewTemplate: product.livePreviewTemplate ?? '',
     livePreviewConfig: product.livePreviewConfig ?? {},
     productionDays: product.productionDays ?? null,
+    videoUrl: product.videoUrl ?? null,
     seoTitle: product.seoTitle ?? '',
     seoDescription: product.seoDescription ?? '',
     seoKeywords: product.seoKeywords ?? '',
@@ -410,7 +414,14 @@ export default function AdminProductEdit() {
       ) : null}
 
       {/* ---------------- Images ---------------- */}
-      {tab === 'media' && !isNew ? <ImagesTab productId={id!} images={product?.images ?? []} /> : null}
+      {tab === 'media' && !isNew ? (
+        <ImagesTab
+          productId={id!}
+          images={product?.images ?? []}
+          videoUrl={form.videoUrl ?? ''}
+          onVideoChange={(value) => set('videoUrl', value || null)}
+        />
+      ) : null}
 
       {/* ---------------- Pricing ---------------- */}
       {tab === 'pricing' ? (
@@ -632,7 +643,14 @@ export default function AdminProductEdit() {
 // Images tab
 // ---------------------------------------------------------------------------
 
-function ImagesTab({ productId, images }: { productId: string; images: ProductImage[] }) {
+function ImagesTab({
+  productId, images, videoUrl, onVideoChange,
+}: {
+  productId: string;
+  images: ProductImage[];
+  videoUrl: string;
+  onVideoChange: (value: string) => void;
+}) {
   const queryClient = useQueryClient();
   const { push } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -772,6 +790,14 @@ function ImagesTab({ productId, images }: { productId: string; images: ProductIm
         ) : null}
 
         <MultiImageUpload onUpload={(files) => void upload(files)} uploading={uploading} />
+      </AdminCard>
+
+      <AdminCard
+        title="Product video"
+        description="Optional. Shown as the last slide in the gallery."
+        className="lg:col-span-2"
+      >
+        <VideoField value={videoUrl} onChange={onVideoChange} />
       </AdminCard>
 
       <AdminCard title="Tips">
@@ -1766,5 +1792,78 @@ function FieldForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * The optional product video.
+ *
+ * A link rather than an upload: a video is tens of megabytes, the uploads
+ * directory on the host is wiped on every deploy, and YouTube and Vimeo
+ * already do the transcoding and the bandwidth. The link is checked as it is
+ * typed and played back here, so a wrong paste is obvious before saving.
+ */
+function VideoField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+
+  const trimmed = draft.trim();
+  const video = resolveVideo(trimmed);
+  const broken = Boolean(trimmed) && !video;
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <div>
+        <Input
+          label="Video link"
+          placeholder="https://www.youtube.com/watch?v=…"
+          value={draft}
+          error={broken ? VIDEO_HELP : undefined}
+          hint={broken ? undefined : VIDEO_HELP}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            const next = trimmed;
+            // A link that cannot be played is not saved, so the gallery never
+            // has to cope with one.
+            if (next && !resolveVideo(next)) return;
+            if (next !== (value ?? '')) onChange(next);
+          }}
+        />
+
+        {value ? (
+          <button
+            type="button"
+            className="a-btn a-btn-ghost mt-2 text-state-danger"
+            onClick={() => { setDraft(''); onChange(''); }}
+          >
+            <TrashIcon size={13} />
+            Remove the video
+          </button>
+        ) : null}
+      </div>
+
+      <div>
+        <span className="field-label">Preview</span>
+        {video ? (
+          video.kind === 'file' ? (
+            <video controls preload="metadata" className="aspect-video w-full rounded-[var(--a-radius-sm)] bg-ink">
+              <source src={video.src} />
+            </video>
+          ) : (
+            <iframe
+              src={video.src}
+              title="Video preview"
+              loading="lazy"
+              allowFullScreen
+              className="aspect-video w-full rounded-[var(--a-radius-sm)] border-0 bg-ink"
+            />
+          )
+        ) : (
+          <div className="flex aspect-video w-full items-center justify-center rounded-[var(--a-radius-sm)] border border-dashed border-stone-line text-xs text-ink-400">
+            {broken ? 'That link cannot be played' : 'No video yet'}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

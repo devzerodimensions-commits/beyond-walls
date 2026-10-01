@@ -144,6 +144,8 @@ export interface Product {
   livePreviewTemplate?: string | null;
   livePreviewConfig?: Record<string, unknown>;
   productionDays?: number | null;
+  /** Optional gallery video: a YouTube or Vimeo link, or a direct mp4/webm. */
+  videoUrl?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
   seoKeywords?: string | null;

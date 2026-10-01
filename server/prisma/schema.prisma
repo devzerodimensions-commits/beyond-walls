@@ -365,6 +365,10 @@ model Product {
   /// as the preset; anything set here wins. See preview.service.ts.
   livePreviewConfig   Json    @default("{}")
 
+  /// An optional video for the gallery: a YouTube or Vimeo link, or a direct
+  /// URL to an mp4/webm. Left null on almost every product.
+  videoUrl       String?
+
   productionDays Int?
   seoTitle       String?
   seoDescription String?

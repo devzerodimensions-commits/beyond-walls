@@ -104,6 +104,20 @@ const productSchema = z.object({
   livePreviewConfig: z.record(z.unknown()).optional(),
 
   productionDays: nullableNumber,
+  /*
+   * A YouTube or Vimeo link, or a direct URL to an mp4/webm. Validated in the
+   * admin rather than here beyond a length and a scheme, because a studio
+   * pasting a link should be told what is wrong with it while they are looking
+   * at the field, not after a save.
+   */
+  videoUrl: z
+    .string()
+    .max(500)
+    .refine((v) => !v || /^https?:\/\//i.test(v) || v.startsWith('/uploads/'), {
+      message: 'Enter a full https:// link to the video',
+    })
+    .nullable()
+    .optional(),
   seoTitle: z.string().max(200).nullable().optional(),
   seoDescription: z.string().max(400).nullable().optional(),
   seoKeywords: z.string().max(400).nullable().optional(),

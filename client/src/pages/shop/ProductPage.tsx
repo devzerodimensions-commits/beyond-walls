@@ -241,6 +241,7 @@ export default function ProductPage() {
             <ProductGallery
               images={product.images}
               productName={product.name}
+              videoUrl={product.videoUrl}
               badges={
                 <GalleryBadges badge={product.badge} isNew={product.isNew} discount={discount} />
               }

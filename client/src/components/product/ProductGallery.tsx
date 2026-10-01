@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { assetUrl } from '../../lib/api';
 import type { ProductImage } from '../../lib/types';
+import { resolveVideo } from '../../lib/video';
 import { Badge, ChevronLeft, ChevronRight, CloseIcon } from '../ui';
 
 /**
@@ -9,11 +10,13 @@ import { Badge, ChevronLeft, ChevronRight, CloseIcon } from '../ui';
  * Falls back cleanly to plain tap-through on touch devices.
  */
 export function ProductGallery({
-  images, productName, badges,
+  images, productName, badges, videoUrl,
 }: {
   images: ProductImage[];
   productName: string;
   badges?: React.ReactNode;
+  /** Optional, and usually absent: a YouTube or Vimeo link, or an mp4. */
+  videoUrl?: string | null;
 }) {
   const [active, setActive] = useState(0);
   const [zooming, setZooming] = useState(false);
@@ -21,10 +24,19 @@ export function ProductGallery({
   const [lightbox, setLightbox] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
+  /*
+   * The video, when there is one, is the slide after the last photograph. It
+   * is a slide rather than a separate player so it shares the thumbnails, the
+   * arrows and the dots: one gallery, not a gallery and a video beside it.
+   */
+  const video = resolveVideo(videoUrl);
   const count = images.length;
+  const slides = count + (video ? 1 : 0);
+  const onVideo = Boolean(video) && active === count;
+
   const go = useCallback(
-    (delta: number) => setActive((i) => (i + delta + count) % Math.max(count, 1)),
-    [count],
+    (delta: number) => setActive((i) => (i + delta + slides) % Math.max(slides, 1)),
+    [slides],
   );
 
   useEffect(() => setActive(0), [productName]);
@@ -56,14 +68,16 @@ export function ProductGallery({
   };
 
   if (!count) {
-    return (
+    return video ? (
+      <VideoFrame video={video} title={productName} />
+    ) : (
       <div className="flex aspect-[4/3] items-center justify-center bg-paper-warm text-2xs uppercase tracking-architect text-ink-300 sm:aspect-square">
         No image
       </div>
     );
   }
 
-  const current = images[active];
+  const current = images[Math.min(active, count - 1)];
 
   return (
     <>
@@ -73,7 +87,7 @@ export function ProductGallery({
           The phone already has swipe and the dot indicators, so a second way
           to change image costs a third of the screen for nothing.
         */}
-        {count > 1 ? (
+        {slides > 1 ? (
           <div className="no-scrollbar hidden gap-2.5 overflow-x-auto sm:flex lg:w-[76px] lg:shrink-0 lg:flex-col lg:overflow-visible">
             {images.map((image, index) => (
               <button
@@ -96,12 +110,34 @@ export function ProductGallery({
                 />
               </button>
             ))}
+
+            {video ? (
+              <button
+                type="button"
+                onClick={() => setActive(count)}
+                aria-label="Watch the video"
+                aria-current={onVideo}
+                className={clsx(
+                  'relative aspect-square w-[68px] shrink-0 overflow-hidden border bg-ink transition-colors duration-200 lg:w-full',
+                  onVideo ? 'border-ink' : 'border-stone-line hover:border-ink-300',
+                )}
+              >
+                {video.thumbnail ? (
+                  <img src={video.thumbnail} alt="" loading="lazy" className="h-full w-full object-cover opacity-70" />
+                ) : null}
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <PlayMark />
+                </span>
+              </button>
+            ) : null}
           </div>
         ) : null}
 
         {/* Main frame */}
         <div className="relative min-w-0 flex-1">
+          {onVideo ? <VideoFrame video={video!} title={productName} /> : null}
           <div
+            hidden={onVideo}
             ref={frameRef}
             onMouseEnter={() => setZooming(true)}
             onMouseLeave={() => setZooming(false)}
@@ -133,16 +169,18 @@ export function ProductGallery({
           </div>
 
           {/* Mobile arrows */}
-          {count > 1 ? (
+          {slides > 1 ? (
             <>
               <GalleryArrow side="left" onClick={() => go(-1)} />
               <GalleryArrow side="right" onClick={() => go(1)} />
               <div className="mt-3 flex justify-center gap-1.5 lg:hidden">
-                {images.map((image, index) => (
+                {Array.from({ length: slides }).map((_, index) => (
                   <span
-                    key={image.url}
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={index}
                     className={clsx(
-                      'h-1 w-5 transition-colors',
+                      'h-1 transition-colors',
+                      video && index === count ? 'w-3' : 'w-5',
                       index === active ? 'bg-ink' : 'bg-stone-mute',
                     )}
                   />
@@ -256,5 +294,53 @@ export function GalleryBadges({
       {isNew && !badge ? <Badge tone="dark">New</Badge> : null}
       {discount ? <Badge tone="danger">−{discount}%</Badge> : null}
     </>
+  );
+}
+
+/**
+ * The video slide.
+ *
+ * YouTube and Vimeo are iframes; anything else is a real <video> with the
+ * browser's own controls. Nothing autoplays — a product page that starts
+ * making noise when you scroll to it is an ambush, not a feature.
+ */
+function VideoFrame({ video, title }: { video: NonNullable<ReturnType<typeof resolveVideo>>; title: string }) {
+  if (video.kind === 'file') {
+    return (
+      <video
+        controls
+        preload="metadata"
+        playsInline
+        className="aspect-[4/3] w-full bg-ink object-contain sm:aspect-square"
+        aria-label={`${title} — video`}
+      >
+        <source src={assetUrl(video.src)} />
+        Your browser cannot play this video.
+      </video>
+    );
+  }
+
+  return (
+    <div className="aspect-[4/3] w-full overflow-hidden bg-ink sm:aspect-square">
+      <iframe
+        src={video.src}
+        title={`${title} — video`}
+        loading="lazy"
+        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
+        className="h-full w-full border-0"
+      />
+    </div>
+  );
+}
+
+/** The triangle on the video thumbnail. */
+function PlayMark() {
+  return (
+    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-paper/90">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" className="ml-0.5">
+        <path d="M2 1.5 10.5 6 2 10.5Z" fill="currentColor" className="text-ink" />
+      </svg>
+    </span>
   );
 }
