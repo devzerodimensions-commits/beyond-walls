@@ -19,7 +19,8 @@
     "verify:payments": "node scripts/verify-payments.mjs",
     "sandbox:razorpay": "node scripts/razorpay-sandbox-server.mjs",
     "postinstall": "prisma generate",
-    "build:deploy": "prisma migrate deploy && npm run build"
+    "build:deploy": "prisma migrate deploy && npm run build && node scripts/register-uploads.mjs",
+    "register:uploads": "node scripts/register-uploads.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
