@@ -20,7 +20,9 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   // --- Brand -----------------------------------------------------------------
   { key: 'brand.name', group: 'brand', label: 'Business name', value: 'Beyond Walls' },
   { key: 'brand.logoText', group: 'brand', label: 'Text logo (used until artwork is supplied)', value: 'BEYOND WALLS' },
-  { key: 'brand.logoTagline', group: 'brand', label: 'Logo tagline', value: 'SIGNAGE STUDIO' },
+  /* Empty by default: the studio wants the mark to stand on its own. Set one
+     in Admin -> Brand and it appears under the logo again. */
+  { key: 'brand.logoTagline', group: 'brand', label: 'Logo tagline', value: '' },
   { key: 'brand.logoImage', group: 'brand', label: 'Logo image (light background)', value: null },
   { key: 'brand.logoImageDark', group: 'brand', label: 'Logo image (dark background)', value: null },
   { key: 'brand.favicon', group: 'brand', label: 'Favicon', value: null },
