@@ -723,33 +723,25 @@ function bulkIds(body: unknown): string[] {
 /*
  * Into the trash.
  *
- * A file still used somewhere is refused by name rather than as a count, so
- * whoever selected forty thumbnails knows which ones to put back. Everything
- * that is free is moved, so one awkward file does not block the rest.
+ * Nothing is refused here, even a file a product is using. The trash only sets
+ * a date on the row: the file stays on disk and every page still showing it
+ * carries on working, so putting one in the trash cannot break anything and
+ * can be undone by clicking Restore.
+ *
+ * The check that matters runs at the other end, where the file is actually
+ * removed. Refusing at this step as well made tidying up impossible: a library
+ * full of old artwork could not be cleared without first hunting down every
+ * reference, for an action that was never destructive.
  */
 router.post(
   '/media/trash',
   asyncHandler(async (req, res) => {
     const ids = bulkIds(req.body);
-    const assets = await prisma.mediaAsset.findMany({ where: { id: { in: ids } } });
-
-    const blocked: string[] = [];
-    const movable: string[] = [];
-
-    for (const asset of assets) {
-      const inUse = await fileReferenceCount(asset.url);
-      if (inUse > 0) blocked.push(asset.filename);
-      else movable.push(asset.id);
-    }
-
-    if (movable.length) {
-      await prisma.mediaAsset.updateMany({
-        where: { id: { in: movable } },
-        data: { deletedAt: new Date() },
-      });
-    }
-
-    res.json({ success: true, data: { moved: movable.length, blocked } });
+    const { count } = await prisma.mediaAsset.updateMany({
+      where: { id: { in: ids } },
+      data: { deletedAt: new Date() },
+    });
+    res.json({ success: true, data: { moved: count, blocked: [] } });
   }),
 );
 

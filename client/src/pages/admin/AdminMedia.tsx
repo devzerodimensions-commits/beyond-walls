@@ -33,7 +33,6 @@ export default function AdminMedia() {
   const [uploadFolder, setUploadFolder] = useState('general');
   const [uploading, setUploading] = useState(false);
   const [viewing, setViewing] = useState<MediaAsset | null>(null);
-  const [deleting, setDeleting] = useState<MediaAsset | null>(null);
   /** Which shelf is on screen: the library, or what has been thrown away. */
   const [view, setView] = useState<'library' | 'trash'>('library');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -84,20 +83,6 @@ export default function AdminMedia() {
     onSuccess: async () => {
       await invalidate();
       push('Saved', 'success');
-    },
-  });
-
-  const remove = useMutation({
-    mutationFn: (id: string) => api.delete(`/admin/media/${id}`),
-    onSuccess: async () => {
-      await invalidate();
-      setDeleting(null);
-      setViewing(null);
-      push('File deleted', 'info');
-    },
-    onError: (err) => {
-      push(err instanceof ApiError ? err.message : 'Could not delete', 'error');
-      setDeleting(null);
     },
   });
 
@@ -437,18 +422,31 @@ export default function AdminMedia() {
                 <dd>{formatDate(viewing.createdAt)}</dd>
               </div>
             </dl>
+
+            <div className="flex justify-end border-t border-stone-line pt-4">
+              {trashed ? (
+                <Button
+                  variant="secondary"
+                  loading={bulk.isPending}
+                  onClick={() => { act('restore', [viewing.id]); setViewing(null); }}
+                >
+                  <RefreshIcon size={14} />
+                  Restore
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  loading={bulk.isPending}
+                  onClick={() => { act('trash', [viewing.id]); setViewing(null); }}
+                >
+                  <TrashIcon size={14} />
+                  Move to trash
+                </Button>
+              )}
+            </div>
           </div>
         ) : null}
       </Modal>
-
-      <ConfirmDialog
-        open={Boolean(deleting)}
-        title="Delete this file?"
-        message="The file is removed from the server. If a product still uses it, the deletion is blocked."
-        loading={remove.isPending}
-        onCancel={() => setDeleting(null)}
-        onConfirm={() => deleting && remove.mutate(deleting.id)}
-      />
 
       {/*
         The only step that cannot be undone, so it is the only one that asks.

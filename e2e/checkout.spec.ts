@@ -50,7 +50,33 @@ test.beforeAll(async () => {
     body: JSON.stringify({ code: COUPON, type: 'PERCENT', value: 10, status: 'PUBLISHED' }),
   });
   couponId = coupon.data?.id ?? '';
+
+  await restock();
 });
+
+/*
+ * Puts the stock back before the run.
+ *
+ * This suite places real orders, and a real order takes real stock. Run it
+ * enough times and the product it buys sells out, at which point the add-to-
+ * cart test fails for a reason that has nothing to do with the code -- which
+ * is exactly what happened after a few dozen runs.
+ *
+ * Topping up beforehand rather than restoring afterwards means an interrupted
+ * run cannot leave the fixture empty either.
+ */
+async function restock() {
+  const products = await adminFetch('/admin/products?perPage=100');
+  for (const product of products.data ?? []) {
+    for (const variant of product.variants ?? []) {
+      if ((variant.stock ?? 0) >= 10) continue;
+      await adminFetch(`/admin/products/${product.id}/variants/${variant.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stock: 40 }),
+      });
+    }
+  }
+}
 
 test.afterAll(async () => {
   if (couponId) await adminFetch(`/admin/coupons/${couponId}`, { method: 'DELETE' });
