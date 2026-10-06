@@ -116,7 +116,7 @@ const CATEGORY_TREE: CategorySeed[] = [
     shortText: 'Nameplates for homes, apartments and villas.',
     description:
       'Nameplates for home entrances, apartments, villas and bungalows. Choose by material, style and shape, and personalise the plate with your family name and house number.',
-    image: '/uploads/products/minimal-acrylic-name-plate-2.png',
+    image: '/uploads/products/minimal-acrylic-name-plate-2.webp',
     seoTitle: 'Home Nameplates in Ahmedabad | Beyond Walls',
     seoDescription:
       'Personalised home nameplates in stainless steel, acrylic and mild steel. Minimal, traditional, modern and experimental styles in rectangle, square, oval and circle shapes.',
@@ -177,7 +177,7 @@ const CATEGORY_TREE: CategorySeed[] = [
     shortText: 'Prohibition, way finding and mandatory signage.',
     description:
       'Informative and safety signage in acrylic, stainless steel and foam board for offices, commercial complexes and restaurants.',
-    image: '/uploads/products/no-smoking-sign-3.png',
+    image: '/uploads/products/no-smoking-sign-3.webp',
     seoTitle: 'Safety & Informative Signs in Ahmedabad | Beyond Walls',
     seoDescription:
       'Prohibition signs, way finding and mandatory signage in acrylic, stainless steel and foam board.',
@@ -435,9 +435,9 @@ async function seedProducts(
       seoKeywords: 'no smoking sign, prohibition sign, acrylic sign, safety signage, Ahmedabad',
       images: {
         create: [
-          { url: '/uploads/products/no-smoking-sign-1.png', alt: 'No Smoking Sign in acrylic', sortOrder: 0, isPrimary: true },
-          { url: '/uploads/products/no-smoking-sign-2.png', alt: 'No Smoking Sign dimensions: 6.5 x 7 inches', sortOrder: 1 },
-          { url: '/uploads/products/no-smoking-sign-3.png', alt: 'No Smoking Sign mounted in a meeting room', sortOrder: 2 },
+          { url: '/uploads/products/no-smoking-sign-1.webp', alt: 'No Smoking Sign in acrylic', sortOrder: 0, isPrimary: true },
+          { url: '/uploads/products/no-smoking-sign-2.webp', alt: 'No Smoking Sign dimensions: 6.5 x 7 inches', sortOrder: 1 },
+          { url: '/uploads/products/no-smoking-sign-3.webp', alt: 'No Smoking Sign mounted in a meeting room', sortOrder: 2 },
         ],
       },
       variants: {
@@ -557,18 +557,18 @@ async function seedProducts(
       images: {
         create: [
           {
-            url: '/uploads/products/minimal-acrylic-name-plate-1.png',
+            url: '/uploads/products/minimal-acrylic-name-plate-1.webp',
             alt: 'Minimal acrylic name plate with house number and family name',
             sortOrder: 0,
             isPrimary: true,
           },
           {
-            url: '/uploads/products/minimal-acrylic-name-plate-2.png',
+            url: '/uploads/products/minimal-acrylic-name-plate-2.webp',
             alt: 'Minimal acrylic name plate mounted beside a front door',
             sortOrder: 1,
           },
           {
-            url: '/uploads/products/minimal-acrylic-name-plate-3.png',
+            url: '/uploads/products/minimal-acrylic-name-plate-3.webp',
             alt: 'Minimal acrylic name plate on a console table',
             sortOrder: 2,
           },
@@ -756,12 +756,12 @@ async function syncPlaceholderPricing(
 // ---------------------------------------------------------------------------
 async function seedMedia() {
   const files = [
-    'minimal-acrylic-name-plate-1.png',
-    'minimal-acrylic-name-plate-2.png',
-    'minimal-acrylic-name-plate-3.png',
-    'no-smoking-sign-1.png',
-    'no-smoking-sign-2.png',
-    'no-smoking-sign-3.png',
+    'minimal-acrylic-name-plate-1.webp',
+    'minimal-acrylic-name-plate-2.webp',
+    'minimal-acrylic-name-plate-3.webp',
+    'no-smoking-sign-1.webp',
+    'no-smoking-sign-2.webp',
+    'no-smoking-sign-3.webp',
   ];
 
   for (const filename of files) {
@@ -935,7 +935,7 @@ async function seedHomepage() {
         title: 'Nameplates & signage',
         subtitle:
           'Home nameplates, office branding, GST plates, QR stands, desk plates, prints and safety signage.',
-        image: '/uploads/products/minimal-acrylic-name-plate-2.png',
+        image: '/uploads/products/minimal-acrylic-name-plate-2.webp',
         link: '/shop',
         ctaLabel: 'Browse the shop',
         placement: 'HOME_HERO',
@@ -947,10 +947,10 @@ async function seedHomepage() {
 
   // Gallery from the supplied lifestyle photography.
   const gallery = [
-    { image: '/uploads/products/minimal-acrylic-name-plate-2.png', title: 'Minimal acrylic name plate', tag: 'Nameplates' },
-    { image: '/uploads/products/minimal-acrylic-name-plate-3.png', title: 'Name plate, interior setting', tag: 'Nameplates' },
-    { image: '/uploads/products/no-smoking-sign-3.png', title: 'No smoking sign, meeting room', tag: 'Signage' },
-    { image: '/uploads/products/no-smoking-sign-1.png', title: 'No smoking sign', tag: 'Signage' },
+    { image: '/uploads/products/minimal-acrylic-name-plate-2.webp', title: 'Minimal acrylic name plate', tag: 'Nameplates' },
+    { image: '/uploads/products/minimal-acrylic-name-plate-3.webp', title: 'Name plate, interior setting', tag: 'Nameplates' },
+    { image: '/uploads/products/no-smoking-sign-3.webp', title: 'No smoking sign, meeting room', tag: 'Signage' },
+    { image: '/uploads/products/no-smoking-sign-1.webp', title: 'No smoking sign', tag: 'Signage' },
   ];
 
   for (const [index, item] of gallery.entries()) {

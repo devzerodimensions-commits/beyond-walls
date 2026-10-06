@@ -71,6 +71,75 @@ async function main() {
   }
 
   console.log(`media library: ${added} added, ${already} already listed`);
+
+  await repointConvertedImages();
+}
+
+/**
+ * Follows images that have been re-encoded since they were first referenced.
+ *
+ * The product photographs shipped as PNGs -- 6.6MB of them, for six pictures --
+ * and were converted to WebP, which took them to 449KB. The files changed name
+ * with the format, and the rows pointing at them did not: a database is not
+ * deployed, so every environment still asked for a .png that no longer exists.
+ *
+ * Only rows whose file has actually gone AND whose .webp replacement is present
+ * are moved. A row pointing at a file that still exists is never touched, so
+ * this cannot disturb anything the studio uploaded.
+ */
+async function repointConvertedImages() {
+  const moved = [];
+
+  const rename = (url) => url.replace(/\.(png|jpg|jpeg)$/i, '.webp');
+  const onDisk = (url) => fs.existsSync(path.join(UPLOADS, url.replace('/uploads/', '')));
+
+  /** Rows worth following: a dead file with a live .webp beside it. */
+  const needsMove = (url) =>
+    typeof url === 'string' &&
+    url.startsWith('/uploads/') &&
+    /\.(png|jpg|jpeg)$/i.test(url) &&
+    !onDisk(url) &&
+    onDisk(rename(url));
+
+  const tables = [
+    ['ProductImage', 'url', (where, data) => prisma.productImage.updateMany({ where, data })],
+    ['GalleryItem', 'image', (where, data) => prisma.galleryItem.updateMany({ where, data })],
+    ['Category', 'image', (where, data) => prisma.category.updateMany({ where, data })],
+    ['MediaAsset', 'url', (where, data) => prisma.mediaAsset.updateMany({ where, data })],
+    ['Banner', 'image', (where, data) => prisma.banner.updateMany({ where, data })],
+  ];
+
+  for (const [label, field, update] of tables) {
+    let rows = [];
+    try {
+      rows = await prisma[label[0].toLowerCase() + label.slice(1)].findMany({
+        select: { id: true, [field]: true },
+      });
+    } catch {
+      continue; // a table this build does not have
+    }
+
+    for (const row of rows) {
+      const url = row[field];
+      if (!needsMove(url)) continue;
+      // MediaAsset keys on a unique url, so a stale duplicate is dropped rather
+      // than collided with.
+      try {
+        await update({ id: row.id }, { [field]: rename(url) });
+        moved.push(label);
+      } catch {
+        if (label === 'MediaAsset') await prisma.mediaAsset.delete({ where: { id: row.id } }).catch(() => {});
+      }
+    }
+  }
+
+  if (moved.length) {
+    const counts = moved.reduce((acc, t) => ({ ...acc, [t]: (acc[t] || 0) + 1 }), {});
+    console.log(
+      'repointed to webp: ' +
+        Object.entries(counts).map(([t, n]) => `${t} ${n}`).join(', '),
+    );
+  }
 }
 
 main()

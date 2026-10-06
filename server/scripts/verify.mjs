@@ -301,7 +301,7 @@ async function main() {
     const img = await call(`/admin/products/${productId}/images/link`, {
       method: 'POST',
       token: adminToken,
-      body: { url: '/uploads/products/no-smoking-sign-1.png', alt: 'Original alt' },
+      body: { url: '/uploads/products/no-smoking-sign-1.webp', alt: 'Original alt' },
     });
     const alt = await call(`/admin/products/${productId}/images/${img.data?.id}`, {
       method: 'PATCH',
@@ -526,7 +526,7 @@ async function main() {
     check('application/octet-stream blocked', octetUpload.status === 400);
 
     // Served uploads must carry hardening headers.
-    const served = await fetch(`${ROOT}/uploads/products/no-smoking-sign-1.png`);
+    const served = await fetch(`${ROOT}/uploads/products/no-smoking-sign-1.webp`);
     check('Uploads served with nosniff', served.headers.get('x-content-type-options') === 'nosniff');
     check('Uploads served with a restrictive CSP',
       (served.headers.get('content-security-policy') ?? '').includes('sandbox'));
@@ -539,7 +539,7 @@ async function main() {
       ['faqs', { question: 'Verify question?', answer: 'Verify answer.', status: 'PUBLISHED' }, 'FAQ'],
       ['testimonials', { name: 'Verify Person', content: 'Verify quote.', rating: 5, status: 'DRAFT' }, 'Testimonial'],
       ['banners', { title: 'Verify banner', placement: 'HOME_HERO', status: 'DRAFT' }, 'Banner'],
-      ['gallery', { title: 'Verify image', image: '/uploads/products/no-smoking-sign-1.png', status: 'DRAFT' }, 'Gallery item'],
+      ['gallery', { title: 'Verify image', image: '/uploads/products/no-smoking-sign-1.webp', status: 'DRAFT' }, 'Gallery item'],
       ['nav-links', { label: 'Verify link', href: '/verify', group: 'footer', status: 'DRAFT' }, 'Nav link'],
     ]) {
       const made = await call(`/admin/${resource}`, { method: 'POST', token: adminToken, body: payload });
@@ -575,7 +575,7 @@ async function main() {
     await call(`/admin/reviews/${review.data?.id}`, { method: 'DELETE', token: adminToken });
 
     // Regression: deleting a record must not delete a file another record uses.
-    const sharedUrl = '/uploads/products/no-smoking-sign-1.png';
+    const sharedUrl = '/uploads/products/no-smoking-sign-1.webp';
     const tile = await call('/admin/gallery', {
       method: 'POST', token: adminToken,
       body: { title: 'Shares a product image', image: sharedUrl, status: 'DRAFT' },
