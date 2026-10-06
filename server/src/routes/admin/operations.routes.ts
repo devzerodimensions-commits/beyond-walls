@@ -636,19 +636,34 @@ router.get(
   '/media',
   asyncHandler(async (req, res) => {
     const { page, perPage, skip, take } = parsePagination(req.query as Record<string, unknown>, 40, 200);
-    const where: Prisma.MediaAssetWhereInput = {};
+    /*
+     * The library shows what is in use; the trash is asked for by name. A
+     * folder filter applies to both, so searching inside the trash works the
+     * same way as searching outside it.
+     */
+    const inTrash = String(req.query.trashed ?? '') === '1';
+    const where: Prisma.MediaAssetWhereInput = inTrash
+      ? { deletedAt: { not: null } }
+      : { deletedAt: null };
+
     if (req.query.folder) where.folder = String(req.query.folder);
     if (req.query.search) where.filename = { contains: String(req.query.search), mode: 'insensitive' };
 
-    const [items, total] = await Promise.all([
-      prisma.mediaAsset.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take }),
+    const [items, total, trashCount] = await Promise.all([
+      prisma.mediaAsset.findMany({
+        where,
+        orderBy: inTrash ? { deletedAt: 'desc' } : { createdAt: 'desc' },
+        skip,
+        take,
+      }),
       prisma.mediaAsset.count({ where }),
+      prisma.mediaAsset.count({ where: { deletedAt: { not: null } } }),
     ]);
 
     res.json({
       success: true,
       data: items,
-      meta: { ...buildPageMeta(page, perPage, total), folders: UPLOAD_FOLDERS },
+      meta: { ...buildPageMeta(page, perPage, total), folders: UPLOAD_FOLDERS, trashCount },
     });
   }),
 );
@@ -693,6 +708,94 @@ router.patch(
       data: { alt: req.body?.alt ?? null, folder: req.body?.folder ?? undefined },
     });
     res.json({ success: true, data: asset });
+  }),
+);
+
+/** The ids a bulk action was asked to act on. */
+function bulkIds(body: unknown): string[] {
+  const ids = (body as { ids?: unknown })?.ids;
+  if (!Array.isArray(ids) || !ids.length) {
+    throw ApiError.badRequest('Select at least one file');
+  }
+  return ids.map(String).slice(0, 200);
+}
+
+/*
+ * Into the trash.
+ *
+ * A file still used somewhere is refused by name rather than as a count, so
+ * whoever selected forty thumbnails knows which ones to put back. Everything
+ * that is free is moved, so one awkward file does not block the rest.
+ */
+router.post(
+  '/media/trash',
+  asyncHandler(async (req, res) => {
+    const ids = bulkIds(req.body);
+    const assets = await prisma.mediaAsset.findMany({ where: { id: { in: ids } } });
+
+    const blocked: string[] = [];
+    const movable: string[] = [];
+
+    for (const asset of assets) {
+      const inUse = await fileReferenceCount(asset.url);
+      if (inUse > 0) blocked.push(asset.filename);
+      else movable.push(asset.id);
+    }
+
+    if (movable.length) {
+      await prisma.mediaAsset.updateMany({
+        where: { id: { in: movable } },
+        data: { deletedAt: new Date() },
+      });
+    }
+
+    res.json({ success: true, data: { moved: movable.length, blocked } });
+  }),
+);
+
+/** Back out of the trash. */
+router.post(
+  '/media/restore',
+  asyncHandler(async (req, res) => {
+    const ids = bulkIds(req.body);
+    const { count } = await prisma.mediaAsset.updateMany({
+      where: { id: { in: ids } },
+      data: { deletedAt: null },
+    });
+    res.json({ success: true, data: { restored: count } });
+  }),
+);
+
+/*
+ * Gone for good: the row and the file.
+ *
+ * Only acts on what is already in the trash, so this can never be the first
+ * thing that happens to a file. The reference check runs again -- something
+ * could have started using the file while it sat in the trash.
+ */
+router.post(
+  '/media/destroy',
+  asyncHandler(async (req, res) => {
+    const ids = bulkIds(req.body);
+    const assets = await prisma.mediaAsset.findMany({
+      where: { id: { in: ids }, deletedAt: { not: null } },
+    });
+
+    const blocked: string[] = [];
+    let destroyed = 0;
+
+    for (const asset of assets) {
+      const inUse = await fileReferenceCount(asset.url);
+      if (inUse > 0) {
+        blocked.push(asset.filename);
+        continue;
+      }
+      await prisma.mediaAsset.delete({ where: { id: asset.id } });
+      deleteUploadedFile(asset.url);
+      destroyed += 1;
+    }
+
+    res.json({ success: true, data: { destroyed, blocked } });
   }),
 );
 

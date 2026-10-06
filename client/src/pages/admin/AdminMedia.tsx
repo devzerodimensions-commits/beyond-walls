@@ -9,8 +9,15 @@ import {
   AdminCard, AdminPageHeader, AdminSearch, MultiImageUpload,
 } from '../../components/admin/AdminKit';
 import {
-  Button, ConfirmDialog, CopyIcon, Input, Modal, Pagination, Select, Skeleton, TrashIcon,
+  Button, ConfirmDialog, CopyIcon, Input, Modal, Pagination, RefreshIcon, Select, Skeleton,
+  TrashIcon,
 } from '../../components/ui';
+
+/** The two shelves the library has. */
+const SHELVES = [
+  ['library', 'Library'],
+  ['trash', 'Trash'],
+] as const;
 
 const FOLDERS = [
   'products', 'categories', 'banners', 'gallery', 'personalization', 'logo', 'pages', 'testimonials', 'general',
@@ -27,12 +34,31 @@ export default function AdminMedia() {
   const [uploading, setUploading] = useState(false);
   const [viewing, setViewing] = useState<MediaAsset | null>(null);
   const [deleting, setDeleting] = useState<MediaAsset | null>(null);
+  /** Which shelf is on screen: the library, or what has been thrown away. */
+  const [view, setView] = useState<'library' | 'trash'>('library');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [emptying, setEmptying] = useState(false);
+
+  const trashed = view === 'trash';
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-media', page, search, folder],
-    queryFn: () => api.list<MediaAsset[]>('/admin/media', { page, perPage: 48, search, folder }),
+    queryKey: ['admin-media', page, search, folder, view],
+    queryFn: () =>
+      api.list<MediaAsset[]>('/admin/media', {
+        page, perPage: 48, search, folder, trashed: trashed ? '1' : '',
+      }),
     placeholderData: keepPreviousData,
   });
+
+  /** Nothing stays selected across a change of shelf, page or filter. */
+  const clearSelection = () => setSelected(new Set());
+  const toggle = (id: string) =>
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-media'] });
 
@@ -75,7 +101,44 @@ export default function AdminMedia() {
     },
   });
 
+  /*
+   * A file still used somewhere is refused by name, and everything else in the
+   * selection still moves. Telling someone "3 of 40 are in use" and doing
+   * nothing would leave them to find which three.
+   */
+  const bulk = useMutation({
+    mutationFn: ({ action, ids }: { action: 'trash' | 'restore' | 'destroy'; ids: string[] }) =>
+      api.post<{ moved?: number; restored?: number; destroyed?: number; blocked?: string[] }>(
+        `/admin/media/${action}`,
+        { ids },
+      ),
+    onSuccess: async (result, { action }) => {
+      await invalidate();
+      clearSelection();
+      setEmptying(false);
+
+      const n = result.moved ?? result.restored ?? result.destroyed ?? 0;
+      const word = action === 'trash' ? 'moved to the trash' : action === 'restore' ? 'restored' : 'deleted for good';
+      if (n) push(`${n} file${n === 1 ? '' : 's'} ${word}`, action === 'destroy' ? 'info' : 'success');
+
+      if (result.blocked?.length) {
+        push(
+          `Still in use, so left alone: ${result.blocked.slice(0, 3).join(', ')}` +
+            (result.blocked.length > 3 ? ` and ${result.blocked.length - 3} more` : ''),
+          'error',
+        );
+      }
+    },
+    onError: (err) => push(err instanceof ApiError ? err.message : 'That did not work', 'error'),
+  });
+
+  const act = (action: 'trash' | 'restore' | 'destroy', ids: string[]) => {
+    if (ids.length) bulk.mutate({ action, ids });
+  };
+
   const assets = data?.data ?? [];
+  const allOnPageSelected = assets.length > 0 && assets.every((a) => selected.has(a.id));
+  const trashCount = (data?.meta as { trashCount?: number } | undefined)?.trashCount ?? 0;
 
   const copyUrl = async (url: string) => {
     try {
@@ -129,7 +192,97 @@ export default function AdminMedia() {
           <div className="flex items-center text-xs text-ink-400">
             {data?.meta?.total ?? 0} file{data?.meta?.total === 1 ? '' : 's'}
           </div>
+
+          {/*
+            Library or trash. The count sits on the tab, so a full trash is not
+            something you have to go looking for.
+          */}
+          <div
+            className="flex rounded-[var(--a-radius-sm)] p-0.5"
+            style={{ background: 'var(--a-sunken)', border: '1px solid var(--a-line)' }}
+          >
+            {SHELVES.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => { setView(key); setPage(1); clearSelection(); }}
+                aria-pressed={view === key}
+                className={clsx(
+                  'rounded-[6px] px-3 py-1.5 text-xs font-medium transition-all',
+                  view === key
+                    ? 'bg-paper text-ink shadow-[var(--a-shadow)]'
+                    : 'text-[color:var(--a-faint)] hover:text-ink',
+                )}
+              >
+                {label}
+                {key === 'trash' && trashCount ? ' (' + trashCount + ')' : ''}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* What is selected, and what can be done with it. */}
+        {assets.length ? (
+          <div
+            className="mb-4 flex flex-wrap items-center gap-3 rounded-[var(--a-radius-sm)] px-3 py-2"
+            style={{ background: selected.size ? 'var(--a-accent-soft)' : 'var(--a-sunken)' }}
+          >
+            <label className="flex cursor-pointer items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={allOnPageSelected}
+                onChange={() =>
+                  setSelected(allOnPageSelected ? new Set() : new Set(assets.map((a) => a.id)))
+                }
+                className="h-4 w-4 cursor-pointer"
+              />
+              {allOnPageSelected ? 'Clear' : 'Select all on this page'}
+            </label>
+
+            <span className="text-xs" style={{ color: 'var(--a-muted)' }}>
+              {selected.size
+                ? selected.size + ' selected'
+                : 'Tick files to act on several at once'}
+            </span>
+
+            <div className="flex-1" />
+
+            {selected.size ? (
+              <div className="flex flex-wrap gap-2">
+                {trashed ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={bulk.isPending}
+                      onClick={() => act('restore', [...selected])}
+                    >
+                      Restore
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      loading={bulk.isPending}
+                      onClick={() => setEmptying(true)}
+                    >
+                      Delete permanently
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={bulk.isPending}
+                    onClick={() => act('trash', [...selected])}
+                  >
+                    <TrashIcon size={13} />
+                    Move to trash
+                  </Button>
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {isLoading ? (
           <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
@@ -140,12 +293,39 @@ export default function AdminMedia() {
           </div>
         ) : assets.length === 0 ? (
           <p className="py-12 text-center text-sm text-ink-400">
-            No files yet. Upload something above.
+            {trashed ? 'The trash is empty.' : 'No files yet. Upload something above.'}
           </p>
         ) : (
           <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
             {assets.map((asset) => (
-              <figure key={asset.id} className="group relative border border-stone-line bg-paper-warm">
+              <figure
+                key={asset.id}
+                className={clsx(
+                  'group relative border bg-paper-warm transition-colors',
+                  selected.has(asset.id)
+                    ? 'border-[color:var(--a-accent)]'
+                    : 'border-stone-line',
+                )}
+              >
+                {/* Appears on hover, and stays on while ticked. */}
+                <label
+                  className={clsx(
+                    'absolute left-1.5 top-1.5 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded transition-opacity',
+                    selected.has(asset.id)
+                      ? 'opacity-100'
+                      : 'opacity-0 focus-within:opacity-100 group-hover:opacity-100',
+                  )}
+                  style={{ background: 'var(--a-surface)', border: '1px solid var(--a-line)' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(asset.id)}
+                    onChange={() => toggle(asset.id)}
+                    aria-label={'Select ' + asset.filename}
+                    className="h-3.5 w-3.5 cursor-pointer"
+                  />
+                </label>
+
                 <button
                   type="button"
                   onClick={() => setViewing(asset)}
@@ -177,14 +357,25 @@ export default function AdminMedia() {
                     >
                       <CopyIcon size={13} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleting(asset)}
-                      className="text-ink-400 hover:text-state-danger"
-                      aria-label="Delete"
-                    >
-                      <TrashIcon size={13} />
-                    </button>
+                    {trashed ? (
+                      <button
+                        type="button"
+                        onClick={() => act('restore', [asset.id])}
+                        className="text-ink-400 hover:text-ink"
+                        aria-label={'Restore ' + asset.filename}
+                      >
+                        <RefreshIcon size={13} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => act('trash', [asset.id])}
+                        className="text-ink-400 hover:text-state-danger"
+                        aria-label={'Move ' + asset.filename + ' to the trash'}
+                      >
+                        <TrashIcon size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </figure>
@@ -257,6 +448,22 @@ export default function AdminMedia() {
         loading={remove.isPending}
         onCancel={() => setDeleting(null)}
         onConfirm={() => deleting && remove.mutate(deleting.id)}
+      />
+
+      {/*
+        The only step that cannot be undone, so it is the only one that asks.
+        Moving to the trash and restoring are both reversible and go straight
+        through.
+      */}
+      <ConfirmDialog
+        open={emptying}
+        title={'Delete ' + selected.size + ' file' + (selected.size === 1 ? '' : 's') + ' for good?'}
+        message="The files are removed from the server and cannot be recovered. Anything still used somewhere on the site is left alone."
+        confirmLabel="Delete permanently"
+        tone="danger"
+        loading={bulk.isPending}
+        onCancel={() => setEmptying(false)}
+        onConfirm={() => act('destroy', [...selected])}
       />
     </>
   );

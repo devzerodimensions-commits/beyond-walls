@@ -915,8 +915,12 @@ model MediaAsset {
   width     Int?
   height    Int?
   createdAt DateTime @default(now())
+  /// Set when the file is put in the trash. The row and the file both stay
+  /// until it is emptied, so a wrong click costs nothing.
+  deletedAt DateTime?
 
   @@index([folder])
+  @@index([deletedAt])
 }
 
 /// Editable header / footer navigation.
