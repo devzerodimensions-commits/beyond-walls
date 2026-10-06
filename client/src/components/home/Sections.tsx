@@ -688,15 +688,39 @@ export function CtaSection({ section }: { section: HomeSection }) {
   );
 }
 
+/**
+  * A block of prose.
+  *
+  * Ranged left and held to a readable measure, because this is what carries a
+  * policy or an about page. Centred text is a display treatment: fine for a
+  * line under a heading, unreadable for four paragraphs about returns, because
+  * the eye loses the start of every new line. Centre it per block in the editor
+  * where a short statement really wants it.
+  *
+  * The vertical padding is deliberately small. Several of these stack to make
+  * one page, and marketing-sized gaps between them turn a policy into a
+  * scavenger hunt.
+  */
 export function RichTextSection({ section }: { section: HomeSection }) {
-  if (!section.bodyText) return null;
+  if (!section.bodyText && !section.title) return null;
+  const centred = (section.config as { align?: string } | null)?.align === 'center';
+
   return (
-    <section className="container-site py-14">
-      <div className="mx-auto max-w-2xl text-center">
-        {section.title ? <h2 className="text-2xl sm:text-[1.75rem]">{section.title}</h2> : null}
-        <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-ink-500">
-          {section.bodyText}
-        </p>
+    <section className="container-site py-6 first:pt-12 last:pb-16">
+      <div className={clsx('max-w-[62ch]', centred && 'mx-auto text-center')}>
+        {section.title ? (
+          <h2 className="text-lg font-medium sm:text-xl">{section.title}</h2>
+        ) : null}
+        {section.bodyText ? (
+          <p
+            className={clsx(
+              'whitespace-pre-line text-sm leading-relaxed text-ink-600',
+              section.title && 'mt-3',
+            )}
+          >
+            {section.bodyText}
+          </p>
+        ) : null}
       </div>
     </section>
   );
@@ -706,11 +730,25 @@ export function RichTextSection({ section }: { section: HomeSection }) {
 // Blocks the homepage never needed, but a content page does
 // ---------------------------------------------------------------------------
 
-/** A heading and a line of text, with nothing else. */
+/**
+  * A heading and a line under it, with nothing else.
+  *
+  * Used at the top of a content page as its title, so it ranges left with the
+  * prose below it rather than sitting centred above left-aligned text.
+  */
 export function SectionHeadingBlock({ section }: { section: HomeSection }) {
+  const centred = (section.config as { align?: string } | null)?.align === 'center';
+
   return (
-    <section className="container-site py-12">
-      <SectionHeading title={section.title} subtitle={section.subtitle} align="center" />
+    <section className="container-site pb-2 pt-14">
+      <div className={clsx('max-w-[62ch]', centred && 'mx-auto text-center')}>
+        {section.title ? (
+          <h1 className="text-3xl lg:text-4xl">{section.title}</h1>
+        ) : null}
+        {section.subtitle ? (
+          <p className="mt-3 text-sm leading-relaxed text-ink-500">{section.subtitle}</p>
+        ) : null}
+      </div>
     </section>
   );
 }

@@ -179,6 +179,41 @@ const PAGES = [
   },
 ];
 
+/**
+ * Puts About in the main menu.
+ *
+ * It was reachable only from the footer, which is where nobody looks for it.
+ * Added before Contact, which is where a visitor expects it, and only when it
+ * is not already there -- so the studio can move or remove it afterwards and a
+ * deploy will not put it back.
+ */
+async function ensureAboutInMenu() {
+  const existing = await prisma.navLink.findFirst({
+    where: { group: 'header', href: '/about' },
+    select: { id: true },
+  });
+  if (existing) return 'about already in the menu';
+
+  const contact = await prisma.navLink.findFirst({
+    where: { group: 'header', href: '/contact' },
+    select: { id: true, sortOrder: true },
+  });
+
+  const at = contact ? contact.sortOrder : 99;
+  if (contact) {
+    // Everything from Contact onwards shifts down one to make room.
+    await prisma.navLink.updateMany({
+      where: { group: 'header', sortOrder: { gte: at } },
+      data: { sortOrder: { increment: 1 } },
+    });
+  }
+
+  await prisma.navLink.create({
+    data: { label: 'About', href: '/about', group: 'header', sortOrder: at, status: 'PUBLISHED' },
+  });
+  return 'about added to the menu';
+}
+
 async function main() {
   const filled = [];
   const skipped = [];
@@ -228,6 +263,8 @@ async function main() {
 
     filled.push(`${def.slug} (${def.sections.length} blocks)`);
   }
+
+  console.log(await ensureAboutInMenu());
 
   if (filled.length) console.log('content pages written: ' + filled.join(', '));
   if (skipped.length) console.log('content pages left alone: ' + skipped.join(', '));

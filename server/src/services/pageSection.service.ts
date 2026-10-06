@@ -101,6 +101,23 @@ const LIMIT: WidgetField = {
 /** Blocks built on the shared heading all take the same two fields. */
 const HEADED = [TITLE, LEAD];
 
+/**
+ * Ranged left by default.
+ *
+ * Centring is a display treatment: right for a single line under a heading,
+ * wrong for four paragraphs, where the eye loses the start of each new line.
+ */
+const ALIGN: WidgetField = {
+  key: 'align',
+  label: 'Alignment',
+  type: 'select',
+  inConfig: true,
+  options: [
+    { value: 'left', label: 'Left (best for reading)' },
+    { value: 'center', label: 'Centred' },
+  ],
+};
+
 export const WIDGETS: WidgetDefinition[] = [
   {
     type: 'HERO',
@@ -137,7 +154,7 @@ export const WIDGETS: WidgetDefinition[] = [
     name: 'Section title',
     description: 'A heading and a line of text, with nothing else.',
     group: 'Layout',
-    fields: HEADED,
+    fields: [...HEADED, ALIGN],
     defaults: { title: 'A section heading' },
   },
 
@@ -225,7 +242,7 @@ export const WIDGETS: WidgetDefinition[] = [
     name: 'Text',
     description: 'A heading and a block of text.',
     group: 'Content',
-    fields: [TITLE, { key: 'bodyText', label: 'Text', type: 'textarea' }],
+    fields: [TITLE, { key: 'bodyText', label: 'Text', type: 'textarea' }, ALIGN],
     defaults: { title: 'A heading', bodyText: 'Write something here.' },
   },
   {
