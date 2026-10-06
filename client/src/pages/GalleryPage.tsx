@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api, assetUrl } from '../lib/api';
 import type { GalleryItem } from '../lib/types';
+import { resolveVideo } from '../lib/video';
 import { Seo } from '../lib/seo';
 import { useSettings } from '../context/StoreProvider';
 import { ButtonLink, ChevronLeft, ChevronRight, CloseIcon, EmptyState, Skeleton } from '../components/ui';
@@ -51,6 +52,7 @@ export default function GalleryPage() {
   }, [index, close, go]);
 
   const active = index !== null ? filtered[index] : null;
+  const activeVideo = resolveVideo(active?.videoUrl);
 
   return (
     <>
@@ -120,6 +122,23 @@ export default function GalleryPage() {
                 />
                 <span className="absolute inset-0 bg-ink/0 transition-colors duration-300 group-hover:bg-ink/15" />
 
+                {/*
+                  A video entry still shows its picture: the image is the still,
+                  and the mark is the only thing that says there is more. Nothing
+                  plays in the grid -- a wall of thumbnails that all start moving
+                  is unreadable, and expensive on a phone.
+                */}
+                {resolveVideo(item.videoUrl) ? (
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-paper/90 shadow-panel">
+                      <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true" className="ml-0.5">
+                        <path d="M2 1.5 10.5 6 2 10.5Z" fill="currentColor" className="text-ink" />
+                      </svg>
+                    </span>
+                    <span className="sr-only">Video</span>
+                  </span>
+                ) : null}
+
                 {item.title || item.tag ? (
                   <span className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/85 px-4 py-3 transition-transform duration-300 group-hover:translate-y-0">
                     {item.title ? (
@@ -156,11 +175,36 @@ export default function GalleryPage() {
           </div>
 
           <div className="relative flex flex-1 items-center justify-center px-4">
-            <img
-              src={assetUrl(active.image)}
-              alt={active.title ?? ''}
-              className="max-h-full max-w-full object-contain"
-            />
+            {activeVideo ? (
+              activeVideo.kind === 'file' ? (
+                <video
+                  key={active.id}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-h-full max-w-full"
+                  aria-label={active.title ?? 'Video'}
+                >
+                  <source src={assetUrl(activeVideo.src)} />
+                </video>
+              ) : (
+                <iframe
+                  key={active.id}
+                  /* Opened deliberately, so this one may start on its own. */
+                  src={activeVideo.src + (activeVideo.src.includes('?') ? '&' : '?') + 'autoplay=1'}
+                  title={active.title ?? 'Video'}
+                  allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  className="aspect-video h-auto w-full max-w-5xl border-0"
+                />
+              )
+            ) : (
+              <img
+                src={assetUrl(active.image)}
+                alt={active.title ?? ''}
+                className="max-h-full max-w-full object-contain"
+              />
+            )}
 
             {filtered.length > 1 ? (
               <>

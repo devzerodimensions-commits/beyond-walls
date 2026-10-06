@@ -112,6 +112,13 @@ const RESOURCES: Record<ResourceKey, ResourceConfig> = {
     defaults: { status: 'DRAFT' },
     fields: [
       { key: 'image', label: 'Image', type: 'image', folder: 'gallery', colSpan: 2, required: true },
+      {
+        key: 'videoUrl',
+        label: 'Video link (optional)',
+        type: 'text',
+        colSpan: 2,
+        hint: 'A YouTube or Vimeo link, or a direct .mp4. The image above becomes the still.',
+      },
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'tag', label: 'Tag', type: 'text', hint: 'Used as a filter chip, e.g. Nameplates' },
       { key: 'caption', label: 'Caption', type: 'textarea', colSpan: 2 },

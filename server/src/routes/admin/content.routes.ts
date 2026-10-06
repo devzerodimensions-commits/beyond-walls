@@ -228,8 +228,25 @@ router.use(
     searchFields: ['title', 'caption', 'tag'],
     hasStatus: true,
     hasSortOrder: true,
-    writableFields: ['title', 'caption', 'image', 'tag', 'link', 'sortOrder', 'status'],
+    writableFields: ['title', 'caption', 'image', 'videoUrl', 'tag', 'link', 'sortOrder', 'status'],
     numberFields: ['sortOrder'],
+    /*
+     * A video link that cannot be played is refused rather than stored. The
+     * storefront would simply not show a play mark, which looks like the save
+     * silently failed -- better to say so while the field is still on screen.
+     */
+    beforeWrite: (data) => {
+      const url = String(data.videoUrl ?? '').trim();
+      if ('videoUrl' in data) {
+        if (!url) data.videoUrl = null;
+        else if (!/^https?:\/\//i.test(url) && !url.startsWith('/uploads/')) {
+          throw ApiError.badRequest(
+            'Paste a YouTube or Vimeo link, or a direct link to an .mp4 or .webm file',
+          );
+        }
+      }
+      return data;
+    },
     beforeDelete: async (record) => {
       const item = record as { id: string; image: string };
       await deleteFileIfUnreferenced(item.image, { model: 'galleryItem', id: item.id });

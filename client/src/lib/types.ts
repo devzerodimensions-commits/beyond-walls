@@ -382,6 +382,8 @@ export interface GalleryItem {
   title?: string | null;
   caption?: string | null;
   image: string;
+  /** Optional: a YouTube or Vimeo link, or a direct mp4. The image is the still. */
+  videoUrl?: string | null;
   tag?: string | null;
   link?: string | null;
   sortOrder: number;

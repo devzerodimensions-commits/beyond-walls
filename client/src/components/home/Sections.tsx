@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { assetUrl } from '../../lib/api';
+import { resolveVideo } from '../../lib/video';
 import type {
   Banner, Category, Faq, GalleryItem, HomeSection, PersonalizationField, Product, Testimonial,
 } from '../../lib/types';
@@ -462,6 +463,18 @@ export function GallerySection({ section }: { section: HomeSection }) {
                 index % 3 === 0 ? 'aspect-[4/5]' : index % 3 === 1 ? 'aspect-square' : 'aspect-[4/3]',
               )}
             />
+            {/* Says there is a video behind the still; it plays on the gallery page. */}
+            {resolveVideo(item.videoUrl) ? (
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-paper/90 shadow-panel">
+                  <svg width="13" height="13" viewBox="0 0 12 12" aria-hidden="true" className="ml-0.5">
+                    <path d="M2 1.5 10.5 6 2 10.5Z" fill="currentColor" className="text-ink" />
+                  </svg>
+                </span>
+                <span className="sr-only">Video</span>
+              </span>
+            ) : null}
+
             {item.title ? (
               <span className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/85 px-3 py-2.5 text-2xs text-paper transition-transform duration-300 group-hover:translate-y-0">
                 {item.title}

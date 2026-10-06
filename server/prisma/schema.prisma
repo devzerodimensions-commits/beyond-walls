@@ -797,6 +797,9 @@ model GalleryItem {
   title     String?
   caption   String?
   image     String
+  /// Optional. A YouTube or Vimeo link, or a direct mp4/webm. The image stays
+  /// required and is used as the still the visitor sees before pressing play.
+  videoUrl  String?
   tag       String?
   link      String?
   sortOrder Int           @default(0)
