@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { fillPersonalisation, isMobile } from './helpers';
 
+const API = process.env.E2E_API_URL ?? 'http://localhost:4000/api';
+
 /**
  * The storefront journey a customer actually takes, on desktop and on a phone.
  *
@@ -108,6 +110,58 @@ test.describe('Storefront', () => {
     const cart = page.getByRole('dialog').filter({ hasText: /your cart/i });
     await expect(cart).toBeVisible();
     await expect(cart).toContainText('₹');
+  });
+
+  /*
+   * The choices on a product are rows in the database, not code, so a deploy
+   * carries none of them. Twice now the studio has asked for a change here --
+   * "remove this optional logo section", and their own fonts and colours -- and
+   * seen it on one site and not the other, because only the first database was
+   * touched. This reads the product the storefront reads, so pointing
+   * E2E_API_URL at a deployment says whether that deployment actually has them.
+   */
+  test('the product offers the personalisation the studio asked for', async ({ request }) => {
+    const response = await request.get(API + '/catalog/products/minimal-acrylic-name-plate');
+    expect(response.ok(), 'the product is published').toBeTruthy();
+
+    const fields = (await response.json()).data.personalization as Array<{
+      key: string;
+      type: string;
+      options: Array<{ value: string; hex?: string }>;
+    }>;
+
+    // The logo upload they asked us to take off the product page.
+    expect(fields.map((f) => f.key)).not.toContain('logoUpload');
+    expect(fields.map((f) => f.type)).not.toContain('IMAGE_UPLOAD');
+
+    const choices = (key: string) =>
+      (fields.find((f) => f.key === key)?.options ?? []).map((o) => o.value);
+
+    // Every face the preview can draw, per PLATE_FONTS in LivePreview.tsx. A
+    // value missing here is a face the customer cannot pick; a value the
+    // renderer does not know falls back to the default without saying so.
+    const drawable = ['grotesque', 'display', 'serif', 'condensed', 'mono', 'script'];
+    expect(choices('font')).toEqual(expect.arrayContaining(drawable));
+    for (const value of choices('font')) expect(drawable).toContain(value);
+
+    expect(choices('plateColour')).toEqual(
+      expect.arrayContaining(['black', 'white', 'brass', 'steel']),
+    );
+    expect(choices('textColour')).toEqual(
+      expect.arrayContaining(['white', 'black', 'brass', 'blue']),
+    );
+
+    // The preview paints opt.hex, falling back to the bare value. Without a hex
+    // a swatch is only as good as the name happening to be a CSS colour, and
+    // "brass" is not one.
+    for (const key of ['plateColour', 'textColour']) {
+      const options = fields.find((f) => f.key === key)!.options;
+      for (const option of options) {
+        expect(option.hex, key + ' option "' + option.value + '" carries a hex').toMatch(
+          /^#[0-9a-fA-F]{6}$/,
+        );
+      }
+    }
   });
 
   test('cart totals are arithmetically consistent', async ({ page }) => {
