@@ -85,8 +85,8 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     group: 'footer',
     label: 'Footer about text',
     value:
-      'Design-led pieces for homes and workplaces, made to order in Ahmedabad. A signage ' +
-      'manufacturer since 2004, now building for residential and commercial spaces alike.',
+      'A contemporary home & lifestyle brand creating thoughtfully designed objects for ' +
+      'spaces that feel like yours. Made to order in Ahmedabad.',
   },
   { key: 'footer.copyright', group: 'footer', label: 'Copyright line', value: '© {year} Beyond Walls. All rights reserved.' },
   { key: 'footer.newsletterEnabled', group: 'footer', label: 'Show newsletter signup', value: false },
@@ -114,7 +114,12 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'tax.gstin', group: 'tax', label: 'Business GSTIN', value: '' },
 
   // --- SEO -------------------------------------------------------------------
-  { key: 'seo.defaultTitle', group: 'seo', label: 'Default page title', value: 'Beyond Walls — Nameplates & Signage, Ahmedabad' },
+  {
+    key: 'seo.defaultTitle',
+    group: 'seo',
+    label: 'Default page title',
+    value: 'Beyond Walls — A design-led brand for your spaces',
+  },
   {
     key: 'seo.titleTemplate',
     group: 'seo',
@@ -126,9 +131,15 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     group: 'seo',
     label: 'Default meta description',
     value:
-      'Beyond Walls designs and makes nameplates, office branding, GST plates, QR stands, desk plates, prints and safety signage in Ahmedabad.',
+      'Beyond Walls is a contemporary home & lifestyle brand creating thoughtfully designed ' +
+      'objects for spaces that feel like yours. Made to order in Ahmedabad.',
   },
-  { key: 'seo.defaultKeywords', group: 'seo', label: 'Default meta keywords', value: 'nameplates, signage, Ahmedabad, acrylic name plate, office branding' },
+  {
+    key: 'seo.defaultKeywords',
+    group: 'seo',
+    label: 'Default meta keywords',
+    value: 'home and lifestyle, design-led objects, nameplates, signage, prints, Ahmedabad',
+  },
   { key: 'seo.defaultOgImage', group: 'seo', label: 'Default social share image', value: null },
   {
     key: 'seo.siteUrl',
