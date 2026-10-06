@@ -141,6 +141,11 @@ enum SectionType {
   SECTION_HEADING
   IMAGE_TEXT
   CONTACT_BLOCK
+  // A full-bleed opening image with the page title over it, and a numbered
+  // sequence of steps. Both exist so a content page can carry its own weight
+  // rather than being a column of paragraphs.
+  PAGE_HERO
+  STEPS
 }
 
 enum BannerPlacement {

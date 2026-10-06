@@ -731,6 +731,126 @@ export function RichTextSection({ section }: { section: HomeSection }) {
 // ---------------------------------------------------------------------------
 
 /**
+ * The opening of a content page: a photograph with the title over it.
+ *
+ * The image is darkened rather than the text being given a box, because a
+ * panel floating on a photograph looks like a sticker. The gradient is heavier
+ * at the bottom, where the words sit, and lighter at the top so the picture is
+ * still a picture.
+ *
+ * Without an image it falls back to the ink panel rather than disappearing —
+ * a page opener with nothing in it is worse than a plain one.
+ */
+export function PageHero({ section }: { section: HomeSection }) {
+  const config = (section.config ?? {}) as { image?: string; height?: string };
+
+  const height =
+    config.height === 'tall'
+      ? 'min-h-[22rem] sm:min-h-[30rem] lg:min-h-[36rem]'
+      : config.height === 'short'
+        ? 'min-h-[14rem] sm:min-h-[18rem] lg:min-h-[20rem]'
+        : 'min-h-[18rem] sm:min-h-[24rem] lg:min-h-[28rem]';
+
+  return (
+    <section className={clsx('relative flex items-end overflow-hidden bg-ink', height)}>
+      {config.image ? (
+        <img
+          src={assetUrl(config.image)}
+          alt=""
+          /* The opener is the first thing painted, so it is never lazy. */
+          {...{ fetchpriority: 'high' }}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : null}
+
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-t from-ink via-ink/55 to-ink/10"
+      />
+
+      <div className="container-site relative w-full pb-10 pt-20 sm:pb-14 lg:pb-16">
+        <div className="max-w-2xl">
+          {section.subtitle ? (
+            <p className="eyebrow mb-4 text-paper/70">{section.subtitle}</p>
+          ) : null}
+          {section.title ? (
+            <h1 className="text-balance text-3xl leading-tight text-paper sm:text-4xl lg:text-5xl">
+              {section.title}
+            </h1>
+          ) : null}
+          {section.bodyText ? (
+            <p className="mt-5 max-w-xl text-sm leading-relaxed text-paper/75 sm:text-base">
+              {section.bodyText}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * A numbered sequence.
+ *
+ * The numbers are the design: large, set in the brand colour, and ranged above
+ * each step so the eye follows them down the page on a phone and across it on a
+ * laptop. A connecting rule runs between them on the wide layout, which is what
+ * makes it read as one process rather than four unrelated cards.
+ */
+export function StepsSection({ section }: { section: HomeSection }) {
+  const items = ((section.config?.items ?? []) as { title?: string; text?: string }[]) ?? [];
+  if (!items.length) return null;
+
+  return (
+    <section className="border-y border-stone-line bg-paper-off py-14 lg:py-20">
+      <div className="container-site">
+        {section.subtitle || section.title || section.bodyText ? (
+          <div className="mb-10 max-w-2xl lg:mb-14">
+            {section.subtitle ? <p className="eyebrow mb-4">{section.subtitle}</p> : null}
+            {section.title ? (
+              <h2 className="text-2xl leading-tight sm:text-3xl lg:text-[2.25rem]">
+                {section.title}
+              </h2>
+            ) : null}
+            {section.bodyText ? (
+              <p className="mt-4 text-sm leading-relaxed text-ink-500">{section.bodyText}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <ol className="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+          {items.map((item, index) => (
+            <li key={item.title ?? index} className="relative">
+              {/* The rule between steps, on the wide layout only. */}
+              {index < items.length - 1 ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute left-12 right-0 top-5 hidden h-px bg-stone-line lg:block"
+                />
+              ) : null}
+
+              <span
+                className="relative flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold"
+                style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+              >
+                {String(index + 1).padStart(2, '0')}
+              </span>
+
+              {item.title ? (
+                <h3 className="mt-5 text-base font-medium leading-snug text-ink">{item.title}</h3>
+              ) : null}
+              {item.text ? (
+                <p className="mt-2 text-sm leading-relaxed text-ink-500">{item.text}</p>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+/**
   * A heading and a line under it, with nothing else.
   *
   * Used at the top of a content page as its title, so it ranges left with the
@@ -905,6 +1025,10 @@ export function SectionRenderer({ section }: { section: HomeSection }) {
       return <CtaSection section={section} />;
     case 'RICH_TEXT':
       return <RichTextSection section={section} />;
+    case 'PAGE_HERO':
+      return <PageHero section={section} />;
+    case 'STEPS':
+      return <StepsSection section={section} />;
     case 'SECTION_HEADING':
       return <SectionHeadingBlock section={section} />;
     case 'IMAGE_TEXT':

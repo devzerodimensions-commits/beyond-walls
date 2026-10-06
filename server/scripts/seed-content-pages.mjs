@@ -39,21 +39,33 @@ const PAGES = [
       'Beyond Walls began in 2004 as Patel Corporation. Two decades of signage manufacturing, now a design-led brand for personal spaces.',
     showInFooter: true,
     sections: [
-      heading('Where it started', '2004 — under the name Patel Corporation'),
+      {
+        type: 'PAGE_HERO',
+        subtitle: 'About us',
+        title: 'Where it started',
+        bodyText: '2004 — under the name Patel Corporation',
+        config: { image: '/uploads/photos/bw-photo-03.webp', height: 'tall' },
+      },
 
-      text(
-        null,
-        'In 2004 we started as Patel Corporation, an offline signage manufacturing business.\n\n' +
+      {
+        type: 'IMAGE_TEXT',
+        subtitle: 'Two decades',
+        title: 'From signs to a design-led brand',
+        bodyText:
+          'In 2004 we started as Patel Corporation, an offline signage manufacturing business.\n\n' +
           'For more than two decades we have worked with materials, finishes, spaces and businesses ' +
           'to turn ideas into physical signs. That experience taught us something simple: the right ' +
           'detail can change how a space feels.\n\n' +
           'Now the second generation is carrying that experience forward in a new direction — from ' +
           'making signs to a design-led brand for personal spaces.',
-      ),
+        config: { image: '/uploads/photos/bw-photo-07.webp', imageSide: 'right' },
+      },
 
-      text(
-        'Founder — Patel Mohmed Ammar',
-        'From digital design to physical expression.\n\n' +
+      {
+        type: 'IMAGE_TEXT',
+        subtitle: 'Founder — Patel Mohmed Ammar',
+        title: 'From digital design to physical expression',
+        bodyText:
           'With a Bachelor’s degree in Fine Arts and two years of experience as a visual designer, I ' +
           'have spent much of my career working with ideas through a screen: building identities, ' +
           'creating visuals, and finding ways to communicate through design.\n\n' +
@@ -63,11 +75,14 @@ const PAGES = [
           'background in visual design to build Beyond Walls.\n\n' +
           'The goal is simple: to explore what happens when design leaves the screen and becomes ' +
           'something you can see, touch and live with.',
-      ),
+        config: { image: '/uploads/photos/bw-photo-04.webp', imageSide: 'left' },
+      },
 
-      text(
-        'Co-founder — Patel Mohmed Ishaq',
-        'Twenty years of making things real.\n\n' +
+      {
+        type: 'IMAGE_TEXT',
+        subtitle: 'Co-founder — Patel Mohmed Ishaq',
+        title: 'Twenty years of making things real',
+        bodyText:
           'With 20 years of experience in signage manufacturing, Mohmed Ishaq brings hands-on ' +
           'knowledge of materials, fabrication and execution to Beyond Walls.\n\n' +
           'Over the years he has completed more than 500 signage and elevation projects, working ' +
@@ -78,25 +93,49 @@ const PAGES = [
           'together, and how they perform in the real world.\n\n' +
           'At Beyond Walls that experience is the foundation of our approach: pieces that are not ' +
           'only designed well, but made to work well.',
-      ),
+        config: { image: '/uploads/photos/bw-photo-01.webp', imageSide: 'right' },
+      },
 
-      text(
-        'Our process',
-        'Screen → Prototype → Production → Your space\n\n' +
-          'It starts on a screen. Every Beyond Walls piece begins as an idea. We bring it to life ' +
-          'digitally first, refining the design, the proportions and the details before anything is ' +
-          'made.\n\n' +
-          'Then we make a prototype. Before moving into production we make smaller versions of the ' +
-          'design to understand how it looks, how it feels and how it comes together in the physical ' +
-          'world. This is where ideas meet materials.\n\n' +
-          'Then we make it real. Once the prototype is refined and approved, production begins at our ' +
-          'in-house facility. From choosing the material to assembly and finishing, each piece is ' +
-          'made with hands-on attention to detail.',
-      ),
+      {
+        type: 'STEPS',
+        subtitle: 'Our process',
+        title: 'Screen → Prototype → Production → Your space',
+        config: {
+          /*
+           * Three steps, not four. The studio named a fourth -- "your space" --
+           * but wrote nothing under it, and a step with invented copy under it
+           * would be us talking, not them. It stays in the heading instead.
+           */
+          items: [
+            {
+              title: 'It starts on a screen',
+              text:
+                'Every Beyond Walls piece begins as an idea. We bring it to life digitally first, ' +
+                'refining the design, the proportions and the details before anything is made.',
+            },
+            {
+              title: 'Then we make a prototype',
+              text:
+                'Before moving into production we make smaller versions of the design to understand ' +
+                'how it looks, how it feels and how it comes together in the physical world. This is ' +
+                'where ideas meet materials.',
+            },
+            {
+              title: 'Then we make it real',
+              text:
+                'Once the prototype is refined and approved, production begins at our in-house ' +
+                'facility. From choosing the material to assembly and finishing, each piece is made ' +
+                'with hands-on attention to detail.',
+            },
+          ],
+        },
+      },
 
-      text(
-        'What makes us different',
-        'We understand both sides of the design.\n\n' +
+      {
+        type: 'IMAGE_TEXT',
+        subtitle: 'What makes us different',
+        title: 'We understand both sides of the design',
+        bodyText:
           'At Beyond Walls we do not stop at how something looks. We understand what happens after ' +
           'the design leaves the screen: the materials, the making, the details, and the challenges ' +
           'that come with turning an idea into a physical product.\n\n' +
@@ -106,7 +145,17 @@ const PAGES = [
           'customers as numbers or orders. We listen, we understand the idea behind the request, and ' +
           'we work towards something that feels right for the person and the space.\n\n' +
           'Good design starts with an idea. Good making brings it to life. We understand both.',
-      ),
+        config: { image: '/uploads/photos/bw-photo-02.webp', imageSide: 'left' },
+      },
+
+      {
+        type: 'CTA',
+        title: 'Something in mind for your space?',
+        bodyText:
+          'Send us the sizes, the material and the artwork, and we will come back to you with a quote.',
+        ctaLabel: 'Start a custom order',
+        ctaLink: '/custom-order',
+      },
     ],
   },
 
@@ -249,6 +298,10 @@ async function main() {
         title: section.title ?? null,
         subtitle: section.subtitle ?? null,
         bodyText: section.bodyText ?? null,
+        ctaLabel: section.ctaLabel ?? null,
+        ctaLink: section.ctaLink ?? null,
+        // Pictures, alignment and the steps of a process all live in config.
+        config: section.config ?? {},
         sortOrder: index,
         status: 'PUBLISHED',
       })),

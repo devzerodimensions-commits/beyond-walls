@@ -127,8 +127,18 @@ export function Header() {
               <Logo />
             </Link>
 
-            {/* ---- Desktop navigation ---- */}
-            <nav className="hidden flex-1 items-center justify-center gap-8 lg:flex" aria-label="Main">
+            {/*
+              Desktop navigation. The gap tightens between 1024 and 1280.
+
+              A media query counts the scrollbar in the viewport width; the
+              layout does not get it. At 1024 the nav therefore believes it has
+              about fifteen more pixels than it has, and adding one more link
+              was enough to push the icons off the edge.
+            */}
+            <nav
+              className="hidden flex-1 items-center justify-center gap-5 lg:flex xl:gap-8"
+              aria-label="Main"
+            >
               <Link
                 to="/shop"
                 onMouseEnter={openMenu}

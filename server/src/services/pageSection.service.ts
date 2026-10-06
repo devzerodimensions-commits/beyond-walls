@@ -150,6 +150,53 @@ export const WIDGETS: WidgetDefinition[] = [
     defaults: { title: 'Wide banner' },
   },
   {
+    type: 'PAGE_HERO',
+    name: 'Page opener',
+    description: 'A full-width photograph with the page title over it.',
+    group: 'Layout',
+    fields: [
+      EYEBROW,
+      TITLE,
+      BODY,
+      { key: 'image', label: 'Background photograph', type: 'image', inConfig: true },
+      {
+        key: 'height',
+        label: 'Height',
+        type: 'select',
+        inConfig: true,
+        options: [
+          { value: 'tall', label: 'Tall' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'short', label: 'Short' },
+        ],
+      },
+    ],
+    defaults: { title: 'A page title', config: { height: 'medium' } },
+  },
+  {
+    type: 'STEPS',
+    name: 'Numbered steps',
+    description: 'A sequence -- how something is made, or what happens next.',
+    group: 'Content',
+    fields: [
+      EYEBROW,
+      TITLE,
+      BODY,
+      {
+        key: 'items',
+        label: 'Steps',
+        type: 'items',
+        inConfig: true,
+        hint: 'Three or four reads best. They are numbered automatically.',
+        itemFields: [
+          { key: 'title', label: 'Step', type: 'text' },
+          { key: 'text', label: 'What happens', type: 'textarea' },
+        ],
+      },
+    ],
+    defaults: { title: 'How it works', config: { items: [] } },
+  },
+  {
     type: 'SECTION_HEADING',
     name: 'Section title',
     description: 'A heading and a line of text, with nothing else.',

@@ -184,7 +184,7 @@ test.describe('Storefront', () => {
   });
 
   test('no horizontal overflow at this viewport', async ({ page }) => {
-    for (const path of ['/', '/shop', '/product/minimal-acrylic-name-plate', '/contact']) {
+    for (const path of ['/', '/shop', '/product/minimal-acrylic-name-plate', '/contact', '/about', '/shipping-policy']) {
       await page.goto(path);
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -208,4 +208,30 @@ test.describe('Storefront', () => {
     const real = errors.filter((e) => !/favicon|ERR_INTERNET|net::ERR/i.test(e));
     expect(real, real.join('\n')).toHaveLength(0);
   });
+});
+
+/*
+ * The header sits on the edge of fitting.
+ *
+ * A media query counts the scrollbar in the viewport width and the layout does
+ * not get it, so just above the 1024px breakpoint the navigation believes it
+ * has about fifteen more pixels than exist. Adding one link to the menu was
+ * enough to push the icons off the side of the page — and nothing caught it,
+ * because the suite only ever looked at 1440 and at phone width.
+ */
+test.describe('Header fits', () => {
+  for (const width of [1024, 1040, 1100, 1280, 1440]) {
+    test(`no sideways scroll at ${width}px`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name === 'mobile', 'desktop widths only');
+
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/about');
+      await page.waitForLoadState('networkidle');
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `the page scrolls sideways at ${width}px`).toBeLessThanOrEqual(1);
+    });
+  }
 });
