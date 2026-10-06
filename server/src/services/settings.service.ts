@@ -80,7 +80,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'social.pinterest', group: 'social', label: 'Pinterest URL', value: null },
 
   // --- Footer ----------------------------------------------------------------
-  { key: 'footer.about', group: 'footer', label: 'Footer about text', value: '' },
+  {
+    key: 'footer.about',
+    group: 'footer',
+    label: 'Footer about text',
+    value:
+      'Design-led pieces for homes and workplaces, made to order in Ahmedabad. A signage ' +
+      'manufacturer since 2004, now building for residential and commercial spaces alike.',
+  },
   { key: 'footer.copyright', group: 'footer', label: 'Copyright line', value: '© {year} Beyond Walls. All rights reserved.' },
   { key: 'footer.newsletterEnabled', group: 'footer', label: 'Show newsletter signup', value: false },
   { key: 'footer.newsletterHeading', group: 'footer', label: 'Newsletter heading', value: '' },
