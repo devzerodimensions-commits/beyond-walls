@@ -73,6 +73,23 @@
     @apply h-px w-full bg-stone-line;
   }
 
+  /*
+   * The tick inside a checkbox whose native appearance has been removed.
+   *
+   * This is plain CSS on purpose. It was written three times as a Tailwind
+   * arbitrary value instead -- checked:bg-[url('data:image/svg+xml,<svg ...')]
+   * -- and a space ends a class name, so the scanner stopped at the first one
+   * and never emitted the rule. The neighbouring checked:bg-ink did come
+   * through, so every ticked box on the site, storefront and admin alike,
+   * filled in solid with nothing in it. A data URI is mostly spaces; it does
+   * not belong in a class name.
+   */
+  .tickbox:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Cpath fill=%27%23fff%27 d=%27M6.2 11.3 3.4 8.5l1-1 1.8 1.8 4.4-4.4 1 1z%27/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+  }
   .field-label {
     @apply mb-1.5 block text-xs font-medium uppercase tracking-architect text-ink-500;
   }

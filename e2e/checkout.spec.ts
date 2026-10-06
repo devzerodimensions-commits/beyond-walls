@@ -136,6 +136,27 @@ test('a customer can register, personalise, apply a coupon and pay cash on deliv
   await page.getByRole('link', { name: /checkout/i }).first().click();
   await expect(page).toHaveURL(/\/checkout/);
 
+  /*
+   * A ticked box has to show its tick.
+   *
+   * The checkmark was a Tailwind arbitrary value holding an inline SVG. A space
+   * ends a class name and a data URI is mostly spaces, so that rule was never
+   * generated -- while the checked:bg-ink sitting beside it was. Every ticked
+   * box on the site, storefront and admin, filled in solid with nothing in it.
+   * Nothing else catches this: the markup is right, the types are right, and
+   * only the compiled stylesheet is short a rule. So this asks the browser what
+   * it actually painted.
+   */
+  const billingSame = page.getByLabel(/billing address is the same/i);
+  await expect(billingSame, 'billing defaults to the delivery address').toBeChecked();
+  const painted = await billingSame.evaluate((el) => getComputedStyle(el).backgroundImage);
+  expect(painted, 'a ticked box draws its tick').toContain('svg');
+
+  // And the tick belongs to the checked state alone, not to every box.
+  const gstBox = page.getByLabel(/I need a GST invoice/i);
+  await expect(gstBox).not.toBeChecked();
+  expect(await gstBox.evaluate((el) => getComputedStyle(el).backgroundImage)).toBe('none');
+
   await page.getByLabel('Full name').fill('E2E Customer');
   await page.getByLabel('Phone').first().fill('9876543210');
   const emailField = page.getByLabel('Email');

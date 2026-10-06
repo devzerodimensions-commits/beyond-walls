@@ -820,8 +820,7 @@ export function RenderField({
             type="checkbox"
             checked={Boolean(value)}
             onChange={(e) => onChange(e.target.checked)}
-            className="h-4 w-4 shrink-0 cursor-pointer appearance-none border border-ink-300 bg-paper checked:border-ink checked:bg-ink
-                       checked:bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22white%22><path d=%22M6.2 11.3 3.4 8.5l1-1 1.8 1.8 4.4-4.4 1 1z%22/></svg>')] checked:bg-center checked:bg-no-repeat"
+            className="tickbox h-4 w-4 shrink-0 cursor-pointer appearance-none border border-ink-300 bg-paper checked:border-ink checked:bg-ink"
           />
           <span className="text-sm text-ink-700">{field.label}</span>
         </label>

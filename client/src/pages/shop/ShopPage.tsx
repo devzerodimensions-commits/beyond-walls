@@ -576,8 +576,7 @@ function FilterCheckbox({
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="h-3.5 w-3.5 shrink-0 cursor-pointer appearance-none border border-ink-300 bg-paper transition-colors checked:border-ink checked:bg-ink
-                   checked:bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22white%22><path d=%22M6.2 11.3 3.4 8.5l1-1 1.8 1.8 4.4-4.4 1 1z%22/></svg>')] checked:bg-center checked:bg-no-repeat"
+        className="tickbox h-3.5 w-3.5 shrink-0 cursor-pointer appearance-none border border-ink-300 bg-paper transition-colors checked:border-ink checked:bg-ink"
       />
       {hex ? <span className="h-3.5 w-3.5 shrink-0 border border-ink-100" style={{ background: hex }} /> : null}
       <span className={clsx('flex-1 text-xs transition-colors', checked ? 'text-ink' : 'text-ink-500 group-hover:text-ink')}>
