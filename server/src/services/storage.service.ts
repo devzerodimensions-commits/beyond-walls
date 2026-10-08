@@ -1,14 +1,18 @@
 import fs from 'fs';
 import path from 'path';
 import { env } from '../config/env';
+import prisma from '../lib/prisma';
 
 /**
  * Storage abstraction.
  *
  * Local disk is the default and needs no configuration. Production can switch to
- * S3, Cloudflare R2 (S3-compatible) or Cloudinary purely through env vars — the
- * rest of the codebase only ever sees a public URL string, so nothing else
- * changes.
+ * the database, S3, Cloudflare R2 (S3-compatible) or Cloudinary purely through
+ * env vars — the rest of the codebase only ever sees a public URL string, so
+ * nothing else changes.
+ *
+ * On a host that rebuilds its filesystem between deploys, local disk loses every
+ * upload. STORAGE_DRIVER=database is the answer that needs no other account.
  */
 
 export interface StoredFile {
@@ -192,6 +196,52 @@ class CloudinaryDriver implements StorageDriver {
 
 let driver: StorageDriver | null = null;
 
+// ---------------------------------------------------------------------------
+// Database
+// ---------------------------------------------------------------------------
+
+/*
+ * Uploads kept as rows instead of files.
+ *
+ * Render rebuilds the filesystem on every deploy, so the local driver loses
+ * anything the studio uploads. The database already outlives a deploy, and
+ * unlike object storage it needs no second account, no card and no key that can
+ * silently go stale.
+ *
+ * The key is exactly the path the local driver would have written, so the URL
+ * is an ordinary /uploads/... one. A file stored here is served by the same
+ * route, behind the same headers, as a file on disk -- see the fallthrough in
+ * app.ts. Nothing else in the app can tell the difference.
+ */
+class DatabaseDriver implements StorageDriver {
+  readonly name = 'database';
+
+  async put(input: { buffer: Buffer; filename: string; mimeType: string; folder: string }): Promise<StoredFile> {
+    const key = `${input.folder}/${input.filename}`;
+    // Prisma's Bytes takes a plain Uint8Array. A Node Buffer is a view into a
+    // shared pool, so give it a copy of its own rather than a window onto that.
+    const bytes = new Uint8Array(input.buffer);
+    await prisma.mediaBlob.upsert({
+      where: { key },
+      create: { key, mimeType: input.mimeType, bytes, size: bytes.length },
+      update: { mimeType: input.mimeType, bytes, size: bytes.length },
+    });
+    return { url: `/uploads/${key}`, key };
+  }
+
+  async remove(urlOrKey: string): Promise<void> {
+    const key = urlOrKey.replace(/^\/uploads\//, '');
+    // Already gone is the desired state. deleteMany rather than delete: a
+    // missing row is not a failure here, and delete logs its own error before
+    // a catch can swallow it, which would fill the log with non-problems.
+    await prisma.mediaBlob.deleteMany({ where: { key } });
+  }
+
+  owns(url: string): boolean {
+    return url.startsWith('/uploads/');
+  }
+}
+
 export function getStorage(): StorageDriver {
   if (driver) return driver;
 
@@ -205,6 +255,11 @@ export function getStorage(): StorageDriver {
       } else {
         driver = new S3Driver(env.storageDriver);
       }
+      break;
+
+    case 'database':
+    case 'db':
+      driver = new DatabaseDriver();
       break;
 
     case 'cloudinary':

@@ -82,18 +82,21 @@ services:
         value: /opt/render/project/src/client/dist
 
       # --- Uploads ----------------------------------------------------------
-      # Render's filesystem is rebuilt on every deploy, so anything uploaded
-      # through the admin panel would vanish. Cloudinary's free tier keeps them
-      # and serves them over a CDN. Until these are filled in the server falls
-      # back to local disk and says so in the log.
+      # Render's filesystem is rebuilt on every deploy, so anything the studio
+      # uploads through the admin panel would vanish at the next one. (The
+      # product photos in the repository survive only because the build lists
+      # them again each time.)
+      #
+      # Uploads therefore go into the database, which is the one piece of
+      # storage here that outlives a deploy. It needs no second account, no card
+      # and no key that can quietly expire -- there is nothing to fill in below,
+      # and nothing to forget. They are served from /uploads like any other
+      # file; see the fallthrough in app.ts.
+      #
+      # The alternatives remain available by env var alone: STORAGE_DRIVER of
+      # s3, r2 or cloudinary, with that provider's credentials.
       - key: STORAGE_DRIVER
-        value: cloudinary
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
+        value: database
       - key: MAX_UPLOAD_MB
         value: "10"
 

@@ -62,7 +62,6 @@ without them and tells you in the log what is missing.
 | Variable | Needed for | If you leave it blank |
 | --- | --- | --- |
 | `SEED_ADMIN_PASSWORD` | Your admin login | **Set this now.** See step 3. |
-| `CLOUDINARY_*` | Images surviving a deploy | Uploads are lost on the next deploy |
 | `SMTP_*` | Order and password-reset emails | Emails are written to the log, not sent |
 | `RAZORPAY_*` | Online payment | Cash on delivery only; the site makes no payment claims |
 
@@ -122,36 +121,41 @@ the sitemap and every share link.
 
 ---
 
-## Images: why Cloudinary
+## Images: where uploads live
 
 **Render rebuilds the filesystem on every deploy.** Anything uploaded through
-the admin panel — product photography, gallery images, customer artwork — is
-gone the next time you push a change. This is not a bug in Render; it is how
+the admin panel — product photography, gallery images, customer artwork — would
+be gone the next time you push a change. This is not a bug in Render; it is how
 containerised hosting works.
 
-The seeded product images survive because they are committed to the repository.
-Nothing uploaded afterwards is.
+The seeded product images survive only because they are committed to the
+repository and listed again by each build. Nothing uploaded afterwards has that
+protection.
 
-Cloudinary's free tier (25 GB) solves this and serves images over a CDN. The
-driver is already written; you only supply credentials:
+So uploads go into the **database**, which is the one piece of storage here
+that outlives a deploy. `STORAGE_DRIVER` is already set to `database`: there is
+nothing to sign up for, nothing to pay for and no credential to fill in — which
+also means no credential to get wrong or let expire.
 
-1. Sign up at **cloudinary.com**
-2. Dashboard → copy **Cloud name**, **API Key**, **API Secret**
-3. Paste them into Render → Environment as `CLOUDINARY_CLOUD_NAME`,
-   `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+Stored files keep ordinary `/uploads/...` URLs and are served by the same route,
+behind the same hardening headers, as files on disk. Images already in the
+repository keep being served from disk; only new uploads go to the database.
+Nothing else in the app can tell the two apart.
 
-`STORAGE_DRIVER` is already set to `cloudinary`. Until the credentials are
-present the server falls back to local disk and says so at startup:
-
-```
-storage    local
-```
-
-Once configured it reads:
+At startup the log names the driver in use:
 
 ```
-storage    cloudinary
+storage    database
 ```
+
+If that says `local` instead, `STORAGE_DRIVER` has not been set, and uploads
+will not survive the next deploy.
+
+**Other options.** The database suits a catalogue of product photographs. For a
+much larger or more image-heavy site, object storage with a CDN in front of it
+is the better fit, and those drivers are already written — set `STORAGE_DRIVER`
+to `s3`, `r2` or `cloudinary` and supply that provider's credentials. No code
+changes either way.
 
 **Amazon S3 or Cloudflare R2** are also supported — set `STORAGE_DRIVER=s3` and
 the `S3_*` variables instead.
@@ -255,7 +259,7 @@ is not configured:
 | Blank page, API works | The client build is missing. Look for `[web] no client build at …` in the log. |
 | Signed out after ~15 min | `PUBLIC_SITE_URL` points at a different origin than the site is served from. |
 | Password reset link does not work | `PUBLIC_SITE_URL` is missing `https://`, or SMTP is unconfigured. |
-| Images vanish after a deploy | Cloudinary is not configured. The log says `storage    local`. |
+| Images vanish after a deploy | STORAGE_DRIVER is not set. The log says `storage    local` instead of `storage    database`. |
 | Everyone is rate limited at once | `TRUST_PROXY` is not `true`, so every customer looks like one visitor. |
 | Payment says unavailable | Razorpay keys are missing, or it is disabled in Admin → Settings → Payments. |
 

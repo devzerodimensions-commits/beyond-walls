@@ -530,6 +530,27 @@ async function main() {
     check('Uploads served with nosniff', served.headers.get('x-content-type-options') === 'nosniff');
     check('Uploads served with a restrictive CSP',
       (served.headers.get('content-security-policy') ?? '').includes('sandbox'));
+
+    /*
+     * An upload URL that does not decode must be a miss, not a crash.
+     *
+     * The database-backed uploads are looked up by a decoded path, and
+     * decodeURIComponent throws on a malformed escape. In an async handler that
+     * throw is an unhandled rejection, which ends the process -- so a single
+     * request to /uploads/%zz took the entire site down until this was fixed.
+     * Checked last, and followed by a liveness probe, because the symptom of a
+     * regression here is the server no longer being there at all.
+     */
+    for (const bad of ['%zz', '%', 'products/%E0%A4.webp']) {
+      const malformed = await fetch(`${ROOT}/uploads/${bad}`).catch(() => null);
+      check(`Malformed upload URL /uploads/${bad} is a 404, not a crash`,
+        malformed !== null && malformed.status === 404,
+        malformed === null ? 'no response — the server went down' : `got ${malformed.status}`);
+    }
+
+    const alive = await fetch(`${ROOT}/api/health`).catch(() => null);
+    check('Server still answering after malformed upload URLs',
+      alive !== null && alive.ok, alive === null ? 'the server is gone' : `got ${alive.status}`);
   }
 
   // ------------------------------------------------------------ admin CRUD

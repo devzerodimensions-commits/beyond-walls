@@ -940,3 +940,23 @@ model NavLink {
 
   @@index([group, sortOrder])
 }
+
+/// An uploaded file held in the database rather than on disk.
+///
+/// Render rebuilds the server's filesystem on every deploy, so anything written
+/// to local disk is gone at the next one. The database is the only storage this
+/// deployment already has that outlives a deploy, and keeping the bytes here
+/// needs no third-party account, no card and no second vendor to go wrong.
+///
+/// `key` is the same path the local driver would have written -- "products/
+/// plate.webp" -- so a stored file keeps the ordinary /uploads/... URL and is
+/// served by the same route, under the same headers, as a file on disk.
+model MediaBlob {
+  key       String   @id
+  mimeType  String
+  bytes     Bytes
+  size      Int
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

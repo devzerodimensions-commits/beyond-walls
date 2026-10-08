@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { env } from './config/env';
+import prisma from './lib/prisma';
 import routes from './routes';
 import seoRoutes from './routes/public/seo.routes';
 import { errorHandler, notFoundHandler } from './middleware/error';
@@ -154,6 +155,52 @@ export function createApp() {
       },
     }),
   );
+
+  /*
+   * Uploads held in the database.
+   *
+   * express.static above runs with fallthrough, so this only sees paths that
+   * are not on disk. That ordering is what makes the two kinds of storage
+   * interchangeable: the images committed to the repository keep being served
+   * from the filesystem, anything uploaded since comes from here, and both
+   * arrive under the same URL and the same locked-down headers set above.
+   *
+   * Mounted on /uploads rather than a path of its own so a stored file needs no
+   * special URL -- nothing in the client, the admin panel or the database rows
+   * has to know where a given image actually lives.
+   */
+  app.use('/uploads', async (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+
+    /*
+     * decodeURIComponent throws on a malformed escape such as /uploads/%zz, and
+     * an async handler's throw becomes an unhandled rejection that takes the
+     * process down -- one stray URL would stop the whole site. A path that does
+     * not decode cannot name a stored file anyway, so it is simply a miss.
+     */
+    let key: string;
+    try {
+      key = decodeURIComponent(req.path.replace(/^\//, ''));
+    } catch {
+      return next();
+    }
+    if (!key) return next();
+
+    try {
+      const blob = await prisma.mediaBlob.findUnique({ where: { key } });
+      if (!blob) return next();
+
+      res.setHeader('Content-Type', blob.mimeType);
+      res.setHeader('Content-Length', String(blob.size));
+      // Filenames carry a content hash, so a stored file never changes under
+      // its key and can be cached as long as the ones served from disk.
+      res.setHeader('Cache-Control', env.isProduction ? 'public, max-age=2592000, immutable' : 'no-store');
+      if (req.method === 'HEAD') return res.end();
+      return res.end(blob.bytes);
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   app.get('/api/health', (_req, res) => {
     res.json({
