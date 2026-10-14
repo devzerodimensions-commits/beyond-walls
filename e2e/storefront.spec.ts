@@ -63,12 +63,22 @@ test.describe('Storefront', () => {
       const panel = page.locator('.shadow-panel').first();
       await expect(panel).toBeVisible();
 
+      /*
+       * The panel is a band across the header now, not a box floating under
+       * the Shop link, so it is meant to be the full width. What still has to
+       * hold is that it spans the viewport exactly -- a band one pixel wider
+       * than the page is a horizontal scrollbar on every screen -- and that it
+       * does not grow so tall it swallows the page behind it.
+       */
       const box = (await panel.boundingBox())!;
       const viewport = page.viewportSize()!;
-      expect(box.width).toBeLessThanOrEqual(viewport.width * 0.95);
-      expect(box.height).toBeLessThanOrEqual(viewport.height * 0.75);
+      expect(Math.round(box.width)).toBe(viewport.width);
       expect(box.x).toBeGreaterThanOrEqual(-1);
-      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(box.height).toBeLessThanOrEqual(viewport.height * 0.8);
+
+      const overflow = await page.evaluate(() =>
+        document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, 'an open menu must not widen the page').toBeLessThanOrEqual(1);
 
       await panel.getByRole('link', { name: 'View everything' }).click();
     }

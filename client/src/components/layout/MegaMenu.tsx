@@ -159,10 +159,10 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
   const image = active?.image ?? active?.bannerImage ?? gallery[0]?.image ?? null;
 
   return (
-    <div className="w-[min(94vw,1040px)] animate-fade-up overflow-hidden border border-stone-line bg-paper shadow-panel">
-      <div className="grid grid-cols-[190px_minmax(0,1fr)_240px]">
+    <div className="container-site animate-fade-up">
+      <div className="grid grid-cols-[210px_minmax(0,1fr)_300px] gap-10 py-8">
         {/* ---- Collections ---- */}
-        <div className="border-r border-stone-line bg-paper-off px-5 py-6">
+        <div className="border-r border-stone-line pr-8">
           <p className="eyebrow mb-4 text-ink-300">Collections</p>
           <ul className="space-y-0.5">
             {categories.map((category) => (
@@ -214,7 +214,7 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
         </div>
 
         {/* ---- The ranges inside the hovered collection ---- */}
-        <div className="min-w-0 px-7 py-6">
+        <div className="min-w-0">
           <div className="mb-4 flex items-baseline justify-between gap-4">
             <p className="eyebrow text-ink-300">{active ? active.name : 'Shop by'}</p>
             {active ? (
@@ -316,7 +316,7 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
         <Link
           to={active ? `/shop/${active.slug}` : '/shop'}
           onClick={onNavigate}
-          className="group/panel relative flex flex-col justify-end overflow-hidden bg-paper-warm"
+          className="group/panel relative flex aspect-[4/5] flex-col justify-end overflow-hidden bg-paper-warm"
         >
           {image ? (
             <>

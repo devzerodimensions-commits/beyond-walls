@@ -38,7 +38,7 @@ export function AnnouncementBar() {
 
 export function Header() {
   const navigate = useNavigate();
-  const { navLinks } = useSettings();
+  const { navLinks, get } = useSettings();
   const { itemCount, openDrawer } = useCart();
   const { user, isAuthenticated } = useAuth();
   const { count: wishlistCount } = useWishlist();
@@ -86,12 +86,41 @@ export function Header() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const headerLinks = useMemo(
+  /*
+   * The header carries two kinds of link, and the reference the studio sent
+   * puts them on two different lines: the small row at the very top is for
+   * errands -- about the company, how to reach them -- and the big centred row
+   * under the logo is for shopping.
+   *
+   * Split by destination rather than by a list kept here, so adding a link in
+   * the admin still lands on the right line.
+   */
+  const { shoppingLinks, utilityLinks } = useMemo(() => {
+    const all = navLinks
+      .filter((l) => l.group === 'header' && l.href !== '/shop' && l.href !== '/custom-order')
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+    const isErrand = (href: string) =>
+      !href.startsWith('/shop') && href !== '/gallery';
+
+    return {
+      shoppingLinks: all.filter((l) => !isErrand(l.href)),
+      utilityLinks: all.filter((l) => isErrand(l.href)),
+    };
+  }, [navLinks]);
+
+  const socials = useMemo(
     () =>
-      navLinks
-        .filter((l) => l.group === 'header' && l.href !== '/shop' && l.href !== '/custom-order')
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
-    [navLinks],
+      ([
+        ['social.instagram', 'Instagram'],
+        ['social.facebook', 'Facebook'],
+        ['social.pinterest', 'Pinterest'],
+        ['social.linkedin', 'LinkedIn'],
+        ['social.youtube', 'YouTube'],
+      ] as const)
+        .map(([key, label]) => ({ label, url: get<string | null>(key, null) }))
+        .filter((s) => Boolean(s.url)),
+    [get],
   );
 
   const openMenu = () => {
@@ -112,81 +141,84 @@ export function Header() {
           scrolled ? 'border-stone-line shadow-card' : 'border-stone-line/60',
         )}
       >
-        <div className="container-site">
-          <div className="flex h-[68px] items-center justify-between gap-5 sm:h-[76px]">
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              className="-ml-2 p-2 text-ink lg:hidden"
-              aria-label="Open menu"
-            >
-              <MenuIcon size={21} />
-            </button>
-
-            <Link to="/" className="shrink-0" aria-label="Beyond Walls — home">
-              <Logo />
-            </Link>
-
-            {/*
-              Desktop navigation. The gap tightens between 1024 and 1280.
-
-              A media query counts the scrollbar in the viewport width; the
-              layout does not get it. At 1024 the nav therefore believes it has
-              about fifteen more pixels than it has, and adding one more link
-              was enough to push the icons off the edge.
-            */}
-            <nav
-              className="hidden flex-1 items-center justify-center gap-5 lg:flex xl:gap-8"
-              aria-label="Main"
-            >
-              <Link
-                to="/shop"
-                onMouseEnter={openMenu}
-                onMouseLeave={closeMenu}
-                onFocus={openMenu}
-                aria-expanded={menuOpen}
-                className={clsx(
-                  'flex items-center gap-1.5 py-6 text-xs font-medium uppercase tracking-[0.12em] transition-colors',
-                  menuOpen ? 'text-ink' : 'text-ink-600 hover:text-ink',
-                )}
-              >
-                Shop
-                <ChevronDown
-                  size={12}
-                  className={clsx('transition-transform duration-300', menuOpen && 'rotate-180')}
-                />
-              </Link>
-
-              {headerLinks.map((link) => (
-                <RouterNavLink
-                  key={link.id}
-                  to={link.href}
-                  className={({ isActive }) =>
-                    clsx(
-                      'text-xs font-medium uppercase tracking-[0.12em] transition-colors',
-                      isActive ? 'text-ink' : 'text-ink-600 hover:text-ink',
-                    )
-                  }
+        {/* ---- Errands, and where to find the studio elsewhere ---- */}
+        {utilityLinks.length || socials.length ? (
+          <div className="hidden border-b border-stone-line/60 lg:block">
+            <div className="container-site flex h-9 items-center justify-between">
+              <nav className="flex items-center gap-6" aria-label="Secondary">
+                {utilityLinks.map((link) => (
+                  <Link
+                    key={link.id}
+                    to={link.href}
+                    className="text-2xs uppercase tracking-architect text-ink-400 transition-colors hover:text-ink"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+                <Link
+                  to="/track-order"
+                  className="text-2xs uppercase tracking-architect text-ink-400 transition-colors hover:text-ink"
                 >
-                  {link.label}
-                </RouterNavLink>
-              ))}
+                  Track an order
+                </Link>
+              </nav>
 
-              {/* Custom Order is the one highlighted destination. */}
-              <Link
-                to="/custom-order"
-                className="border border-ink px-4 py-2 text-xs font-medium uppercase tracking-[0.12em] text-ink transition-colors duration-200 hover:bg-ink hover:text-paper"
+              <div className="flex items-center gap-5">
+                {socials.map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.url as string}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-2xs uppercase tracking-architect text-ink-400 transition-colors hover:text-ink"
+                  >
+                    {social.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/*
+          ---- The logo, centred, with the tools either side ----
+
+          Three columns of equal width rather than a flex row. The logo is only
+          truly centred on the page if what sits to its left and what sits to
+          its right take the same space, and they never hold the same things.
+        */}
+        <div className="container-site">
+          <div className="grid h-[68px] grid-cols-[1fr_auto_1fr] items-center gap-4 sm:h-[76px]">
+            <div className="flex items-center justify-start">
+              <button
+                type="button"
+                onClick={() => setMobileOpen(true)}
+                className="-ml-2 p-2 text-ink lg:hidden"
+                aria-label="Open menu"
               >
-                Custom Order
-              </Link>
-            </nav>
+                <MenuIcon size={21} />
+              </button>
 
-            {/* ---- Utilities ---- */}
-            <div className="flex items-center gap-0.5 sm:gap-1">
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
-                className="p-2.5 text-ink-600 transition-colors hover:text-ink"
+                className="hidden p-2.5 text-ink-600 transition-colors hover:text-ink lg:block"
+                aria-label="Search"
+              >
+                <SearchIcon size={19} />
+              </button>
+            </div>
+
+            <Link to="/" className="justify-self-center" aria-label="Beyond Walls — home">
+              <Logo />
+            </Link>
+
+            {/* ---- Tools ---- */}
+            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="p-2.5 text-ink-600 transition-colors hover:text-ink lg:hidden"
                 aria-label="Search"
               >
                 <SearchIcon size={19} />
@@ -222,13 +254,64 @@ export function Header() {
           </div>
         </div>
 
+        {/* ---- Shopping, on its own line under the logo ---- */}
+        <div className="hidden border-t border-stone-line/60 lg:block">
+          <nav
+            className="container-site flex items-center justify-center gap-8 xl:gap-10"
+            aria-label="Main"
+          >
+            <Link
+              to="/shop"
+              onMouseEnter={openMenu}
+              onMouseLeave={closeMenu}
+              onFocus={openMenu}
+              aria-expanded={menuOpen}
+              className={clsx(
+                'flex items-center gap-1.5 py-3.5 text-xs font-medium uppercase tracking-[0.12em] transition-colors',
+                menuOpen ? 'text-ink' : 'text-ink-600 hover:text-ink',
+              )}
+            >
+              Shop
+              <ChevronDown
+                size={12}
+                className={clsx('transition-transform duration-300', menuOpen && 'rotate-180')}
+              />
+            </Link>
+
+            {shoppingLinks.map((link) => (
+              <RouterNavLink
+                key={link.id}
+                to={link.href}
+                className={({ isActive }) =>
+                  clsx(
+                    'py-3.5 text-xs font-medium uppercase tracking-[0.12em] transition-colors',
+                    isActive ? 'text-ink' : 'text-ink-600 hover:text-ink',
+                  )
+                }
+              >
+                {link.label}
+              </RouterNavLink>
+            ))}
+
+            {/* Custom Order is the one highlighted destination. */}
+            <Link
+              to="/custom-order"
+              className="my-2 border border-ink px-4 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-ink transition-colors duration-200 hover:bg-ink hover:text-paper"
+            >
+              Custom Order
+            </Link>
+          </nav>
+        </div>
+
         {/*
-          The panel is anchored to the header, not to the Shop link, so it is
-          always centred in the viewport and never clipped at the edges.
+          Full width, flush under the nav rather than a box floating beneath it.
+          A floating panel has to decide where to sit and clips at the edge when
+          it guesses wrong; a band spanning the header has nowhere to be clipped
+          and gives the pictures room to be pictures.
         */}
         {menuOpen ? (
           <div
-            className="absolute inset-x-0 top-full hidden justify-center lg:flex"
+            className="absolute inset-x-0 top-full hidden border-t border-stone-line bg-paper shadow-panel lg:block"
             onMouseEnter={openMenu}
             onMouseLeave={closeMenu}
           >
