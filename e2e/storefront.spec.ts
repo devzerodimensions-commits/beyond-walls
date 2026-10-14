@@ -52,7 +52,11 @@ test.describe('Storefront', () => {
       await page.getByLabel('Open menu').click();
       const drawer = page.getByRole('dialog');
       await expect(drawer).toBeVisible();
-      await drawer.getByRole('link', { name: /^shop$/i }).first().click();
+
+      // The drawer separates browsing from errands, so Shop is a tab and not a
+      // destination; it opens on that tab and the way through is the collections.
+      await expect(drawer.getByRole('tab', { name: 'Shop' })).toHaveAttribute('aria-selected', 'true');
+      await drawer.getByRole('link', { name: 'View everything' }).click();
     } else {
       // The mega menu opens on hover and must stay compact.
       await page.getByRole('navigation', { name: 'Main' }).getByText('Shop', { exact: true }).hover();
@@ -71,6 +75,42 @@ test.describe('Storefront', () => {
 
     await expect(page).toHaveURL(/\/shop/);
     await expect(page.locator('article, a[href^="/product/"]').first()).toBeVisible();
+  });
+
+  test('the phone drawer keeps the collections apart from the pages', async ({ page }) => {
+    /*
+     * The studio asked for the phone header to be redone "for categories and
+     * pages". They were two halves of one scroll: Contact and Track an order
+     * sat below every collection and every filter group, which is a long way
+     * down for an errand that takes one tap on a laptop.
+     */
+    test.skip(!isMobile(page), 'the drawer is the phone header');
+
+    await page.goto('/');
+    await page.getByLabel('Open menu').click();
+    const drawer = page.getByRole('dialog');
+    await expect(drawer).toBeVisible();
+
+    // Browsing is what the drawer opens on.
+    const shopTab = drawer.getByRole('tab', { name: 'Shop' });
+    const pagesTab = drawer.getByRole('tab', { name: 'Pages' });
+    await expect(shopTab).toHaveAttribute('aria-selected', 'true');
+    await expect(pagesTab).toHaveAttribute('aria-selected', 'false');
+
+    // The collections are shown as pictures, so each one is a link with a tile.
+    const shopPanel = drawer.locator('#mobile-shop');
+    await expect(shopPanel.locator('a[href^="/shop/"]').first()).toBeVisible();
+    await expect(shopPanel).toContainText(/custom order/i);
+
+    // The errands are one tap away, not one scroll.
+    await pagesTab.click();
+    await expect(pagesTab).toHaveAttribute('aria-selected', 'true');
+    const pagesPanel = drawer.locator('#mobile-pages');
+    await expect(pagesPanel).toBeVisible();
+    await expect(pagesPanel.getByRole('link').first()).toBeVisible();
+
+    // And the two halves stay apart: no collection tiles under Pages.
+    await expect(pagesPanel.locator('a[href^="/shop/"]')).toHaveCount(0);
   });
 
   test('every product card offers a real action and a real price', async ({ page }) => {

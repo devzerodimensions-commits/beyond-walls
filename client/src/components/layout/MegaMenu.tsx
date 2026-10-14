@@ -7,13 +7,19 @@ import type { CatalogFilters, Category, GalleryItem } from '../../lib/types';
 import { ArrowRight } from '../ui';
 
 /**
- * Compact desktop mega menu.
+ * Desktop mega menu.
  *
- * Three columns — collections, a contextual middle column and one lifestyle
- * image — all fed from the admin: categories, their subcategories, the
+ * Three columns: the collections down the left, the ranges inside the hovered
+ * collection as picture tiles in the middle, and one lifestyle panel on the
+ * right. Everything is fed from the admin — categories, their children, the
  * attribute groups that actually occur inside the hovered category, and the
- * category tile image. Deliberately capped in width and height so it never
- * blankets the viewport.
+ * tile images.
+ *
+ * The middle column used to be a list of words. A range is a thing you
+ * recognise by sight long before you read its name, and "Way Finding" means
+ * very little until you see one, so it shows the picture.
+ *
+ * Capped in width and height so it never blankets the viewport.
  */
 
 interface Props {
@@ -25,13 +31,12 @@ interface Props {
 
 /** Attribute groups worth surfacing in the menu, in the order they should appear. */
 const MENU_GROUPS = ['material', 'style', 'shape', 'profession', 'requirement'];
-const MAX_GROUPS = 4;
+const MAX_GROUPS = 3;
 const MAX_VALUES = 5;
-const MAX_SUBCATEGORIES = 6;
+const MAX_RANGES = 6;
 
 function rankGroups(filters: CatalogFilters | undefined, limit: number) {
-  const all = filters?.attributes ?? [];
-  return [...all]
+  return [...(filters?.attributes ?? [])]
     .sort((a, b) => {
       const ai = MENU_GROUPS.indexOf(a.slug);
       const bi = MENU_GROUPS.indexOf(b.slug);
@@ -39,6 +44,53 @@ function rankGroups(filters: CatalogFilters | undefined, limit: number) {
     })
     .filter((g) => g.values.length > 0)
     .slice(0, limit);
+}
+
+/**
+ * One range, shown as a picture.
+ *
+ * Falls back to its own name set on a tinted panel when no image has been
+ * uploaded for it yet. That matters: not one subcategory has a tile image at
+ * the time of writing, and a grid of grey rectangles reads as broken, while a
+ * typographic tile reads as a choice. Each one improves on its own the moment
+ * somebody sets the image in Design → Categories.
+ */
+function RangeTile({
+  name,
+  to,
+  image,
+  onNavigate,
+}: {
+  name: string;
+  to: string;
+  image: string | null | undefined;
+  onNavigate: () => void;
+}) {
+  return (
+    <Link
+      to={to}
+      onClick={onNavigate}
+      className="group/tile block overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+    >
+      <div className="relative aspect-[4/3] overflow-hidden bg-paper-warm">
+        {image ? (
+          <img
+            src={assetUrl(image)}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-700 ease-architect group-hover/tile:scale-[1.06]"
+          />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center px-3 text-center text-xs leading-tight text-ink-400 transition-colors duration-300 group-hover/tile:text-ink">
+            {name}
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-ink-600 transition-colors duration-200 group-hover/tile:text-ink">
+        {name}
+      </p>
+    </Link>
+  );
 }
 
 export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
@@ -62,12 +114,12 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
     staleTime: 5 * 60_000,
   });
 
-  const subcategories = (active?.children ?? [])
+  const ranges = (active?.children ?? [])
     .filter((child) => child.showInMenu !== false && child.status === 'PUBLISHED')
-    .slice(0, MAX_SUBCATEGORIES);
+    .slice(0, MAX_RANGES);
 
   // Contextual when the category has its own attributes, global otherwise.
-  const scopedGroups = rankGroups(scoped, subcategories.length ? 2 : MAX_GROUPS);
+  const scopedGroups = rankGroups(scoped, MAX_GROUPS);
   const groups = scopedGroups.length ? scopedGroups : rankGroups(filters, MAX_GROUPS);
   const isScoped = scopedGroups.length > 0;
 
@@ -75,13 +127,8 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
   const image = active?.image ?? active?.bannerImage ?? gallery[0]?.image ?? null;
 
   return (
-    <div
-      className={clsx(
-        'w-[min(92vw,980px)] border border-stone-line bg-paper shadow-panel',
-        'animate-fade-up overflow-hidden',
-      )}
-    >
-      <div className="grid grid-cols-[180px_minmax(0,1fr)_240px]">
+    <div className="w-[min(94vw,1040px)] animate-fade-up overflow-hidden border border-stone-line bg-paper shadow-panel">
+      <div className="grid grid-cols-[190px_minmax(0,1fr)_240px]">
         {/* ---- Collections ---- */}
         <div className="border-r border-stone-line bg-paper-off px-5 py-6">
           <p className="eyebrow mb-4 text-ink-300">Collections</p>
@@ -134,72 +181,85 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
           </Link>
         </div>
 
-        {/* ---- Contextual column: this collection's ranges and filters ---- */}
+        {/* ---- The ranges inside the hovered collection ---- */}
         <div className="min-w-0 px-7 py-6">
-          <p className="eyebrow mb-4 text-ink-300">
-            {isScoped && active ? active.name : 'Shop by'}
-          </p>
-
-          <div className="grid grid-cols-2 gap-x-6 gap-y-6">
-            {subcategories.length ? (
-              <div>
-                <p className="mb-2.5 text-2xs font-semibold uppercase tracking-architect text-ink">
-                  Ranges
-                </p>
-                <ul className="space-y-1.5">
-                  {subcategories.map((child) => (
-                    <li key={child.id}>
-                      <Link
-                        to={`/shop/${active!.slug}?subcategory=${child.slug}`}
-                        onClick={onNavigate}
-                        className="text-sm text-ink-500 transition-colors duration-200 hover:text-ink"
-                      >
-                        {child.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {groups.map((group) => (
-              <div key={group.id}>
-                <p className="mb-2.5 text-2xs font-semibold uppercase tracking-architect text-ink">
-                  {group.name}
-                </p>
-                <ul className="space-y-1.5">
-                  {group.values.slice(0, MAX_VALUES).map((value) => (
-                    <li key={value.id}>
-                      <Link
-                        // Scoped links stay inside the collection being browsed.
-                        to={
-                          isScoped && active
-                            ? `/shop/${active.slug}?attr=${value.slug}`
-                            : `/shop?attr=${value.slug}`
-                        }
-                        onClick={onNavigate}
-                        className="group/link inline-flex items-center gap-1.5 text-sm text-ink-500 transition-colors duration-200 hover:text-ink"
-                      >
-                        {value.hexColor ? (
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 border border-ink-100"
-                            style={{ background: value.hexColor }}
-                          />
-                        ) : null}
-                        {value.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-
-            {!subcategories.length && !groups.length ? (
-              <p className="col-span-2 text-sm text-ink-400">
-                Filter groups appear here once they are published in the admin.
-              </p>
+          <div className="mb-4 flex items-baseline justify-between gap-4">
+            <p className="eyebrow text-ink-300">{active ? active.name : 'Shop by'}</p>
+            {active ? (
+              <Link
+                to={`/shop/${active.slug}`}
+                onClick={onNavigate}
+                className="link-underline text-2xs uppercase tracking-architect text-ink-400"
+              >
+                See all
+              </Link>
             ) : null}
           </div>
+
+          {ranges.length ? (
+            <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+              {ranges.map((child) => (
+                <RangeTile
+                  key={child.id}
+                  name={child.name}
+                  image={child.image}
+                  to={`/shop/${active!.slug}?subcategory=${child.slug}`}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          {/*
+            The filters sit under the pictures rather than beside them: you
+            choose what a thing is before you narrow it by material or shape.
+          */}
+          {groups.length ? (
+            <div
+              className={clsx(
+                'flex flex-wrap gap-x-7 gap-y-4',
+                ranges.length ? 'mt-6 border-t border-stone-line pt-5' : '',
+              )}
+            >
+              {groups.map((group) => (
+                <div key={group.id}>
+                  <p className="mb-2 text-2xs font-semibold uppercase tracking-architect text-ink">
+                    {group.name}
+                  </p>
+                  <ul className="space-y-1.5">
+                    {group.values.slice(0, MAX_VALUES).map((value) => (
+                      <li key={value.id}>
+                        <Link
+                          // Scoped links stay inside the collection being browsed.
+                          to={
+                            isScoped && active
+                              ? `/shop/${active.slug}?attr=${value.slug}`
+                              : `/shop?attr=${value.slug}`
+                          }
+                          onClick={onNavigate}
+                          className="inline-flex items-center gap-1.5 text-sm text-ink-500 transition-colors duration-200 hover:text-ink"
+                        >
+                          {value.hexColor ? (
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 border border-ink-100"
+                              style={{ background: value.hexColor }}
+                            />
+                          ) : null}
+                          {value.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {!ranges.length && !groups.length ? (
+            <p className="text-sm text-ink-400">
+              Ranges and filter groups appear here once they are published in the admin.
+            </p>
+          ) : null}
         </div>
 
         {/* ---- Lifestyle image ---- */}
