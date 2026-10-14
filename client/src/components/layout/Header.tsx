@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, NavLink as RouterNavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink as RouterNavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../../lib/api';
@@ -54,6 +54,39 @@ export function Header() {
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  /*
+   * The header sits over the homepage rather than above it, as the reference
+   * does: the opening photograph starts at the top of the screen and the
+   * header floats on it until you scroll, when it takes its background.
+   *
+   * Only the homepage, because only its first section is built dark -- the
+   * hero carries bg-ink whether or not it has a photograph behind it. Pale
+   * text over a pale section would be text nobody can read, so everywhere
+   * else the header keeps its paper background and the page starts beneath it.
+   */
+  const { pathname } = useLocation();
+  const overlaid = pathname === '/';
+  const transparent = overlaid && !scrolled && !menuOpen;
+
+  /*
+   * Being taken out of the flow means the page no longer knows how tall the
+   * header is, and it is four rows on a laptop and one on a phone. Measured
+   * rather than guessed, and published as a custom property so the layout can
+   * leave exactly that much room -- a hardcoded number here is a strip of
+   * hidden content the first time somebody adds a nav link that wraps.
+   */
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const node = headerRef.current;
+    if (!node) return undefined;
+    const publish = () =>
+      document.documentElement.style.setProperty('--header-h', `${node.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    return () => observer.disconnect();
   }, []);
 
   // Cmd/Ctrl+K opens search, as people expect on a catalogue site.
@@ -133,52 +166,83 @@ export function Header() {
 
   return (
     <>
-      <AnnouncementBar />
-
       <header
+        ref={headerRef}
+        data-transparent={transparent || undefined}
         className={clsx(
-          'sticky top-0 z-50 border-b bg-paper/95 backdrop-blur-md transition-shadow duration-300',
-          scrolled ? 'border-stone-line shadow-card' : 'border-stone-line/60',
+          'fixed inset-x-0 top-0 z-50 border-b transition-[background-color,box-shadow,border-color] duration-300',
+          transparent
+            ? 'border-transparent bg-transparent text-paper'
+            : 'border-stone-line/60 bg-paper/95 text-ink backdrop-blur-md',
+          scrolled && !transparent ? 'border-stone-line shadow-card' : '',
         )}
       >
-        {/* ---- Errands, and where to find the studio elsewhere ---- */}
-        {utilityLinks.length || socials.length ? (
-          <div className="hidden border-b border-stone-line/60 lg:block">
-            <div className="container-site flex h-9 items-center justify-between">
-              <nav className="flex items-center gap-6" aria-label="Secondary">
-                {utilityLinks.map((link) => (
-                  <Link
-                    key={link.id}
-                    to={link.href}
-                    className="text-2xs uppercase tracking-architect text-ink-400 transition-colors hover:text-ink"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-                <Link
-                  to="/track-order"
-                  className="text-2xs uppercase tracking-architect text-ink-400 transition-colors hover:text-ink"
-                >
-                  Track an order
-                </Link>
-              </nav>
+        {/*
+          A wash behind the header while it is transparent. The hero is dark by
+          construction, but a photograph can be light exactly where the nav sits,
+          and a nav that is readable on most pictures is not good enough.
+        */}
+        {transparent ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-ink/55 to-transparent"
+          />
+        ) : null}
 
-              <div className="flex items-center gap-5">
-                {socials.map((social) => (
-                  <a
-                    key={social.label}
-                    href={social.url as string}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-2xs uppercase tracking-architect text-ink-400 transition-colors hover:text-ink"
-                  >
-                    {social.label}
-                  </a>
-                ))}
-              </div>
+        <AnnouncementBar />
+        {/*
+          ---- Errands, and where to find the studio elsewhere ----
+
+          Always rendered, never gated on whether there is anything in it.
+          Its links come from settings, which arrive after the first paint, so
+          a guard here meant the header grew by this row a moment after every
+          page load and pushed the whole page down with it. It always carries
+          Track an order in any case.
+        */}
+        <div className={clsx('hidden border-b lg:block', transparent ? 'border-paper/20' : 'border-stone-line/60')}>
+          <div className="container-site flex h-9 items-center justify-between">
+            <nav className="flex items-center gap-6" aria-label="Secondary">
+              {utilityLinks.map((link) => (
+                <Link
+                  key={link.id}
+                  to={link.href}
+                  className={clsx(
+                    'text-2xs uppercase tracking-architect transition-colors',
+                    transparent ? 'text-paper/70 hover:text-paper' : 'text-ink-400 hover:text-ink',
+                  )}
+                >
+                  {link.label}
+                </Link>
+              ))}
+              <Link
+                to="/track-order"
+                className={clsx(
+                  'text-2xs uppercase tracking-architect transition-colors',
+                  transparent ? 'text-paper/70 hover:text-paper' : 'text-ink-400 hover:text-ink',
+                )}
+              >
+                Track an order
+              </Link>
+            </nav>
+
+            <div className="flex items-center gap-5">
+              {socials.map((social) => (
+                <a
+                  key={social.label}
+                  href={social.url as string}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className={clsx(
+                    'text-2xs uppercase tracking-architect transition-colors',
+                    transparent ? 'text-paper/70 hover:text-paper' : 'text-ink-400 hover:text-ink',
+                  )}
+                >
+                  {social.label}
+                </a>
+              ))}
             </div>
           </div>
-        ) : null}
+        </div>
 
         {/*
           ---- The logo, centred, with the tools either side ----
@@ -193,7 +257,7 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => setMobileOpen(true)}
-                className="-ml-2 p-2 text-ink lg:hidden"
+                className={clsx('-ml-2 p-2 lg:hidden', transparent ? 'text-paper' : 'text-ink')}
                 aria-label="Open menu"
               >
                 <MenuIcon size={21} />
@@ -202,7 +266,7 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
-                className="hidden p-2.5 text-ink-600 transition-colors hover:text-ink lg:block"
+                className={clsx('hidden p-2.5 transition-colors lg:block', transparent ? 'text-paper/80 hover:text-paper' : 'text-ink-600 hover:text-ink')}
                 aria-label="Search"
               >
                 <SearchIcon size={19} />
@@ -210,7 +274,11 @@ export function Header() {
             </div>
 
             <Link to="/" className="justify-self-center" aria-label="Beyond Walls — home">
-              <Logo />
+              {/*
+                Not the same mark in white: the two plates swap colours so it
+                still reads as a plate rather than a silhouette.
+              */}
+              <Logo inverted={transparent} />
             </Link>
 
             {/* ---- Tools ---- */}
@@ -218,7 +286,7 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
-                className="p-2.5 text-ink-600 transition-colors hover:text-ink lg:hidden"
+                className={clsx('p-2.5 transition-colors lg:hidden', transparent ? 'text-paper/80 hover:text-paper' : 'text-ink-600 hover:text-ink')}
                 aria-label="Search"
               >
                 <SearchIcon size={19} />
@@ -226,7 +294,7 @@ export function Header() {
 
               <Link
                 to={isAuthenticated ? '/account/wishlist' : '/login'}
-                className="relative hidden p-2.5 text-ink-600 transition-colors hover:text-ink sm:block"
+                className={clsx('relative hidden p-2.5 transition-colors sm:block', transparent ? 'text-paper/80 hover:text-paper' : 'text-ink-600 hover:text-ink')}
                 aria-label={`Wishlist${wishlistCount ? ` — ${wishlistCount} saved` : ''}`}
               >
                 <HeartIcon size={19} />
@@ -235,7 +303,7 @@ export function Header() {
 
               <Link
                 to={isAuthenticated ? '/account' : '/login'}
-                className="p-2.5 text-ink-600 transition-colors hover:text-ink"
+                className={clsx('p-2.5 transition-colors', transparent ? 'text-paper/80 hover:text-paper' : 'text-ink-600 hover:text-ink')}
                 aria-label={isAuthenticated ? `Account — ${user?.name}` : 'Sign in'}
               >
                 <UserIcon size={19} />
@@ -244,7 +312,7 @@ export function Header() {
               <button
                 type="button"
                 onClick={openDrawer}
-                className="relative p-2.5 text-ink-600 transition-colors hover:text-ink"
+                className={clsx('relative p-2.5 transition-colors', transparent ? 'text-paper/80 hover:text-paper' : 'text-ink-600 hover:text-ink')}
                 aria-label={`Cart — ${itemCount} item${itemCount === 1 ? '' : 's'}`}
               >
                 <CartIcon size={19} />
@@ -255,7 +323,7 @@ export function Header() {
         </div>
 
         {/* ---- Shopping, on its own line under the logo ---- */}
-        <div className="hidden border-t border-stone-line/60 lg:block">
+        <div className={clsx('hidden border-t lg:block', transparent ? 'border-paper/20' : 'border-stone-line/60')}>
           <nav
             className="container-site flex items-center justify-center gap-8 xl:gap-10"
             aria-label="Main"
@@ -268,7 +336,9 @@ export function Header() {
               aria-expanded={menuOpen}
               className={clsx(
                 'flex items-center gap-1.5 py-3.5 text-xs font-medium uppercase tracking-[0.12em] transition-colors',
-                menuOpen ? 'text-ink' : 'text-ink-600 hover:text-ink',
+                transparent
+                  ? 'text-paper/80 hover:text-paper'
+                  : menuOpen ? 'text-ink' : 'text-ink-600 hover:text-ink',
               )}
             >
               Shop
@@ -285,7 +355,9 @@ export function Header() {
                 className={({ isActive }) =>
                   clsx(
                     'py-3.5 text-xs font-medium uppercase tracking-[0.12em] transition-colors',
-                    isActive ? 'text-ink' : 'text-ink-600 hover:text-ink',
+                    transparent
+                      ? isActive ? 'text-paper' : 'text-paper/80 hover:text-paper'
+                      : isActive ? 'text-ink' : 'text-ink-600 hover:text-ink',
                   )
                 }
               >
@@ -296,7 +368,12 @@ export function Header() {
             {/* Custom Order is the one highlighted destination. */}
             <Link
               to="/custom-order"
-              className="my-2 border border-ink px-4 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-ink transition-colors duration-200 hover:bg-ink hover:text-paper"
+              className={clsx(
+                'my-2 border px-4 py-1.5 text-xs font-medium uppercase tracking-[0.12em] transition-colors duration-200',
+                transparent
+                  ? 'border-paper text-paper hover:bg-paper hover:text-ink'
+                  : 'border-ink text-ink hover:bg-ink hover:text-paper',
+              )}
             >
               Custom Order
             </Link>

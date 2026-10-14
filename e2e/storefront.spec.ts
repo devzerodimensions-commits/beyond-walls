@@ -155,6 +155,50 @@ test.describe('Storefront', () => {
     await expect(footer.locator('a[href^="/shop/"]').first()).toBeAttached();
   });
 
+  test('the header floats on the homepage opening and clears every other page', async ({ page }) => {
+    /*
+     * The studio asked for the header to sit over the opening photograph, as
+     * the reference does. Taking it out of the flow to do that is the easy
+     * half; the half that breaks is every other page, where a fixed header
+     * silently covers the first inch of the content and nobody notices until
+     * a heading has gone missing.
+     *
+     * So this checks both halves at once, and the height it must clear is
+     * measured rather than written down -- the header is four rows on a laptop
+     * and one on a phone.
+     */
+    await page.goto('/');
+    const header = page.locator('header');
+    const hero = page.locator('main section').first();
+
+    const headerBox = (await header.boundingBox())!;
+    const heroBox = (await hero.boundingBox())!;
+    expect(heroBox.y, 'the opening starts at the top of the screen').toBeLessThanOrEqual(1);
+    expect(headerBox.y + headerBox.height,
+      'the header lies over the opening').toBeGreaterThan(heroBox.y + 1);
+
+    // Floating over a photograph is only worth anything if it can still be read.
+    // The nav row is a laptop thing; on a phone it lives in the drawer.
+    if (!isMobile(page)) {
+      const navColour = await page
+        .getByRole('navigation', { name: 'Main' })
+        .getByText('Gallery', { exact: true })
+        .evaluate((el) => getComputedStyle(el).color);
+      const [r, g, b] = navColour.match(/\d+/g)!.map(Number);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      expect(luminance, 'pale type, because what is behind it is dark').toBeGreaterThan(0.6);
+    }
+
+    // And on a page with no opening photograph, nothing hides underneath.
+    await page.goto('/contact');
+    const gap = await page.evaluate(() => {
+      const h = document.querySelector('header')!;
+      const first = document.querySelector('main')!.firstElementChild!;
+      return h.getBoundingClientRect().bottom - first.getBoundingClientRect().top;
+    });
+    expect(gap, 'the page starts below the header, not behind it').toBeLessThanOrEqual(1);
+  });
+
   test('every product card offers a real action and a real price', async ({ page }) => {
     await page.goto('/shop');
 

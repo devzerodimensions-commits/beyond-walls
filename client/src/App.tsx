@@ -61,10 +61,22 @@ function ScrollToTop() {
 }
 
 function StorefrontLayout() {
+  /*
+   * The header is fixed, so it no longer takes up room of its own. Every page
+   * leaves exactly its height clear -- published as --header-h by the header
+   * itself, which measures rather than guesses, since it is four rows on a
+   * laptop and one on a phone.
+   *
+   * The homepage is the exception: there the header floats on the opening
+   * photograph, which is the whole point of it.
+   */
+  const { pathname } = useLocation();
+  const overlaid = pathname === '/';
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className="flex-1">
+      <main className="flex-1" style={overlaid ? undefined : { paddingTop: 'var(--header-h)' }}>
         <Suspense fallback={<PageLoader />}>
           <Outlet />
         </Suspense>
