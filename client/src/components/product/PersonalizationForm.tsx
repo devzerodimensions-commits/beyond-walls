@@ -14,20 +14,64 @@ interface Props {
 }
 
 /** Renders the admin-defined personalization fields for a product. */
+/**
+ * The three questions a customer is actually answering.
+ *
+ * Seven inputs in a flat column is a form. The same seven under these headings
+ * is a decision with three parts, and somebody who has never bought a
+ * nameplate can tell at a glance what is being asked of them.
+ *
+ * Which group a field belongs to is read from what the field does, not from a
+ * list kept here, so a field added in the admin lands somewhere sensible
+ * without anyone remembering to update this: anything that puts a colour or a
+ * typeface on the plate is how it looks, anything else bound to the drawing is
+ * what it says, and whatever is left is neither.
+ */
+const GROUPS = [
+  { key: 'says', title: 'What it says', hint: 'Printed on the plate exactly as typed.' },
+  { key: 'looks', title: 'How it looks', hint: undefined },
+  { key: 'extra', title: 'Anything else', hint: undefined },
+] as const;
+
+function groupOf(field: PersonalizationField): (typeof GROUPS)[number]['key'] {
+  if (field.type === 'COLOR' || field.type === 'FONT') return 'looks';
+  return field.previewSlot ? 'says' : 'extra';
+}
+
 export function PersonalizationForm({ fields, values, errors = {}, onChange }: Props) {
   const active = fields.filter((f) => f.status === 'PUBLISHED').sort((a, b) => a.sortOrder - b.sortOrder);
   if (!active.length) return null;
 
+  const input = (field: PersonalizationField) => (
+    <PersonalizationInput
+      key={field.id}
+      field={field}
+      value={values[field.key] ?? ''}
+      error={errors[field.key]}
+      onChange={(value) => onChange(field.key, value)}
+    />
+  );
+
+  const grouped = GROUPS.map((group) => ({
+    ...group,
+    fields: active.filter((f) => groupOf(f) === group.key),
+  })).filter((g) => g.fields.length);
+
+  // One heading over one field is a label with extra steps.
+  if (grouped.length < 2) return <div className="space-y-5">{active.map(input)}</div>;
+
   return (
-    <div className="space-y-5">
-      {active.map((field) => (
-        <PersonalizationInput
-          key={field.id}
-          field={field}
-          value={values[field.key] ?? ''}
-          error={errors[field.key]}
-          onChange={(value) => onChange(field.key, value)}
-        />
+    <div className="space-y-7">
+      {grouped.map((group) => (
+        <div key={group.key}>
+          <div className="mb-3.5 flex items-baseline gap-2 border-b border-stone-line pb-2">
+            <h3 className="text-2xs font-semibold uppercase tracking-architect text-ink">
+              {group.title}
+            </h3>
+            {group.hint ? <p className="text-2xs text-ink-400">{group.hint}</p> : null}
+          </div>
+          <div className="space-y-5">{group.fields.map(input)}</div>
+        </div>
       ))}
     </div>
   );

@@ -256,10 +256,24 @@ export default function ProductPage() {
             */}
             {product.livePreviewEnabled ? (
               <div className="mt-4 hidden border border-stone-line lg:block">
+                {/*
+                  Said out loud, because the two pictures on this page show
+                  different things and nothing was saying which was which: the
+                  photograph above is somebody else's plate, finished and on a
+                  wall, and this one is theirs as they type it. Without the
+                  label a customer can reasonably read the photograph as what
+                  they are about to be sent.
+                */}
+                <div className="flex items-baseline justify-between gap-3 border-b border-stone-line px-4 py-2.5">
+                  <p className="eyebrow text-ink">Your plate</p>
+                  <p className="text-2xs text-ink-400">Updates as you type</p>
+                </div>
                 <LivePreview
                   template={product.livePreviewTemplate}
                   config={product.livePreviewConfig}
                   slots={previewSlots}
+                  // The strip above already says what this is.
+                  hideLabel
                 />
               </div>
             ) : null}
@@ -267,7 +281,12 @@ export default function ProductPage() {
 
           {/* Sticky purchase panel */}
           <div className="lg:col-span-6 xl:col-span-5">
-            <div className="lg:sticky lg:top-[92px]">
+            {/*
+              Sticks clear of the header, whatever height the header is. It
+              used to say 92px, which was true of a one-row header and is not
+              true of this one -- the panel slid underneath it.
+            */}
+            <div className="lg:sticky" style={{ top: 'calc(var(--header-h, 92px) + 1rem)' }}>
               {product.category ? (
                 <Link to={`/shop/${product.category.slug}`} className="eyebrow link-underline">
                   {product.category.name}
@@ -331,7 +350,10 @@ export default function ProductPage() {
               {/* Variants */}
               {variants.length > 1 ? (
                 <div className="mb-6">
-                  <p className="field-label" id="variant-label">Choose an option</p>
+                  <p className="field-label flex items-center" id="variant-label">
+                    <StepNumber>1</StepNumber>
+                    Choose a size
+                  </p>
                   {/*
                     These are mutually exclusive choices, so they are a radio
                     group. Without the roles a screen reader announces four
@@ -389,11 +411,13 @@ export default function ProductPage() {
                     id="personalise"
                     className="mb-6 hidden border border-stone-line bg-paper p-5 lg:block"
                   >
-                    <h2 className="mb-1 text-xs font-semibold uppercase tracking-architect">
-                      Personalise
+                    <h2 className="mb-1 flex items-center text-xs font-semibold uppercase tracking-architect">
+                      <StepNumber>{variants.length > 1 ? 2 : 1}</StepNumber>
+                      Make it yours
                     </h2>
                     <p className="mb-5 text-2xs text-ink-400">
-                      Your details are attached to the order and used for production.
+                      Whatever you type here is what we cut. The fields marked with
+                      an asterisk are the ones we cannot make it without.
                     </p>
                     <PersonalizationForm
                       fields={fields}
@@ -779,6 +803,25 @@ export default function ProductPage() {
         </div>
       ) : null}
     </>
+  );
+}
+
+/**
+ * The step number beside a heading.
+ *
+ * Buying this is three decisions -- a size, the words and the look, then the
+ * cart -- and on a panel this long the sequence is easy to lose. Numbering it
+ * costs a few pixels and tells somebody who has never ordered a nameplate
+ * where they are and how much is left.
+ */
+function StepNumber({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="mr-2.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-ink text-[0.6rem] font-semibold leading-none text-paper"
+    >
+      {children}
+    </span>
   );
 }
 

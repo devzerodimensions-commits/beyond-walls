@@ -236,6 +236,8 @@ interface LivePreviewProps {
   template?: string | null;
   slots: PreviewSlots;
   className?: string;
+  /** Hidden where something outside the frame already names it. */
+  hideLabel?: boolean;
   /**
    * Placeholder copy shown before the customer has typed anything. Overrides
    * the placeholders that come from the product's configuration.
@@ -245,7 +247,7 @@ interface LivePreviewProps {
   config?: Record<string, unknown> | null;
 }
 
-export function LivePreview({ template, slots, className, placeholders, config }: LivePreviewProps) {
+export function LivePreview({ template, slots, className, placeholders, config, hideLabel }: LivePreviewProps) {
   // Namespaces this instance's SVG defs so two previews on one page cannot
   // steal each other's filters and gradients.
   const uid = useId().replace(/:/g, '');
@@ -290,7 +292,9 @@ export function LivePreview({ template, slots, className, placeholders, config }
 
   return (
     <div className={clsx('relative w-full bg-paper-warm p-6 sm:p-10', className)}>
-      <span className="eyebrow absolute left-4 top-4 text-ink-300">Live preview</span>
+      {hideLabel ? null : (
+        <span className="eyebrow absolute left-4 top-4 text-ink-300">Live preview</span>
+      )}
       {body}
       {resolved.caption ? (
         <p className="mt-4 text-center text-2xs text-ink-400">{resolved.caption}</p>
