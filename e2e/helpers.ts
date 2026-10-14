@@ -24,14 +24,19 @@ export async function fillPersonalisation(page: Page, name: string) {
 
   const scope = opensInSheet ? page.getByRole('dialog') : page.locator('#personalise');
   const field = scope.getByLabel('Name', { exact: true });
-  if (!(await field.count())) return;
+  const hasNameField = Boolean(await field.count());
+  const controls = scope.locator('input[required], textarea[required], select[required]');
+  if (!(await controls.count())) return;
 
-  await field.fill(name);
+  const whatsapp = scope.getByLabel(/WhatsApp contact number/i);
+  await expect(whatsapp).toBeVisible();
+  await expect(whatsapp).toHaveAttribute('required', '');
+
+  if (hasNameField) await field.fill(name);
 
   // Every published field is a required part of the production brief. Fill
   // the remaining native controls with valid test values; visual option
   // groups in the seeded product already carry configured defaults.
-  const controls = scope.locator('input[required], textarea[required], select[required]');
   for (let index = 0; index < await controls.count(); index += 1) {
     const control = controls.nth(index);
     if (!(await control.isVisible()) || (await control.isDisabled())) continue;
@@ -68,7 +73,7 @@ export async function fillPersonalisation(page: Page, name: string) {
   }
 
   const preview = scope.locator('svg[aria-label*="preview" i]').first();
-  if (await preview.count()) {
+  if (hasNameField && await preview.count()) {
     await expect(preview).toContainText(new RegExp(name, 'i'));
   }
 

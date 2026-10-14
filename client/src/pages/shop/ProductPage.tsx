@@ -17,6 +17,7 @@ import {
   defaultPersonalizationValues,
   personalizationCost,
   validatePersonalizationValues,
+  withWhatsAppContactField,
 } from '../../components/product/PersonalizationForm';
 import {
   Badge, Button, ButtonLink, CartIcon, CheckIcon, ChevronDown, Drawer, EmptyState,
@@ -58,12 +59,15 @@ export default function ProductPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const fields = useMemo(() => product?.personalization ?? [], [product]);
+  const fields = useMemo(
+    () => withWhatsAppContactField(product?.personalization ?? []),
+    [product],
+  );
 
   useEffect(() => {
     if (!product) return;
     setQuantity(product.minOrderQty ?? 1);
-    setValues(defaultPersonalizationValues(product.personalization ?? []));
+    setValues(defaultPersonalizationValues(fields));
     setErrors({});
     /*
      * Pre-select only when the choice is unambiguous: a single option, or one
@@ -90,7 +94,7 @@ export default function ProductPage() {
       buyable.length === 1 ? buyable[0] : buyable.find((v) => v.isDefault);
 
     setVariantId(preselected?.id ?? null);
-  }, [product]);
+  }, [product, fields]);
 
   if (isLoading) return <PageLoader label="Loading product" />;
   if (isError || !product) {

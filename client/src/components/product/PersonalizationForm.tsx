@@ -33,6 +33,39 @@ const GROUPS = [
   { key: 'extra', title: 'Anything else', hint: undefined },
 ] as const;
 
+export const WHATSAPP_CONTACT_KEY = 'whatsappContact';
+
+const WHATSAPP_CONTACT_FIELD: PersonalizationField = {
+  id: 'system-whatsapp-contact',
+  key: WHATSAPP_CONTACT_KEY,
+  label: 'WhatsApp contact number',
+  type: 'PHONE',
+  placeholder: '+91 98765 43210',
+  helpText: 'For design confirmation or proof approval before production. This is not printed on the product.',
+  required: true,
+  minLength: 6,
+  maxLength: 20,
+  pattern: null,
+  options: [],
+  defaultValue: '',
+  priceDelta: 0,
+  sortOrder: Number.MAX_SAFE_INTEGER,
+  status: 'PUBLISHED',
+  previewSlot: null,
+};
+
+/**
+ * Adds the order-reference contact automatically to products that already
+ * have personalisation. It is deliberately virtual: admins do not need to
+ * create it per product and it can never affect the product price or artwork.
+ */
+export function withWhatsAppContactField(fields: PersonalizationField[]): PersonalizationField[] {
+  const hasPersonalisation = fields.some((field) => field.status === 'PUBLISHED');
+  const alreadyConfigured = fields.some((field) => field.key === WHATSAPP_CONTACT_KEY);
+  if (!hasPersonalisation || alreadyConfigured) return fields;
+  return [...fields, WHATSAPP_CONTACT_FIELD];
+}
+
 function groupOf(field: PersonalizationField): (typeof GROUPS)[number]['key'] {
   if (field.type === 'COLOR' || field.type === 'FONT') return 'looks';
   return field.previewSlot ? 'says' : 'extra';
@@ -451,6 +484,9 @@ export function validatePersonalizationValues(
     }
     if (field.type === 'EMAIL' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
       errors[field.key] = 'Enter a valid email address';
+    }
+    if (field.type === 'PHONE' && !/^[0-9+\-\s()]{6,20}$/.test(value)) {
+      errors[field.key] = 'Enter a valid phone number';
     }
     if (field.type === 'URL') {
       try {

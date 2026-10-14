@@ -23,6 +23,11 @@ function whatsappNumber(phone: string): string {
   return digits;
 }
 
+function itemWhatsAppContact(order: Order, item: OrderItem): string {
+  return item.personalization.find((entry) => entry.key === 'whatsappContact')?.value
+    ?? order.customerPhone;
+}
+
 function productReviewWhatsAppUrl(order: Order, item: OrderItem): string {
   const message = [
     `Hello ${order.customerName}, this is Beyond Walls regarding order ${order.orderNumber}.`,
@@ -30,7 +35,7 @@ function productReviewWhatsAppUrl(order: Order, item: OrderItem): string {
     'Please review the product details/proof we share here and reply with your approval or any changes.',
   ].join(' ');
 
-  return `https://wa.me/${whatsappNumber(order.customerPhone)}?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/${whatsappNumber(itemWhatsAppContact(order, item))}?text=${encodeURIComponent(message)}`;
 }
 
 export default function AdminOrderDetail() {

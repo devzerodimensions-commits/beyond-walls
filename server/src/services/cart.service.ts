@@ -47,6 +47,8 @@ interface FieldOption {
 const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^[0-9+\-\s()]{6,20}$/;
+const WHATSAPP_CONTACT_KEY = 'whatsappContact';
+const WHATSAPP_CONTACT_LABEL = 'WhatsApp contact number';
 
 /**
  * Validates the customer's personalization answers against the product's
@@ -169,6 +171,34 @@ export function validatePersonalization(
       ...(displayValue ? { displayValue } : {}),
       priceDelta: money(delta),
       previewSlot: field.previewSlot,
+    });
+  }
+
+  // A personalised item always carries a WhatsApp contact for proof/design
+  // confirmation. This is a system order-reference field, not a product
+  // option, so it has no price delta and is not configured per product.
+  if (active.length && !active.some((field) => field.key === WHATSAPP_CONTACT_KEY)) {
+    const raw = answers[WHATSAPP_CONTACT_KEY];
+    const value = raw === null || raw === undefined ? '' : String(raw).trim();
+
+    if (!value) {
+      throw ApiError.unprocessable(`"${WHATSAPP_CONTACT_LABEL}" is required`, {
+        field: WHATSAPP_CONTACT_KEY,
+      });
+    }
+    if (!PHONE_PATTERN.test(value)) {
+      throw ApiError.unprocessable(`"${WHATSAPP_CONTACT_LABEL}" must be a valid phone number`, {
+        field: WHATSAPP_CONTACT_KEY,
+      });
+    }
+
+    entries.push({
+      key: WHATSAPP_CONTACT_KEY,
+      label: WHATSAPP_CONTACT_LABEL,
+      type: 'PHONE',
+      value,
+      priceDelta: money(0),
+      previewSlot: null,
     });
   }
 

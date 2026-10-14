@@ -309,6 +309,7 @@ test.describe('Storefront', () => {
     await page.goto('/product/no-smoking-sign');
     const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
     if (await options.count()) await options.first().click();
+    await fillPersonalisation(page, 'Cart test');
     await page.getByRole('button', { name: /^add to cart$/i }).first().click();
 
     // Wait for the add request to finish before navigating. On a remote/free
