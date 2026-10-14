@@ -6,7 +6,7 @@ import { resolveVideo } from '../../lib/video';
 import type {
   Banner, Category, Faq, GalleryItem, HomeSection, PersonalizationField, Product, Testimonial,
 } from '../../lib/types';
-import { ProductGrid } from '../product/ProductCard';
+import { ProductCard, ProductGrid } from '../product/ProductCard';
 import { LivePreview, buildPreviewSlots } from '../product/LivePreview';
 import { ArrowRight, ButtonLink, ChevronDown, Input } from '../ui';
 import { useSettings } from '../../context/StoreProvider';
@@ -1003,6 +1003,127 @@ export function ContactBlock({ section }: { section: HomeSection }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Help me choose — a way in for somebody without the word for it
+// ---------------------------------------------------------------------------
+
+interface FinderRoute {
+  title?: string;
+  text?: string;
+  href?: string;
+  image?: string;
+}
+
+/**
+ * A grid of categories answers "which of these?". This answers "what are you
+ * trying to do?", which is the question somebody actually arrives with: they
+ * know they need something for a front door or a reception desk long before
+ * they know the studio files it under Informative Signs.
+ */
+export function GuidedFinder({ section }: { section: HomeSection }) {
+  const routes = ((section.config?.items as FinderRoute[] | undefined) ?? []).filter(
+    (r) => r.title && r.href,
+  );
+  if (!routes.length) return null;
+
+  return (
+    <section className="container-site py-14 lg:py-18">
+      <SectionHeading
+        title={section.title}
+        subtitle={section.subtitle}
+        ctaLabel={section.ctaLabel}
+        ctaLink={section.ctaLink}
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {routes.map((route, index) => (
+          <Link
+            key={`${route.href}-${index}`}
+            to={route.href!}
+            className="group/route flex flex-col border border-stone-line bg-paper transition-colors duration-300 hover:border-ink"
+          >
+            {route.image ? (
+              <div className="aspect-[4/3] overflow-hidden bg-paper-warm">
+                <img
+                  src={assetUrl(route.image)}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-700 ease-architect group-hover/route:scale-[1.05]"
+                />
+              </div>
+            ) : null}
+
+            <div className="flex flex-1 flex-col p-5">
+              <p className="text-base font-medium leading-snug text-ink">{route.title}</p>
+              {route.text ? (
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-500">{route.text}</p>
+              ) : null}
+              <span className="mt-4 inline-flex items-center gap-1.5 text-2xs uppercase tracking-architect text-ink-500">
+                Browse
+                <ArrowRight
+                  size={13}
+                  className="transition-transform duration-300 group-hover/route:translate-x-1"
+                />
+              </span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Product rail — the same products, along instead of down
+// ---------------------------------------------------------------------------
+
+/**
+ * A grid of eight products is a very long column on a phone, which is where
+ * most of this traffic is. A rail puts them in one screen and invites a swipe.
+ *
+ * Scroll snapping rather than arrows: a swipe is the gesture people already
+ * use, and arrows are a desktop affordance that has to be re-learnt on touch.
+ * The cards keep a fixed width so a partial one shows at the edge -- that
+ * sliver is what tells you there is more to the right.
+ */
+export function ProductRail({ section }: { section: HomeSection }) {
+  const products = section.items as Product[];
+  if (!products?.length) return null;
+
+  return (
+    <section className="py-14 lg:py-18">
+      <div className="container-site">
+        <SectionHeading
+            title={section.title}
+          subtitle={section.subtitle}
+          ctaLabel={section.ctaLabel}
+          ctaLink={section.ctaLink}
+        />
+      </div>
+
+      {/*
+        Bleeds to the edge of the screen rather than stopping at the container,
+        so the row reads as continuing past the page instead of ending in a
+        margin. The padding puts the first card back on the container's line.
+      */}
+      <div
+        className="hide-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 sm:px-8 lg:px-12"
+        role="region"
+        aria-label={section.title ?? 'Products'}
+      >
+        {products.map((product) => (
+          <div
+            key={product.id}
+            className="w-[62vw] shrink-0 snap-start sm:w-[42vw] lg:w-[23%] lg:min-w-[240px]"
+          >
+            <ProductCard product={product} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /**
  * Dispatches a section to its renderer.
  *
@@ -1042,6 +1163,10 @@ export function SectionRenderer({ section }: { section: HomeSection }) {
       return <PageHero section={section} />;
     case 'STEPS':
       return <StepsSection section={section} />;
+    case 'GUIDED_FINDER':
+      return <GuidedFinder section={section} />;
+    case 'PRODUCT_RAIL':
+      return <ProductRail section={section} />;
     case 'SECTION_HEADING':
       return <SectionHeadingBlock section={section} />;
     case 'IMAGE_TEXT':

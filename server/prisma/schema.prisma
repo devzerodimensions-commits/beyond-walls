@@ -146,6 +146,10 @@ enum SectionType {
   // rather than being a column of paragraphs.
   PAGE_HERO
   STEPS
+  // A question-led way in for somebody who does not yet know what they want,
+  // and a row of products that scrolls sideways instead of down.
+  GUIDED_FINDER
+  PRODUCT_RAIL
 }
 
 enum BannerPlacement {

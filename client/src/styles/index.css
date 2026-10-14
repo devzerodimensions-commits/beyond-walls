@@ -151,6 +151,21 @@
 }
 
 @layer utilities {
+  /*
+   * A row that scrolls sideways without a scrollbar across it.
+   *
+   * The bar is hidden, never the scrolling: the row still takes a swipe, a
+   * trackpad, a shift-wheel and the keyboard. A partial card at the edge is
+   * what signals there is more, which a scrollbar would otherwise say twice.
+   */
+  .hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }

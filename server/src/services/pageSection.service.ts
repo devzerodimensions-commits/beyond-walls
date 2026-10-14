@@ -43,8 +43,15 @@ export interface WidgetField {
   options?: { value: string; label: string }[];
   /** Fields under `config` rather than on the section row itself. */
   inConfig?: boolean;
-  /** For `items`: the shape of one row in the list. */
-  itemFields?: { key: string; label: string; type: 'text' | 'textarea' }[];
+  /**
+   * For `items`: the shape of one row in the list.
+   *
+   * A row can carry a picture and a destination, not only words — the routes in
+   * "Help me choose" are a tile each. Narrower than the field types above
+   * because a row is a small record, and a product picker or a nested list
+   * inside a repeating row is a screen nobody can use.
+   */
+  itemFields?: { key: string; label: string; type: 'text' | 'textarea' | 'image' | 'link' }[];
 }
 
 export interface WidgetDefinition {
@@ -195,6 +202,46 @@ export const WIDGETS: WidgetDefinition[] = [
       },
     ],
     defaults: { title: 'How it works', config: { items: [] } },
+  },
+  {
+    type: 'GUIDED_FINDER',
+    name: 'Help me choose',
+    description: 'A few routes in, for somebody who does not know the word for what they want.',
+    group: 'Catalogue',
+    fields: [
+      ...HEADED,
+      {
+        key: 'items',
+        label: 'Routes',
+        type: 'items',
+        inConfig: true,
+        hint: 'Three or four. Each one is a question a customer actually arrives with.',
+        itemFields: [
+          { key: 'title', label: 'Route', type: 'text' },
+          { key: 'text', label: 'Who it is for', type: 'textarea' },
+          { key: 'href', label: 'Goes to', type: 'text' },
+          { key: 'image', label: 'Picture', type: 'image' },
+        ],
+      },
+    ],
+    defaults: { title: 'Not sure where to start?', config: { items: [] } },
+  },
+  {
+    type: 'PRODUCT_RAIL',
+    name: 'Product row',
+    description: 'Products in a row that scrolls sideways. Reads better than a grid on a phone.',
+    group: 'Catalogue',
+    fields: [
+      ...HEADED,
+      {
+        key: 'productIds',
+        label: 'Products',
+        type: 'products',
+        inConfig: true,
+        hint: 'Leave empty to show the featured ones.',
+      },
+    ],
+    defaults: { title: 'New in', config: {} },
   },
   {
     type: 'SECTION_HEADING',
@@ -518,6 +565,9 @@ export async function resolveSections(
           return { ...section, items: ordered };
         }
 
+        // A rail is the same products in a different shape, so it is filled the
+        // same way: the chosen ones in the chosen order, or the featured ones.
+        case 'PRODUCT_RAIL':
         case 'FEATURED_PRODUCTS': {
           const ids = (config.productIds as string[] | undefined) ?? [];
           const products = await prisma.product.findMany({

@@ -113,6 +113,38 @@ test.describe('Storefront', () => {
     await expect(pagesPanel.locator('a[href^="/shop/"]')).toHaveCount(0);
   });
 
+  test('the footer opens its columns on a laptop and folds them on a phone', async ({ page }) => {
+    /*
+     * Four columns side by side cost nothing on a laptop. Stacked on a phone
+     * they put the address and the opening hours a long scroll below the fold,
+     * so there the headings fold. The headings are buttons at every width --
+     * only the behaviour changes -- so this checks what the reader can see
+     * rather than what the markup says.
+     */
+    await page.goto('/');
+    const footer = page.locator('footer');
+    await footer.scrollIntoViewIfNeeded();
+
+    const studio = footer.getByRole('button', { name: /^studio$/i });
+    await expect(studio).toBeVisible();
+    const trackOrder = footer.getByRole('link', { name: /track an order/i });
+
+    if (isMobile(page)) {
+      await expect(trackOrder).toBeHidden();
+      await studio.click();
+      await expect(trackOrder).toBeVisible();
+    } else {
+      // Open already, and pressing the heading must not close it.
+      await expect(trackOrder).toBeVisible();
+      await studio.click({ force: true });
+      await expect(trackOrder).toBeVisible();
+    }
+
+    // The way back into the shop belongs at the foot of a page that was read
+    // to the end.
+    await expect(footer.locator('a[href^="/shop/"]').first()).toBeAttached();
+  });
+
   test('every product card offers a real action and a real price', async ({ page }) => {
     await page.goto('/shop');
 

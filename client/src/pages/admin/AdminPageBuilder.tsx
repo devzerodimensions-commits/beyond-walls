@@ -1259,7 +1259,7 @@ function ItemsEditor({
 }: {
   label: string;
   hint?: string;
-  fields: { key: string; label: string; type: 'text' | 'textarea' }[];
+  fields: { key: string; label: string; type: 'text' | 'textarea' | 'image' | 'link' }[];
   value: Record<string, string>[];
   onChange: (rows: Record<string, string>[]) => void;
 }) {
@@ -1354,24 +1354,41 @@ function ItemsEditor({
             </div>
 
             <div className="space-y-2.5">
-              {fields.map((f) =>
-                f.type === 'textarea' ? (
-                  <Textarea
-                    key={f.key}
-                    label={f.label}
-                    rows={2}
-                    value={String(row[f.key] ?? '')}
-                    onChange={(e) => setCell(index, f.key, e.target.value)}
-                  />
-                ) : (
+              {fields.map((f) => {
+                if (f.type === 'textarea') {
+                  return (
+                    <Textarea
+                      key={f.key}
+                      label={f.label}
+                      rows={2}
+                      value={String(row[f.key] ?? '')}
+                      onChange={(e) => setCell(index, f.key, e.target.value)}
+                    />
+                  );
+                }
+                // The same picker the rest of the builder uses. A row that
+                // wants a picture and offers a box to paste a URL into is a row
+                // nobody fills in.
+                if (f.type === 'image') {
+                  return (
+                    <ImageField
+                      key={f.key}
+                      label={f.label}
+                      folder="banners"
+                      value={(row[f.key] as string) ?? null}
+                      onChange={(url) => setCell(index, f.key, url ?? '')}
+                    />
+                  );
+                }
+                return (
                   <Input
                     key={f.key}
                     label={f.label}
                     value={String(row[f.key] ?? '')}
                     onChange={(e) => setCell(index, f.key, e.target.value)}
                   />
-                ),
-              )}
+                );
+              })}
             </div>
           </div>
         ))}

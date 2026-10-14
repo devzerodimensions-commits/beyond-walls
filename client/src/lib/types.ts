@@ -19,7 +19,8 @@ export type SectionType =
   | 'BANNER_WIDE' | 'GALLERY' | 'TESTIMONIALS' | 'FAQ' | 'RICH_TEXT' | 'CTA' | 'CUSTOM_ORDER_CTA'
   | 'SHOP_BY_ATTRIBUTE' | 'PERSONALISATION_DEMO'
   | 'SECTION_HEADING' | 'IMAGE_TEXT' | 'CONTACT_BLOCK'
-  | 'PAGE_HERO' | 'STEPS';
+  | 'PAGE_HERO' | 'STEPS'
+  | 'GUIDED_FINDER' | 'PRODUCT_RAIL';
 
 export interface User {
   id: string;
