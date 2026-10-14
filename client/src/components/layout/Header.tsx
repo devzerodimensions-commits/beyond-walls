@@ -183,10 +183,27 @@ export function Header() {
           and a nav that is readable on most pictures is not good enough.
         */}
         {transparent ? (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-ink/55 to-transparent"
-          />
+          <>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-ink/55 to-transparent"
+            />
+
+            {/*
+              One drawn line instead of three ruled ones.
+
+              Full-bleed rules between the rows read as scratches across the
+              photograph -- they cut the picture into bands edge to edge, which
+              is what a border does and exactly what you do not want over an
+              image. This marks where the header ends and nothing else, and it
+              fades out before it reaches either margin, so it never meets the
+              edge of the frame. It is the one line a drawing would have.
+            */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-[34%] bottom-0 h-px bg-gradient-to-r from-transparent via-paper/45 to-transparent"
+            />
+          </>
         ) : null}
 
         <AnnouncementBar />
@@ -199,7 +216,7 @@ export function Header() {
           page load and pushed the whole page down with it. It always carries
           Track an order in any case.
         */}
-        <div className={clsx('hidden border-b lg:block', transparent ? 'border-paper/20' : 'border-stone-line/60')}>
+        <div className={clsx('hidden lg:block', transparent ? 'border-b border-transparent' : 'border-b border-stone-line/60')}>
           <div className="container-site flex h-9 items-center justify-between">
             <nav className="flex items-center gap-6" aria-label="Secondary">
               {utilityLinks.map((link) => (
@@ -323,7 +340,7 @@ export function Header() {
         </div>
 
         {/* ---- Shopping, on its own line under the logo ---- */}
-        <div className={clsx('hidden border-t lg:block', transparent ? 'border-paper/20' : 'border-stone-line/60')}>
+        <div className={clsx('hidden lg:block', transparent ? 'border-t border-transparent' : 'border-t border-stone-line/60')}>
           <nav
             className="container-site flex items-center justify-center gap-8 xl:gap-10"
             aria-label="Main"
