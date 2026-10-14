@@ -216,7 +216,16 @@ export function Header() {
           page load and pushed the whole page down with it. It always carries
           Track an order in any case.
         */}
-        <div className={clsx('hidden lg:block', transparent ? 'border-b border-transparent' : 'border-b border-stone-line/60')}>
+        {/*
+            Separated by tone, not by a rule.
+
+            Three full-width lines within sixty pixels of each other made the
+            header look like ruled paper, and two of them were only saying
+            where one row stopped and the next began -- which a change of
+            background says more quietly. The single line at the foot of the
+            header stays, because that one divides the header from the page.
+          */}
+          <div className={clsx('hidden lg:block', transparent ? '' : 'bg-paper-warm')}>
           <div className="container-site flex h-9 items-center justify-between">
             <nav className="flex items-center gap-6" aria-label="Secondary">
               {utilityLinks.map((link) => (
@@ -340,7 +349,7 @@ export function Header() {
         </div>
 
         {/* ---- Shopping, on its own line under the logo ---- */}
-        <div className={clsx('hidden lg:block', transparent ? 'border-t border-transparent' : 'border-t border-stone-line/60')}>
+        <div className="hidden lg:block">
           <nav
             className="container-site flex items-center justify-center gap-8 xl:gap-10"
             aria-label="Main"
