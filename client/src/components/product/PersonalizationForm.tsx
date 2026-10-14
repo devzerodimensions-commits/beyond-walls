@@ -92,13 +92,16 @@ function PersonalizationInput({
   onChange: (value: string) => void;
 }) {
   const label = `${field.label}${priceSuffix(field.priceDelta)}`;
+  // A published personalization field is part of the production brief. The
+  // customer must answer every one before the item can enter the cart.
+  const required = true;
 
   switch (field.type) {
     case 'TEXTAREA':
       return (
         <Textarea
           label={label}
-          required={field.required}
+          required={required}
           error={error}
           hint={field.helpText ?? undefined}
           placeholder={field.placeholder ?? ''}
@@ -112,7 +115,7 @@ function PersonalizationInput({
       return (
         <Select
           label={label}
-          required={field.required}
+          required={required}
           error={error}
           hint={field.helpText ?? undefined}
           value={value}
@@ -130,7 +133,7 @@ function PersonalizationInput({
 
     case 'RADIO':
       return (
-        <FieldWrap label={label} required={field.required} error={error} hint={field.helpText ?? undefined}>
+        <FieldWrap label={label} required={required} error={error} hint={field.helpText ?? undefined}>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {field.options.map((opt) => (
               <button
@@ -156,18 +159,21 @@ function PersonalizationInput({
           <label className="flex cursor-pointer items-start gap-2.5">
             <input
               type="checkbox"
+              required
               checked={value === 'yes'}
               onChange={(e) => onChange(e.target.checked ? 'yes' : '')}
               className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer appearance-none border border-ink-300 bg-paper checked:border-ink checked:bg-ink"
             />
-            <span className="text-sm text-ink-700">{label}</span>
+            <span className="text-sm text-ink-700">
+              {label} <span aria-hidden="true" className="text-state-danger">*</span>
+            </span>
           </label>
         </FieldWrap>
       );
 
     case 'COLOR':
       return (
-        <FieldWrap label={label} required={field.required} error={error} hint={field.helpText ?? undefined}>
+        <FieldWrap label={label} required={required} error={error} hint={field.helpText ?? undefined}>
           <div className="flex flex-wrap gap-2.5">
             {field.options.map((opt) => {
               const selected = value === opt.value;
@@ -199,7 +205,7 @@ function PersonalizationInput({
 
     case 'FONT':
       return (
-        <FieldWrap label={label} required={field.required} error={error} hint={field.helpText ?? undefined}>
+        <FieldWrap label={label} required={required} error={error} hint={field.helpText ?? undefined}>
           <div className="grid grid-cols-3 gap-2">
             {field.options.map((opt) => (
               <button
@@ -233,7 +239,7 @@ function PersonalizationInput({
         <Input
           type="number"
           label={label}
-          required={field.required}
+          required={required}
           error={error}
           hint={field.helpText ?? undefined}
           placeholder={field.placeholder ?? ''}
@@ -247,7 +253,7 @@ function PersonalizationInput({
         <Input
           type="date"
           label={label}
-          required={field.required}
+          required={required}
           error={error}
           hint={field.helpText ?? undefined}
           value={value}
@@ -259,7 +265,7 @@ function PersonalizationInput({
       return (
         <Input
           label={label}
-          required={field.required}
+          required={required}
           error={error}
           hint={field.helpText ?? '15-character GSTIN, e.g. 24AAAAA0000A1Z5'}
           placeholder={field.placeholder ?? '24AAAAA0000A1Z5'}
@@ -275,7 +281,7 @@ function PersonalizationInput({
         <Input
           type="url"
           label={label}
-          required={field.required}
+          required={required}
           error={error}
           hint={field.helpText ?? 'Include https://'}
           placeholder={field.placeholder ?? 'https://'}
@@ -287,7 +293,7 @@ function PersonalizationInput({
     case 'EMAIL':
       return (
         <Input
-          type="email" label={label} required={field.required} error={error}
+          type="email" label={label} required={required} error={error}
           hint={field.helpText ?? undefined} placeholder={field.placeholder ?? ''}
           value={value} onChange={(e) => onChange(e.target.value)}
         />
@@ -296,7 +302,7 @@ function PersonalizationInput({
     case 'PHONE':
       return (
         <Input
-          type="tel" label={label} required={field.required} error={error}
+          type="tel" label={label} required={required} error={error}
           hint={field.helpText ?? undefined} placeholder={field.placeholder ?? ''}
           value={value} onChange={(e) => onChange(e.target.value)}
         />
@@ -307,7 +313,7 @@ function PersonalizationInput({
         <div>
           <Input
             label={label}
-            required={field.required}
+            required={required}
             error={error}
             hint={field.helpText ?? undefined}
             placeholder={field.placeholder ?? ''}
@@ -360,7 +366,7 @@ function FileField({
   const isImage = /\.(png|jpe?g|webp|gif|svg)$/i.test(value);
 
   return (
-    <FieldWrap label={label} required={field.required} error={error ?? uploadError ?? undefined} hint={field.helpText ?? undefined}>
+    <FieldWrap label={label} required error={error ?? uploadError ?? undefined} hint={field.helpText ?? undefined}>
       {value ? (
         <div className="flex items-center gap-3 border border-stone-line bg-paper p-3">
           {isImage ? (
@@ -431,7 +437,7 @@ export function validatePersonalizationValues(
     const value = (values[field.key] ?? '').trim();
 
     if (!value) {
-      if (field.required) errors[field.key] = `${field.label} is required`;
+      errors[field.key] = `${field.label} is required`;
       continue;
     }
     if (field.maxLength && value.length > field.maxLength) {

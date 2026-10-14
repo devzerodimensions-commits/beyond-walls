@@ -145,7 +145,8 @@ export default function ProductPage() {
    */
   const personalisationErrors = fields.some((f) => errors[f.key]);
   const answered = fields.filter((f) => (values[f.key] ?? '').trim() !== '');
-  const personalisationDone = answered.length > 0;
+  const personalisationDone =
+    fields.length > 0 && Object.keys(validatePersonalizationValues(fields, values)).length === 0;
   const personalisationSummary = (() => {
     const spoken = answered
       .filter((f) => ['TEXT', 'TEXTAREA', 'NUMBER'].includes(f.type))
@@ -167,7 +168,11 @@ export default function ProductPage() {
     const validation = validatePersonalizationValues(fields, values);
     if (Object.keys(validation).length) {
       setErrors(validation);
-      document.getElementById('personalise')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (window.matchMedia('(max-width: 1023px)').matches) {
+        setSheetOpen(true);
+      } else {
+        document.getElementById('personalise')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
     setErrors({});
@@ -511,6 +516,12 @@ export default function ProductPage() {
                     </p>
                   ) : null}
 
+                  {fields.length && !personalisationDone ? (
+                    <p className="text-center text-2xs text-state-warning">
+                      Complete every personalisation field before adding this item to your cart.
+                    </p>
+                  ) : null}
+
                   {wishlistEnabled ? (
                     <button
                       type="button"
@@ -783,10 +794,13 @@ export default function ProductPage() {
         </Drawer>
       ) : null}
 
-      {/* ---------------- Mobile sticky buy bar ---------------- */}
+      {/* ---------------- Sticky buy bar — phone, tablet and desktop ---------------- */}
       {hasPrice && !outOfStock ? (
-        <div className="sticky bottom-0 z-40 border-t border-stone-line bg-paper/95 px-4 py-3 backdrop-blur-md lg:hidden">
-          <div className="flex items-center gap-3">
+        <div
+          data-testid="sticky-buy-bar"
+          className="sticky bottom-0 z-40 border-t border-stone-line bg-paper/95 py-3 shadow-[0_-8px_24px_rgba(20,20,20,0.06)] backdrop-blur-md"
+        >
+          <div className="container-site flex items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-2xs text-ink-400">{product.name}</p>
               <p className="text-sm font-medium">{formatPrice(unitPrice)}</p>
@@ -794,10 +808,10 @@ export default function ProductPage() {
             <Button
               size="md"
               loading={busy === 'buy'}
-              disabled={busy !== null}
+              disabled={mustChooseVariant || busy !== null}
               onClick={() => void submit('buy')}
             >
-              Buy now
+              {mustChooseVariant ? 'Choose an option' : 'Buy now'}
             </Button>
           </div>
         </div>

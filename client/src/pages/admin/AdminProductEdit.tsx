@@ -1361,7 +1361,7 @@ interface FieldDraft {
 }
 
 const EMPTY_FIELD: FieldDraft = {
-  key: '', label: '', type: 'TEXT', placeholder: '', helpText: '', required: false,
+  key: '', label: '', type: 'TEXT', placeholder: '', helpText: '', required: true,
   maxLength: null, minLength: null, defaultValue: '', priceDelta: 0, previewSlot: '',
   status: 'PUBLISHED', options: [],
 };
@@ -1390,7 +1390,7 @@ function PersonalizationTab({
         type: draft.type,
         placeholder: draft.placeholder || null,
         helpText: draft.helpText || null,
-        required: draft.required,
+        required: true,
         maxLength: draft.maxLength,
         minLength: draft.minLength,
         defaultValue: draft.defaultValue || null,
@@ -1436,6 +1436,7 @@ function PersonalizationTab({
         if (fields.some((f) => f.key === field.key)) continue;
         await api.post(`/admin/products/${productId}/personalization`, {
           ...field,
+          required: true,
           options: [],
           status: 'PUBLISHED',
         });
@@ -1456,7 +1457,7 @@ function PersonalizationTab({
         <div className="space-y-6 lg:col-span-2">
           <AdminCard
             title="Personalisation fields"
-            description="What the customer fills in. Their answers travel with the cart, order and admin record."
+            description="Every published field is required. The answers travel with the cart, order and admin record."
             actions={
               <Button size="sm" icon={<PlusIcon size={14} />} onClick={() => setEditing({ ...EMPTY_FIELD })}>
                 Add field
@@ -1472,7 +1473,7 @@ function PersonalizationTab({
                     <div className="min-w-0">
                       <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                         {field.label}
-                        {field.required ? <Badge tone="danger">Required</Badge> : null}
+                        {field.status === 'PUBLISHED' ? <Badge tone="danger">Required</Badge> : null}
                         {field.previewSlot ? <Badge tone="info">→ {field.previewSlot}</Badge> : null}
                         {field.status === 'DRAFT' ? <Badge tone="warning">Draft</Badge> : null}
                       </p>
@@ -1492,7 +1493,7 @@ function PersonalizationTab({
                             type: field.type,
                             placeholder: field.placeholder ?? '',
                             helpText: field.helpText ?? '',
-                            required: field.required,
+                            required: true,
                             maxLength: field.maxLength ?? null,
                             minLength: field.minLength ?? null,
                             defaultValue: field.defaultValue ?? '',
@@ -1785,7 +1786,9 @@ function FieldForm({
       ) : null}
 
       <div className="space-y-3">
-        <Checkbox label="Required" checked={form.required} onChange={(v) => setForm({ ...form, required: v })} />
+        <p className="text-xs text-ink-500">
+          Published personalisation fields are always required before purchase.
+        </p>
         <Checkbox
           label="Published (shown to customers)"
           checked={form.status === 'PUBLISHED'}

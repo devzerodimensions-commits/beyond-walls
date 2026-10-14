@@ -452,7 +452,7 @@ export function Drawer({
       />
       <div
         className={clsx(
-          'absolute top-0 flex h-full w-full flex-col bg-paper shadow-panel animate-slide-in-right',
+          'absolute top-0 grid h-full w-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-paper shadow-panel animate-slide-in-right',
           side === 'right' ? 'right-0' : 'left-0',
           width,
         )}
@@ -468,7 +468,7 @@ export function Drawer({
             <CloseIcon />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="min-h-0 overflow-y-auto">{children}</div>
         {footer ? <div className="border-t border-stone-line bg-paper-off px-5 py-4">{footer}</div> : null}
       </div>
     </div>

@@ -28,13 +28,56 @@ export async function fillPersonalisation(page: Page, name: string) {
 
   await field.fill(name);
 
+  // Every published field is a required part of the production brief. Fill
+  // the remaining native controls with valid test values; visual option
+  // groups in the seeded product already carry configured defaults.
+  const controls = scope.locator('input[required], textarea[required], select[required]');
+  for (let index = 0; index < await controls.count(); index += 1) {
+    const control = controls.nth(index);
+    if (!(await control.isVisible()) || (await control.isDisabled())) continue;
+
+    const tag = await control.evaluate((element) => element.tagName.toLowerCase());
+    const type = (await control.getAttribute('type')) ?? '';
+    if (type === 'file') continue;
+    if (type === 'checkbox') {
+      if (!(await control.isChecked())) await control.check();
+      continue;
+    }
+    if (await control.inputValue()) continue;
+
+    if (tag === 'select') {
+      const firstValue = await control.locator('option').evaluateAll((options) =>
+        options.map((option) => (option as HTMLOptionElement).value).find(Boolean) ?? '',
+      );
+      if (firstValue) await control.selectOption(firstValue);
+      continue;
+    }
+
+    const value = type === 'email'
+      ? 'playwright@example.com'
+      : type === 'url'
+        ? 'https://example.com'
+        : type === 'tel'
+          ? '9876543210'
+          : type === 'number'
+            ? '1'
+            : type === 'date'
+              ? '2026-10-14'
+              : 'Playwright details';
+    await control.fill(value);
+  }
+
   const preview = scope.locator('svg[aria-label*="preview" i]').first();
   if (await preview.count()) {
     await expect(preview).toContainText(new RegExp(name, 'i'));
   }
 
   if (opensInSheet) {
-    await scope.getByRole('button', { name: /^done$/i }).click();
+    const done = scope.getByRole('button', { name: /^done$/i });
+    await expect(done).toBeVisible();
+    const box = await done.boundingBox();
+    if (!box) throw new Error('Personalisation Done button has no clickable area');
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await expect(scope).toBeHidden();
   }
 }

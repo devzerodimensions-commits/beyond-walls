@@ -218,6 +218,9 @@ test.describe('Storefront', () => {
 
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.locator('main')).toContainText('₹');
+    // The quick purchase bar is no longer phone-only: it must remain available
+    // on tablet and desktop viewports too.
+    await expect(page.getByTestId('sticky-buy-bar')).toBeVisible();
 
     // A product with more than one option must make you choose before buying.
     const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
@@ -235,6 +238,19 @@ test.describe('Storefront', () => {
     const cart = page.getByRole('dialog').filter({ hasText: /your cart/i });
     await expect(cart).toBeVisible();
     await expect(cart).toContainText('₹');
+  });
+
+  test('personalised products cannot be added before every field is completed', async ({ page }) => {
+    await page.goto('/product/minimal-acrylic-name-plate');
+
+    const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
+    if (await options.count()) await options.first().click();
+
+    await page.getByRole('button', { name: /^add to cart$/i }).first().click();
+
+    await expect(page).toHaveURL(/\/product\/minimal-acrylic-name-plate/);
+    await expect(page.getByRole('dialog').filter({ hasText: /your cart/i })).toHaveCount(0);
+    await expect(page.locator('[role="alert"]:visible').filter({ hasText: /is required/i }).first()).toBeVisible();
   });
 
   /*

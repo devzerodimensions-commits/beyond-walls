@@ -3,18 +3,35 @@ import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { ApiError, api, assetUrl } from '../../lib/api';
-import type { Order, OrderStatus } from '../../lib/types';
+import type { Order, OrderItem, OrderStatus } from '../../lib/types';
 import { formatDate, formatPrice, statusMeta } from '../../lib/format';
 import { useToast } from '../../context/StoreProvider';
 import { AdminCard, AdminPageHeader, DefinitionList } from '../../components/admin/AdminKit';
 import {
-  Badge, Button, ConfirmDialog, Input, Modal, PageLoader, Select, Textarea,
+  Badge, Button, ButtonLink, ConfirmDialog, Input, Modal, PageLoader, Select, Textarea,
 } from '../../components/ui';
 
 const ORDER_STATUSES: OrderStatus[] = [
   'PENDING', 'CONFIRMED', 'IN_PRODUCTION', 'READY_TO_SHIP',
   'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED',
 ];
+
+function whatsappNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 11 && digits.startsWith('0')) return `91${digits.slice(1)}`;
+  return digits;
+}
+
+function productReviewWhatsAppUrl(order: Order, item: OrderItem): string {
+  const message = [
+    `Hello ${order.customerName}, this is Beyond Walls regarding order ${order.orderNumber}.`,
+    `We would like to confirm the personalisation for “${item.productName}” before production and shipping.`,
+    'Please review the product details/proof we share here and reply with your approval or any changes.',
+  ].join(' ');
+
+  return `https://wa.me/${whatsappNumber(order.customerPhone)}?text=${encodeURIComponent(message)}`;
+}
 
 export default function AdminOrderDetail() {
   const { id } = useParams();
@@ -168,6 +185,15 @@ export default function AdminOrderDetail() {
                               </div>
                             ))}
                         </dl>
+                        <ButtonLink
+                          to={productReviewWhatsAppUrl(order, item)}
+                          external
+                          variant="secondary"
+                          size="sm"
+                          className="mt-3 w-full sm:w-auto"
+                        >
+                          WhatsApp customer about this item
+                        </ButtonLink>
                       </div>
                     ) : null}
                   </div>

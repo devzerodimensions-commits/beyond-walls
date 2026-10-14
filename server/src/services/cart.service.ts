@@ -77,10 +77,10 @@ export function validatePersonalization(
     const value = raw === null || raw === undefined ? '' : String(raw).trim();
 
     if (!value) {
-      if (field.required) {
-        throw ApiError.unprocessable(`"${field.label}" is required`, { field: field.key });
-      }
-      continue;
+      // Every published personalization field is production-critical. This
+      // server-side check prevents a caller from bypassing the storefront and
+      // adding an incomplete custom item directly through the API.
+      throw ApiError.unprocessable(`"${field.label}" is required`, { field: field.key });
     }
 
     if (field.maxLength && value.length > field.maxLength) {
