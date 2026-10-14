@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api, assetUrl } from '../../lib/api';
-import type { CatalogFilters, Category, GalleryItem } from '../../lib/types';
+import type { CatalogFilters, Category, GalleryItem, Product } from '../../lib/types';
 import { ArrowRight } from '../ui';
 
 /**
@@ -72,7 +72,17 @@ function RangeTile({
       onClick={onNavigate}
       className="group/tile block overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-paper-warm">
+      {/*
+        With a picture, the caption sits under it. Without one, the name is the
+        tile — printing it inside the panel and again underneath says the same
+        word twice and looks like a mistake, which is what it was.
+      */}
+      <div
+        className={clsx(
+          'relative flex items-center justify-center overflow-hidden bg-paper-warm transition-colors duration-300',
+          image ? 'aspect-[4/3]' : 'aspect-[5/2] group-hover/tile:bg-paper-sand',
+        )}
+      >
         {image ? (
           <img
             src={assetUrl(image)}
@@ -81,14 +91,16 @@ function RangeTile({
             className="h-full w-full object-cover transition-transform duration-700 ease-architect group-hover/tile:scale-[1.06]"
           />
         ) : (
-          <span className="flex h-full w-full items-center justify-center px-3 text-center text-xs leading-tight text-ink-400 transition-colors duration-300 group-hover/tile:text-ink">
+          <span className="px-3 text-center text-xs leading-tight text-ink-600 transition-colors duration-300 group-hover/tile:text-ink">
             {name}
           </span>
         )}
       </div>
-      <p className="mt-2 text-xs text-ink-600 transition-colors duration-200 group-hover/tile:text-ink">
-        {name}
-      </p>
+      {image ? (
+        <p className="mt-2 text-xs text-ink-600 transition-colors duration-200 group-hover/tile:text-ink">
+          {name}
+        </p>
+      ) : null}
     </Link>
   );
 }
@@ -111,6 +123,26 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
     queryKey: ['menu-filters', active?.slug],
     queryFn: () => api.get<CatalogFilters>('/catalog/filters', { category: active!.slug }),
     enabled: Boolean(active?.slug),
+    staleTime: 5 * 60_000,
+  });
+
+  /*
+   * A collection with no ranges of its own.
+   *
+   * "For Home" has no children, so the middle column had a heading, three
+   * filter words and a great deal of nothing. Its products stand in: they are
+   * what the ranges would have pointed at anyway, and a picture of the thing
+   * is a better answer to "what is in here" than the word "Acrylic".
+   *
+   * Only fetched for those collections, and cached per collection.
+   */
+  const hasRanges = (active?.children ?? []).some(
+    (c) => c.showInMenu !== false && c.status === 'PUBLISHED',
+  );
+  const { data: standIns } = useQuery({
+    queryKey: ['menu-products', active?.slug],
+    queryFn: () => api.get<Product[]>('/catalog/products', { category: active!.slug, limit: 6 }),
+    enabled: Boolean(active?.slug) && !hasRanges,
     staleTime: 5 * 60_000,
   });
 
@@ -197,13 +229,31 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
           </div>
 
           {ranges.length ? (
-            <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+            <div
+              className={clsx(
+                'grid gap-x-4 gap-y-4',
+                // Four across three columns strands one on a row of its own.
+                ranges.length === 4 ? 'grid-cols-2' : 'grid-cols-3',
+              )}
+            >
               {ranges.map((child) => (
                 <RangeTile
                   key={child.id}
                   name={child.name}
                   image={child.image}
                   to={`/shop/${active!.slug}?subcategory=${child.slug}`}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+          ) : standIns?.length ? (
+            <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+              {standIns.slice(0, 6).map((product) => (
+                <RangeTile
+                  key={product.id}
+                  name={product.name}
+                  image={product.images?.[0]?.url ?? null}
+                  to={`/product/${product.slug}`}
                   onNavigate={onNavigate}
                 />
               ))}
@@ -218,7 +268,7 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
             <div
               className={clsx(
                 'flex flex-wrap gap-x-7 gap-y-4',
-                ranges.length ? 'mt-6 border-t border-stone-line pt-5' : '',
+                ranges.length || standIns?.length ? 'mt-6 border-t border-stone-line pt-5' : '',
               )}
             >
               {groups.map((group) => (
@@ -255,7 +305,7 @@ export function MegaMenu({ categories, filters, gallery, onNavigate }: Props) {
             </div>
           ) : null}
 
-          {!ranges.length && !groups.length ? (
+          {!ranges.length && !standIns?.length && !groups.length ? (
             <p className="text-sm text-ink-400">
               Ranges and filter groups appear here once they are published in the admin.
             </p>

@@ -43,3 +43,6 @@ assets/client-photos/
 assets/contact-sheet.jpg
 assets/drive-download-*.zip
 assets/*.zip
+
+# Screenshots captured while checking a design change.
+.shots/
