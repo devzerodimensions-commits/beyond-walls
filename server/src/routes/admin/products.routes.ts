@@ -74,6 +74,7 @@ const productSchema = z.object({
   costPrice: nullableNumber,
   taxRatePercent: nullableNumber,
   priceConfirmed: z.boolean().optional(),
+  codAvailable: z.boolean().optional(),
 
   trackInventory: z.boolean().optional(),
   stock: nullableNumber,

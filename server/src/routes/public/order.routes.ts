@@ -63,9 +63,29 @@ const checkoutSchema = z.object({
 // ---------------------------------------------------------------------------
 router.get(
   '/checkout/config',
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
     const settings = await getAllSettings();
     const razorpayEnabled = boolSetting(settings, 'payment.razorpayEnabled', true) && razorpayConfigured;
+    const codEnabled = boolSetting(settings, 'payment.codEnabled', false);
+
+    /*
+     * Cash on delivery is also a property of what is in the basket.
+     *
+     * The studio takes it on stock items but not on bespoke ones -- a plate cut
+     * with someone else's name cannot be resold if the order is refused at the
+     * door. One such item disqualifies the whole order rather than part of it,
+     * because an order ships and is paid for as a single thing.
+     *
+     * Named here, not just counted, so checkout can say which product is the
+     * reason instead of refusing without explanation.
+     */
+    let codBlockedBy: string[] = [];
+    if (codEnabled) {
+      const cart = await resolveCart(req, false);
+      codBlockedBy = (cart?.items ?? [])
+        .filter((item) => item.product && !item.product.codAvailable)
+        .map((item) => item.product.name);
+    }
 
     res.json({
       success: true,
@@ -77,12 +97,17 @@ router.get(
           methods: ['upi', 'card', 'netbanking', 'wallet'],
         },
         cod: {
-          enabled: boolSetting(settings, 'payment.codEnabled', false),
+          enabled: codEnabled && codBlockedBy.length === 0,
+          // Distinguishes "the studio does not offer COD" from "not on these
+          // items", so the page can explain rather than just hide the option.
+          enabledInStore: codEnabled,
+          blockedBy: codBlockedBy,
           fee: numberSetting(settings, 'payment.codFee', 0),
           minOrder: numberSetting(settings, 'payment.codMinOrder', 0),
           maxOrder: numberSetting(settings, 'payment.codMaxOrder', 0),
           note: settings['payment.codNote'] ?? '',
         },
+        gstInvoice: boolSetting(settings, 'tax.gstInvoiceEnabled', false),
         checkoutEnabled: boolSetting(settings, 'store.enableCheckout', true),
         currency: settings['payment.currency'] ?? 'INR',
         shippingNote: settings['shipping.note'] ?? '',

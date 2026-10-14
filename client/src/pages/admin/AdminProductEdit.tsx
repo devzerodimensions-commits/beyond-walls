@@ -54,6 +54,7 @@ interface ProductForm {
   compareAtPrice: number | null;
   taxRatePercent: number | null;
   priceConfirmed: boolean;
+  codAvailable: boolean;
   trackInventory: boolean;
   stock: number | null;
   lowStockAlert: number | null;
@@ -86,7 +87,7 @@ const EMPTY_FORM: ProductForm = {
   installationNote: '', shippingNote: '',
   features: [], applications: [], includedItems: [],
   categoryId: '', subcategoryId: '',
-  price: null, compareAtPrice: null, taxRatePercent: 18, priceConfirmed: false,
+  price: null, compareAtPrice: null, taxRatePercent: 18, priceConfirmed: false, codAvailable: true,
   trackInventory: false, stock: 0, lowStockAlert: 5, minOrderQty: 1, maxOrderQty: null,
   widthInches: null, heightInches: null, depthMm: null, weightGrams: null,
   status: 'DRAFT', featured: false, isNew: false, badge: '', sortOrder: 0,
@@ -116,6 +117,7 @@ function toForm(product: Product): ProductForm {
     compareAtPrice: toNumber(product.compareAtPrice),
     taxRatePercent: toNumber(product.taxRatePercent ?? 18),
     priceConfirmed: product.priceConfirmed ?? false,
+    codAvailable: product.codAvailable ?? true,
     trackInventory: product.trackInventory,
     stock: product.stock,
     lowStockAlert: (product as unknown as { lowStockAlert?: number }).lowStockAlert ?? 5,
@@ -449,6 +451,14 @@ export default function AdminProductEdit() {
                   hint="Seeded products start unconfirmed. The dashboard flags them until you tick this."
                   checked={form.priceConfirmed}
                   onChange={(v) => set('priceConfirmed', v)}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Checkbox
+                  label="Allow cash on delivery for this product"
+                  hint="Leave off for anything made to order. A piece cut to a customer's name cannot be resold if the delivery is refused, and one such item in a basket turns cash on delivery off for that whole order."
+                  checked={form.codAvailable}
+                  onChange={(v) => set('codAvailable', v)}
                 />
               </div>
               <Input

@@ -129,6 +129,7 @@ export default function CheckoutPage() {
   }
 
   const noPaymentMethod = config && !config.razorpay.enabled && !config.cod.enabled;
+  const wantsGstInvoice = Boolean(config?.gstInvoice && gst.wanted);
 
   // --- Submit --------------------------------------------------------------
   const handleSubmit = async (event: FormEvent) => {
@@ -146,9 +147,12 @@ export default function CheckoutPage() {
         billingSameAsShipping: billingSame,
         paymentMethod,
         customerNote: note || null,
-        gstInvoice: gst.wanted,
-        companyName: gst.wanted ? gst.companyName : null,
-        gstin: gst.wanted ? gst.gstin.toUpperCase() : null,
+        // Tied to the setting as well as the tick, so a stale tick from before
+        // the option was switched off cannot ask for an invoice that the studio
+        // is not registered to raise.
+        gstInvoice: wantsGstInvoice,
+        companyName: wantsGstInvoice ? gst.companyName : null,
+        gstin: wantsGstInvoice ? gst.gstin.toUpperCase() : null,
       };
 
       const result = await api.post<OrderResponse>('/orders', payload);
@@ -391,6 +395,20 @@ export default function CheckoutPage() {
                 </div>
               )}
 
+              {/*
+                Cash on delivery is offered in the shop but not on what is in
+                this basket. Say which piece is the reason: a payment option
+                that silently disappears between one order and the next reads
+                as a fault, and the customer cannot act on it.
+              */}
+              {config?.cod.enabledInStore && config.cod.blockedBy.length > 0 ? (
+                <p className="mt-3 text-2xs text-ink-500">
+                  {config.cod.blockedBy.length === 1
+                    ? `${config.cod.blockedBy[0]} is made to order, so it cannot be paid for on delivery.`
+                    : `${config.cod.blockedBy.join(', ')} are made to order, so they cannot be paid for on delivery.`}
+                </p>
+              ) : null}
+
               {config?.razorpay.enabled && !config.razorpay.configured ? (
                 <p className="mt-3 text-2xs text-state-warning">
                   Online payment keys are not configured on the server yet.
@@ -398,7 +416,15 @@ export default function CheckoutPage() {
               ) : null}
             </section>
 
-            {/* GST invoice */}
+            {/*
+              GST invoice.
+              Only a GST-registered business can raise one, so asking a customer
+              for their GSTIN while unregistered collects a number nobody can
+              use and promises paperwork that cannot follow. Hidden rather than
+              deleted: this is the last numbered step, so nothing renumbers, and
+              the day the studio registers it is one switch in Settings -> Tax.
+            */}
+            {config?.gstInvoice ? (
             <section>
               <SectionTitle step={addressesQuery.data?.length ? '05' : '04'} title="GST invoice" />
               <Checkbox
@@ -431,6 +457,7 @@ export default function CheckoutPage() {
                 </div>
               ) : null}
             </section>
+            ) : null}
 
             {/* Note */}
             <section>

@@ -374,6 +374,13 @@ model Product {
   /// URL to an mp4/webm. Left null on almost every product.
   videoUrl       String?
 
+  /// Whether this product may be paid for on delivery.
+  ///
+  /// The studio takes COD on stock items but not on bespoke ones: a name plate
+  /// cut with somebody else's name on it cannot be resold if the order is
+  /// refused at the door. Off for anything made to order.
+  codAvailable   Boolean @default(true)
+
   productionDays Int?
   seoTitle       String?
   seoDescription String?

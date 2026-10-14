@@ -86,7 +86,7 @@ test.afterAll(async () => {
   });
 });
 
-test('a customer can register, personalise, apply a coupon and pay cash on delivery', async ({ page }, testInfo) => {
+test('a customer can register, apply a coupon and pay cash on delivery', async ({ page }, testInfo) => {
   const email = `e2e.${testInfo.project.name}.${Date.now()}@example.com`;
 
   // ---- Register -----------------------------------------------------------
@@ -99,14 +99,15 @@ test('a customer can register, personalise, apply a coupon and pay cash on deliv
   await page.getByRole('button', { name: /create account|register|sign up/i }).click();
   await expect(page).toHaveURL(/\/account|\/$/, { timeout: 15_000 });
 
-  // ---- Product and personalisation ----------------------------------------
-  await page.goto('/product/minimal-acrylic-name-plate');
+  /*
+   * ---- Product ------------------------------------------------------------
+   *
+   * A stock item, because this journey ends in cash on delivery and a
+   * made-to-order piece cannot be paid for that way -- see the test below.
+   * Personalising a product is covered in storefront.spec.ts, where it belongs.
+   */
+  await page.goto('/product/no-smoking-sign');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-
-  // Required personalisation must be filled, or the page refuses the add and
-  // scrolls back to the field — which is the behaviour a customer gets too.
-  // It is inline on a laptop and behind a sheet on a phone.
-  await fillPersonalisation(page, 'E2E Household');
 
   // Options are buttons in a radiogroup, not native radios.
   const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
@@ -152,10 +153,15 @@ test('a customer can register, personalise, apply a coupon and pay cash on deliv
   const painted = await billingSame.evaluate((el) => getComputedStyle(el).backgroundImage);
   expect(painted, 'a ticked box draws its tick').toContain('svg');
 
-  // And the tick belongs to the checked state alone, not to every box.
-  const gstBox = page.getByLabel(/I need a GST invoice/i);
-  await expect(gstBox).not.toBeChecked();
-  expect(await gstBox.evaluate((el) => getComputedStyle(el).backgroundImage)).toBe('none');
+  // And the tick belongs to the checked state alone, not to every box. Shown on
+  // the same control rather than a second one, so this cannot pass by accident
+  // on a box that was never styled.
+  await billingSame.uncheck();
+  expect(
+    await billingSame.evaluate((el) => getComputedStyle(el).backgroundImage),
+    'an unticked box draws nothing',
+  ).toBe('none');
+  await billingSame.check();
 
   await page.getByLabel('Full name').fill('E2E Customer');
   await page.getByLabel('Phone').first().fill('9876543210');
@@ -169,10 +175,16 @@ test('a customer can register, personalise, apply a coupon and pay cash on deliv
   await page.getByLabel('State').selectOption({ label: 'Gujarat' });
   await page.getByLabel('Phone').last().fill('9876543210');
 
-  // ---- GST invoice --------------------------------------------------------
-  await page.getByLabel(/I need a GST invoice/i).check();
-  await page.getByLabel('Company name').fill('E2E Interiors Pvt Ltd');
-  await page.getByLabel('GSTIN').fill('24AAAAA0000A1Z5');
+  /*
+   * No GST invoice step.
+   *
+   * The studio is not GST-registered -- "Currently we are not planning to
+   * register for GST" -- and only a registered business can raise one, so the
+   * section is off by default and the checkout must not ask for a GSTIN it
+   * cannot put on anything. The validation behind it is still covered, server
+   * side, in verify.mjs, so turning the setting back on is safe.
+   */
+  await expect(page.getByLabel(/I need a GST invoice/i)).toHaveCount(0);
 
   // ---- Cash on delivery ---------------------------------------------------
   await page.getByRole('button', { name: /^cash on delivery/i }).click();
@@ -197,8 +209,7 @@ test('a customer can register, personalise, apply a coupon and pay cash on deliv
   await expect(page.locator('main')).toContainText(orderNumber, { timeout: 15_000 });
 
   await page.getByText(orderNumber).first().click();
-  await expect(page.locator('main')).toContainText('E2E Interiors Pvt Ltd');
-  await expect(page.locator('main')).toContainText('24AAAAA0000A1Z5');
+  await expect(page.locator('main')).toContainText('No Smoking Sign');
 
   // ---- And the admin sees the same order ----------------------------------
   const orders = await adminFetch(`/admin/orders?search=${orderNumber}`);
@@ -207,41 +218,63 @@ test('a customer can register, personalise, apply a coupon and pay cash on deliv
   expect(listed.paymentMethod).toBe('COD');
   expect(listed.status).toBe('CONFIRMED');
 
-  // The list is a summary; the money and the GST details live on the detail.
+  // The list is a summary; the money lives on the detail.
   const detail = (await adminFetch(`/admin/orders/${listed.id}`)).data;
   expect(Number(detail.discountAmount)).toBeGreaterThan(0);
-  expect(detail.gstInvoice).toBe(true);
-  expect(detail.companyName).toBe('E2E Interiors Pvt Ltd');
-  expect(detail.gstin).toBe('24AAAAA0000A1Z5');
+  expect(detail.paymentMethod).toBe('COD');
 });
 
-test('checkout refuses an invalid GSTIN', async ({ page }) => {
+test('a made-to-order piece cannot be paid for on delivery', async ({ page }) => {
+  /*
+   * The studio's rule: "Cash on delivery will be available for generic products
+   * but we won't be having cash on delivery on custom Products like name
+   * plates." A plate cut with somebody else's name cannot be resold if the
+   * delivery is refused at the door; a stock sign can.
+   *
+   * One such item disqualifies the whole order rather than part of it, because
+   * an order ships and is paid for as one thing -- so this also stands for a
+   * basket holding both. The server enforces it independently of this page;
+   * hiding a button only stops an honest customer.
+   */
+  await page.goto('/product/minimal-acrylic-name-plate');
+  await fillPersonalisation(page, 'E2E Household');
+
+  const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
+  if (await options.count()) await options.first().click();
+  await page.getByRole('button', { name: /^add to cart$/i }).first().click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+
+  await page.goto('/checkout');
+  await expect(page.getByRole('heading', { name: /payment/i }).first()).toBeVisible();
+
+  // The option is gone, and the page says which piece is the reason: a payment
+  // method that silently vanishes between one order and the next reads as a
+  // fault, and the customer cannot act on it.
+  await expect(page.getByRole('button', { name: /^cash on delivery/i })).toHaveCount(0);
+  await expect(page.locator('main')).toContainText(/made to order/i);
+  await expect(page.locator('main')).toContainText(/Minimal Acrylic Name Plate/i);
+});
+
+test('checkout does not ask for a GSTIN the studio cannot invoice against', async ({ page }) => {
+  /*
+   * A GST invoice can only be raised by a GST-registered business, and the
+   * studio has said they are not registering for now. Asking anyway would
+   * collect a number nobody can use and promise paperwork that never follows.
+   *
+   * This asserts the shipped configuration, not the feature: the GST step is
+   * built and switchable in Settings -> Tax, and the validation behind it --
+   * malformed GSTIN refused, company name required -- is covered server side in
+   * verify.mjs, where it keeps working whether the section is shown or not.
+   */
   await page.goto('/product/no-smoking-sign');
   const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
   if (await options.count()) await options.first().click();
   await page.getByRole('button', { name: /^add to cart$/i }).first().click();
 
   await page.goto('/checkout');
-  await page.getByLabel('Full name').fill('GST Tester');
-  await page.getByLabel('Phone').first().fill('9876543210');
-  const emailField = page.getByLabel('Email');
-  if (await emailField.count()) await emailField.fill('gst.tester@example.com');
+  await expect(page.getByRole('heading', { name: /payment/i }).first()).toBeVisible();
 
-  await page.getByLabel('Recipient name').fill('GST Tester');
-  await page.getByLabel('Address line 1').fill('Prime Center Mall');
-  await page.getByLabel('PIN code').fill('380001');
-  await page.getByLabel('City / town').fill('Ahmedabad');
-  await page.getByLabel('State').selectOption({ label: 'Gujarat' });
-  await page.getByLabel('Phone').last().fill('9876543210');
-
-  await page.getByLabel(/I need a GST invoice/i).check();
-  await page.getByLabel('Company name').fill('Bad GSTIN Ltd');
-  await page.getByLabel('GSTIN').fill('NOT-A-GSTIN');
-
-  await page.getByRole('button', { name: /^cash on delivery/i }).click();
-  await page.getByRole('button', { name: /place order/i }).click();
-
-  // It must stay on checkout and say why.
-  await expect(page).toHaveURL(/\/checkout/);
-  await expect(page.locator('main')).toContainText(/gstin/i);
+  await expect(page.getByLabel(/I need a GST invoice/i)).toHaveCount(0);
+  await expect(page.getByLabel('GSTIN')).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText(/GST invoice/i);
 });

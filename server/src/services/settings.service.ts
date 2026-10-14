@@ -112,6 +112,10 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'shipping.note', group: 'shipping', label: 'Shipping note shown at checkout', value: '' },
   { key: 'tax.pricesIncludeTax', group: 'tax', label: 'Product prices already include GST', value: true },
   { key: 'tax.gstin', group: 'tax', label: 'Business GSTIN', value: '' },
+  // A GST invoice can only be raised by a registered business, so asking the
+  // customer for a GSTIN while unregistered promises what cannot be issued.
+  // Off until the studio registers; the feature stays built either way.
+  { key: 'tax.gstInvoiceEnabled', group: 'tax', label: 'Offer a GST invoice at checkout', value: false },
 
   // --- SEO -------------------------------------------------------------------
   {

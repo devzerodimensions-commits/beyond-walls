@@ -74,6 +74,21 @@ export async function placeOrder(input: PlaceOrderInput) {
     if (!boolSetting(settings, 'payment.codEnabled', false)) {
       throw ApiError.badRequest('Cash on Delivery is not available');
     }
+
+    /*
+     * Enforced here and not only at checkout: hiding the option in the page
+     * stops an honest customer, not a crafted request. A bespoke piece paid for
+     * on delivery and then refused at the door is a total loss, so this is the
+     * gate that has to hold.
+     */
+    const bespoke = input.cart.items.filter((item) => item.product && !item.product.codAvailable);
+    if (bespoke.length > 0) {
+      const names = bespoke.map((item) => `"${item.product.name}"`).join(', ');
+      throw ApiError.badRequest(
+        `Cash on Delivery is not available on made-to-order items (${names}). Please pay online for this order.`,
+      );
+    }
+
     const min = numberSetting(settings, 'payment.codMinOrder', 0);
     const max = numberSetting(settings, 'payment.codMaxOrder', 0);
     if (min > 0 && priced.totals.total < min) {

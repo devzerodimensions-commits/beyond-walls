@@ -127,6 +127,8 @@ export interface Product {
   price: string | number | null;
   compareAtPrice?: string | number | null;
   priceConfirmed?: boolean;
+  /** Off for made-to-order pieces, which cannot be paid for on delivery. */
+  codAvailable?: boolean;
   taxRatePercent?: string | number;
   stock: number;
   trackInventory: boolean;
@@ -475,12 +477,19 @@ export interface CheckoutConfig {
     methods: string[];
   };
   cod: {
+    /** Offered for this cart: both switched on and allowed by every item in it. */
     enabled: boolean;
+    /** Switched on in the admin panel at all. */
+    enabledInStore: boolean;
+    /** Made-to-order items in the cart that rule COD out, named so we can say why. */
+    blockedBy: string[];
     fee: number;
     minOrder: number;
     maxOrder: number;
     note: string;
   };
+  /** False until the studio is GST-registered — see tax.gstInvoiceEnabled. */
+  gstInvoice: boolean;
   checkoutEnabled: boolean;
   currency: string;
   shippingNote: string;
