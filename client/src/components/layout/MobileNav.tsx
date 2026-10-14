@@ -10,14 +10,17 @@ import { Logo } from './Logo';
 /**
  * The drawer behind the phone header.
  *
- * Two tabs, because the drawer carries two unrelated things. Shopping is
- * browsing — you arrive without knowing what you want and move by sight. The
- * pages are errands: track an order, read the returns policy, find the phone
- * number. Stacked in one scroll the errands sit under every category and
- * filter group, which is a long way to go to find "Contact".
+ * One list, read top to bottom: the collections, then the ways to narrow them,
+ * then the handful of pages, then the account.
  *
- * The collections are pictures here for the same reason they are on the
- * desktop menu: a range is recognised by sight before its name is read.
+ * It was two tabs for a while -- browsing on one, errands on the other. The
+ * split was tidy in principle and poor in practice: four links do not fill a
+ * screen, so the second tab was mostly empty space, and anything behind a tab
+ * is something you have to know is there. A list costs a scroll, which is the
+ * gesture a phone is already in the middle of.
+ *
+ * The collections are pictures because a range is recognised by sight long
+ * before its name is read.
  */
 export function MobileNav({
   open, onClose, categories, filters, navLinks,
@@ -29,7 +32,6 @@ export function MobileNav({
   navLinks: NavLink[];
 }) {
   const { isAuthenticated, logout } = useAuth();
-  const [tab, setTab] = useState<'shop' | 'pages'>('shop');
   const [section, setSection] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,13 +48,9 @@ export function MobileNav({
     };
   }, [open, onClose]);
 
-  // Opening the drawer again should start where it starts, not wherever it was
-  // left three pages ago.
+  // Opening it again should start where it starts, not wherever it was left.
   useEffect(() => {
-    if (open) {
-      setTab('shop');
-      setSection(null);
-    }
+    if (open) setSection(null);
   }, [open]);
 
   if (!open) return null;
@@ -60,14 +58,12 @@ export function MobileNav({
   const toggle = (id: string) => setSection(section === id ? null : id);
 
   /*
-   * Pages means pages.
+   * The pages, at the foot.
    *
-   * The header nav mixes the two: alongside About and Contact it carries For
-   * Home, For Offices and Signs, which are collections wearing a nav link.
-   * Listing those here would put the same three collections in both tabs and
-   * undo the split — so anything pointing into the shop belongs to the shop
-   * tab, which shows every collection anyway, and Custom Order has its own
-   * call to action at the foot of it.
+   * Everything that is not a collection and not the custom-order call to
+   * action: Gallery, About, Contact. They are listed rather than labelled,
+   * because "Pages" is a word for whoever builds a site, not for whoever is
+   * trying to find the phone number.
    */
   const pageLinks = navLinks.filter(
     (l) => l.group === 'header' && !l.href.startsWith('/shop') && l.href !== '/custom-order',
@@ -95,158 +91,119 @@ export function MobileNav({
           </button>
         </div>
 
-        {/* ---- Shop / Pages ---- */}
-        <div className="grid grid-cols-2 border-b border-stone-line" role="tablist" aria-label="Menu">
-          {(['shop', 'pages'] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={tab === key}
-              aria-controls={`mobile-${key}`}
-              onClick={() => setTab(key)}
-              className={clsx(
-                'relative px-5 py-3.5 text-2xs uppercase tracking-architect transition-colors duration-200',
-                tab === key ? 'text-ink' : 'text-ink-400',
-              )}
-            >
-              {key === 'shop' ? 'Shop' : 'Pages'}
-              {/* Drawn rather than a border, so switching tabs does not nudge
-                  the panel below by a pixel. */}
-              <span
-                aria-hidden="true"
-                className={clsx(
-                  'absolute inset-x-0 bottom-0 h-px transition-colors duration-200',
-                  tab === key ? 'bg-ink' : 'bg-transparent',
-                )}
-              />
-            </button>
-          ))}
-        </div>
-
         <nav className="flex-1 overflow-y-auto" aria-label="Mobile">
-          {tab === 'shop' ? (
-            <div id="mobile-shop" role="tabpanel">
-              {/* ---- The collections, as pictures ---- */}
-              <div className="grid grid-cols-2 gap-x-3 gap-y-4 px-5 py-5">
-                {categories.map((category) => (
-                  <Link
-                    key={category.id}
-                    to={`/shop/${category.slug}`}
-                    onClick={onClose}
-                    className="group/tile block"
-                  >
-                    <div className="relative aspect-[4/3] overflow-hidden bg-paper-warm">
-                      {category.image ? (
-                        <img
-                          src={assetUrl(category.image)}
-                          alt=""
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center px-2 text-center text-2xs leading-tight text-ink-400">
-                          {category.name}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1.5 text-xs font-medium leading-snug text-ink">
-                      {category.name}
-                    </p>
-                    {category.children?.length ? (
-                      <p className="mt-0.5 text-2xs leading-snug text-ink-400">
-                        {category.children
-                          .slice(0, 3)
-                          .map((c) => c.name)
-                          .join(' · ')}
-                      </p>
-                    ) : category._count?.products ? (
-                      <p className="mt-0.5 text-2xs text-ink-300">
-                        {category._count.products}{' '}
-                        {category._count.products === 1 ? 'design' : 'designs'}
-                      </p>
-                    ) : null}
-                  </Link>
-                ))}
-              </div>
-
-              <div className="border-t border-stone-line">
-                <Link
-                  to="/shop"
-                  onClick={onClose}
-                  className="flex items-center justify-between border-b border-stone-line px-5 py-3.5 text-sm text-ink-700"
-                >
-                  View everything
-                  <span aria-hidden="true">→</span>
-                </Link>
-              </div>
-
-              {/* ---- Narrow it down ---- */}
-              {(filters?.attributes ?? []).slice(0, 4).map((group) => (
-                <Accordion
-                  key={group.id}
-                  id={group.id}
-                  label={`Shop by ${group.name.toLowerCase()}`}
-                  open={section === group.id}
-                  onToggle={() => toggle(group.id)}
-                >
-                  <ul className="grid grid-cols-2 gap-x-4">
-                    {group.values.map((value) => (
-                      <li key={value.id}>
-                        <Link
-                          to={`/shop?attr=${value.slug}`}
-                          onClick={onClose}
-                          className="flex items-center gap-2 py-2 text-sm text-ink-600"
-                        >
-                          {value.hexColor ? (
-                            <span
-                              className="h-2.5 w-2.5 shrink-0 border border-ink-100"
-                              style={{ background: value.hexColor }}
-                            />
-                          ) : null}
-                          {value.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </Accordion>
-              ))}
-
+          {/* ---- The collections, as pictures ---- */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-4 px-5 py-5">
+            {categories.map((category) => (
               <Link
-                to="/custom-order"
+                key={category.id}
+                to={`/shop/${category.slug}`}
                 onClick={onClose}
-                className="flex items-center justify-between bg-ink px-5 py-4 text-sm font-medium text-paper"
+                className="group/tile block"
               >
-                Custom Order
-                <span aria-hidden="true">→</span>
+                <div className="relative aspect-[4/3] overflow-hidden bg-paper-warm">
+                  {category.image ? (
+                    <img
+                      src={assetUrl(category.image)}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center px-2 text-center text-2xs leading-tight text-ink-400">
+                      {category.name}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1.5 text-xs font-medium leading-snug text-ink">{category.name}</p>
+                {category.children?.length ? (
+                  <p className="mt-0.5 text-2xs leading-snug text-ink-400">
+                    {category.children.slice(0, 3).map((c) => c.name).join(' · ')}
+                  </p>
+                ) : category._count?.products ? (
+                  <p className="mt-0.5 text-2xs text-ink-300">
+                    {category._count.products}{' '}
+                    {category._count.products === 1 ? 'design' : 'designs'}
+                  </p>
+                ) : null}
               </Link>
-            </div>
-          ) : (
-            <ul id="mobile-pages" role="tabpanel">
-              {pageLinks.map((link) => (
-                <li key={link.id}>
-                  <Link
-                    to={link.href}
-                    onClick={onClose}
-                    className="flex items-center justify-between border-b border-stone-line px-5 py-4 text-sm text-ink-700"
-                  >
-                    {link.label}
-                    <span aria-hidden="true" className="text-ink-300">→</span>
-                  </Link>
-                </li>
-              ))}
-              <li>
+            ))}
+          </div>
+
+          <Link
+            to="/shop"
+            onClick={onClose}
+            className="flex items-center justify-between border-y border-stone-line px-5 py-3.5 text-sm text-ink-700"
+          >
+            View everything
+            <span aria-hidden="true" className="text-ink-300">→</span>
+          </Link>
+
+          {/* ---- Narrow it down ---- */}
+          {(filters?.attributes ?? []).slice(0, 4).map((group) => (
+            <Accordion
+              key={group.id}
+              id={group.id}
+              label={`Shop by ${group.name.toLowerCase()}`}
+              open={section === group.id}
+              onToggle={() => toggle(group.id)}
+            >
+              <ul className="grid grid-cols-2 gap-x-4">
+                {group.values.map((value) => (
+                  <li key={value.id}>
+                    <Link
+                      to={`/shop?attr=${value.slug}`}
+                      onClick={onClose}
+                      className="flex items-center gap-2 py-2 text-sm text-ink-600"
+                    >
+                      {value.hexColor ? (
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 border border-ink-100"
+                          style={{ background: value.hexColor }}
+                        />
+                      ) : null}
+                      {value.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Accordion>
+          ))}
+
+          <Link
+            to="/custom-order"
+            onClick={onClose}
+            className="flex items-center justify-between bg-ink px-5 py-4 text-sm font-medium text-paper"
+          >
+            Custom Order
+            <span aria-hidden="true">→</span>
+          </Link>
+
+          {/* ---- The pages, quieter than the shop above them ---- */}
+          <ul className="pb-2">
+            {pageLinks.map((link) => (
+              <li key={link.id}>
                 <Link
-                  to="/custom-order"
+                  to={link.href}
                   onClick={onClose}
-                  className="flex items-center justify-between border-b border-stone-line px-5 py-4 text-sm text-ink-700"
+                  className="flex items-center justify-between border-b border-stone-line px-5 py-3.5 text-sm text-ink-600"
                 >
-                  Custom Order
+                  {link.label}
                   <span aria-hidden="true" className="text-ink-300">→</span>
                 </Link>
               </li>
-            </ul>
-          )}
+            ))}
+            <li>
+              <Link
+                to="/track-order"
+                onClick={onClose}
+                className="flex items-center justify-between border-b border-stone-line px-5 py-3.5 text-sm text-ink-600"
+              >
+                Track an order
+                <span aria-hidden="true" className="text-ink-300">→</span>
+              </Link>
+            </li>
+          </ul>
         </nav>
 
         <div className="border-t border-stone-line px-5 py-4">
@@ -283,7 +240,7 @@ export function MobileNav({
   );
 }
 
-/** A collapsible group inside the shop tab. */
+/** A group that opens where it stands, rather than on a screen of its own. */
 function Accordion({
   id, label, open, onToggle, children,
 }: {

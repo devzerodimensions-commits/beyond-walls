@@ -53,9 +53,8 @@ test.describe('Storefront', () => {
       const drawer = page.getByRole('dialog');
       await expect(drawer).toBeVisible();
 
-      // The drawer separates browsing from errands, so Shop is a tab and not a
-      // destination; it opens on that tab and the way through is the collections.
-      await expect(drawer.getByRole('tab', { name: 'Shop' })).toHaveAttribute('aria-selected', 'true');
+      // The drawer opens on the collections, and the way past them is the last
+      // row under the pictures.
       await drawer.getByRole('link', { name: 'View everything' }).click();
     } else {
       // The mega menu opens on hover and must stay compact.
@@ -87,12 +86,15 @@ test.describe('Storefront', () => {
     await expect(page.locator('article, a[href^="/product/"]').first()).toBeVisible();
   });
 
-  test('the phone drawer keeps the collections apart from the pages', async ({ page }) => {
+  test('the phone drawer reaches the shop and the pages in one list', async ({ page }) => {
     /*
-     * The studio asked for the phone header to be redone "for categories and
-     * pages". They were two halves of one scroll: Contact and Track an order
-     * sat below every collection and every filter group, which is a long way
-     * down for an errand that takes one tap on a laptop.
+     * One list, read top to bottom, rather than two tabs.
+     *
+     * The studio asked for the phone header to handle "categories and pages",
+     * and for a while that was a tab each. Four page links do not fill a
+     * screen, so the second tab was mostly empty, and anything behind a tab is
+     * something you have to know is there. Both halves are now in one scroll,
+     * which is the gesture a phone is already in the middle of.
      */
     test.skip(!isMobile(page), 'the drawer is the phone header');
 
@@ -101,26 +103,23 @@ test.describe('Storefront', () => {
     const drawer = page.getByRole('dialog');
     await expect(drawer).toBeVisible();
 
-    // Browsing is what the drawer opens on.
-    const shopTab = drawer.getByRole('tab', { name: 'Shop' });
-    const pagesTab = drawer.getByRole('tab', { name: 'Pages' });
-    await expect(shopTab).toHaveAttribute('aria-selected', 'true');
-    await expect(pagesTab).toHaveAttribute('aria-selected', 'false');
+    // No tabs: nothing is hidden behind a second screen.
+    await expect(drawer.getByRole('tab')).toHaveCount(0);
 
-    // The collections are shown as pictures, so each one is a link with a tile.
-    const shopPanel = drawer.locator('#mobile-shop');
-    await expect(shopPanel.locator('a[href^="/shop/"]').first()).toBeVisible();
-    await expect(shopPanel).toContainText(/custom order/i);
+    // The collections, as pictures, and the way past them.
+    await expect(drawer.locator('a[href^="/shop/"]').first()).toBeVisible();
+    await expect(drawer.getByRole('link', { name: /view everything/i })).toBeVisible();
 
-    // The errands are one tap away, not one scroll.
-    await pagesTab.click();
-    await expect(pagesTab).toHaveAttribute('aria-selected', 'true');
-    const pagesPanel = drawer.locator('#mobile-pages');
-    await expect(pagesPanel).toBeVisible();
-    await expect(pagesPanel.getByRole('link').first()).toBeVisible();
+    // A group opens where it stands rather than on a screen of its own.
+    const group = drawer.getByRole('button', { name: /^shop by /i }).first();
+    await expect(group).toHaveAttribute('aria-expanded', 'false');
+    await group.click();
+    await expect(group).toHaveAttribute('aria-expanded', 'true');
 
-    // And the two halves stay apart: no collection tiles under Pages.
-    await expect(pagesPanel.locator('a[href^="/shop/"]')).toHaveCount(0);
+    // And the errands are in the same list, further down.
+    await expect(drawer.getByRole('link', { name: /^custom order$/i })).toBeVisible();
+    await expect(drawer.getByRole('link', { name: /track an order/i })).toBeVisible();
+    await expect(drawer.getByRole('link', { name: /^contact$/i })).toBeVisible();
   });
 
   test('the footer opens its columns on a laptop and folds them on a phone', async ({ page }) => {
