@@ -1,7 +1,45 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { fillPersonalisation, isMobile } from './helpers';
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:4000/api';
+
+async function mockShareableProduct(page: Page) {
+  await page.route('**/api/catalog/products/minimal-acrylic-name-plate', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          id: 'shareable-product',
+          name: 'Minimal Acrylic Name Plate',
+          slug: 'minimal-acrylic-name-plate',
+          sku: 'BW-TEST-001',
+          shortDescription: 'A personalised acrylic name plate.',
+          description: 'A personalised acrylic name plate.',
+          price: '1499',
+          compareAtPrice: null,
+          stock: 10,
+          trackInventory: false,
+          minOrderQty: 1,
+          maxOrderQty: null,
+          status: 'PUBLISHED',
+          featured: false,
+          isNew: false,
+          badge: null,
+          livePreviewEnabled: false,
+          productionDays: null,
+          images: [],
+          variants: [],
+          personalization: [],
+          attributes: [],
+          related: [],
+          category: { id: 'home', name: 'For Home', slug: 'for-home' },
+          subcategory: null,
+        },
+      }),
+    });
+  });
+}
 
 /**
  * The storefront journey a customer actually takes, on desktop and on a phone.
@@ -238,6 +276,83 @@ test.describe('Storefront', () => {
     const cart = page.getByRole('dialog').filter({ hasText: /your cart/i });
     await expect(cart).toBeVisible();
     await expect(cart).toContainText('₹');
+  });
+
+  test('a customer can share a product with another person', async ({ page }) => {
+    await mockShareableProduct(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'share', {
+        configurable: true,
+        value: async (data: ShareData) => {
+          (window as typeof window & { __sharedProduct?: ShareData }).__sharedProduct = data;
+        },
+      });
+    });
+
+    await page.goto('/product/minimal-acrylic-name-plate');
+    await page.getByRole('button', { name: /share minimal acrylic name plate/i }).click();
+
+    const shared = await page.evaluate(() =>
+      (window as typeof window & { __sharedProduct?: ShareData }).__sharedProduct,
+    );
+    expect(shared?.title).toBe('Minimal Acrylic Name Plate');
+    expect(shared?.url).toBe(`${new URL(page.url()).origin}/product/minimal-acrylic-name-plate`);
+  });
+
+  test('wishlist feedback is instant while the save request finishes', async ({ page }) => {
+    await mockShareableProduct(page);
+    await page.addInitScript(() => {
+      localStorage.setItem('bw.accessToken', 'playwright-token');
+      localStorage.setItem('bw.hasSession', '1');
+    });
+
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            id: 'playwright-user',
+            name: 'Playwright Customer',
+            email: 'playwright@example.com',
+            phone: null,
+            role: 'CUSTOMER',
+            isActive: true,
+          },
+        }),
+      });
+    });
+
+    let saveFinished = false;
+    await page.route('**/api/wishlist**', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: [] }),
+        });
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      saveFinished = true;
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { productId: 'saved' } }),
+      });
+    });
+
+    await page.goto('/product/minimal-acrylic-name-plate');
+    const save = page.getByRole('button', { name: /save minimal acrylic name plate to wishlist/i });
+    await expect(save).toBeVisible();
+    await save.click();
+
+    await expect(
+      page.getByRole('button', { name: /remove minimal acrylic name plate from wishlist/i }),
+    ).toHaveAttribute('aria-pressed', 'true', { timeout: 500 });
+    expect(saveFinished, 'the heart changes before the network request finishes').toBeFalsy();
+
+    await expect.poll(() => saveFinished).toBeTruthy();
   });
 
   test('personalised products cannot be added before every field is completed', async ({ page }) => {

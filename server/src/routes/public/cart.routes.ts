@@ -221,6 +221,18 @@ wishlistRouter.use(requireAuth);
 wishlistRouter.get(
   '/',
   asyncHandler(async (req, res) => {
+    if (req.query.idsOnly === '1') {
+      const items = await prisma.wishlistItem.findMany({
+        where: {
+          userId: req.user!.sub,
+          product: { status: 'PUBLISHED' },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { productId: true },
+      });
+      return res.json({ success: true, data: items });
+    }
+
     const items = await prisma.wishlistItem.findMany({
       where: { userId: req.user!.sub },
       orderBy: { createdAt: 'desc' },
@@ -246,7 +258,7 @@ wishlistRouter.get(
         },
       },
     });
-    res.json({ success: true, data: items.filter((i) => i.product.status === 'PUBLISHED') });
+    return res.json({ success: true, data: items.filter((i) => i.product.status === 'PUBLISHED') });
   }),
 );
 

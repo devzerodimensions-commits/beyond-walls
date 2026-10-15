@@ -98,6 +98,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 interface WishlistContextValue {
   ids: Set<string>;
   isWishlisted: (productId: string) => boolean;
+  isUpdating: (productId: string) => boolean;
   toggle: (productId: string) => Promise<void>;
   count: number;
   refresh: () => Promise<void>;
@@ -383,10 +384,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // --- Wishlist ------------------------------------------------------------
   const wishlistQuery = useQuery({
     queryKey: ['wishlist', user?.id],
-    queryFn: () => api.get<{ productId: string }[]>('/wishlist'),
+    // Cards and headers only need IDs. The account wishlist keeps using the
+    // full endpoint because it renders product details.
+    queryFn: () => api.get<{ productId: string }[]>('/wishlist', { idsOnly: 1 }),
     enabled: Boolean(user),
     staleTime: 60 * 1000,
   });
+
+  const [wishlistPendingIds, setWishlistPendingIds] = useState<Set<string>>(() => new Set());
 
   const wishlistIds = useMemo(
     () => new Set((wishlistQuery.data ?? []).map((w) => w.productId)),
@@ -399,33 +404,59 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         push('Sign in to save items to your wishlist', 'info', { label: 'Sign in', href: '/login' });
         return;
       }
+
+      // Ignore a second tap while the same product is being saved. The first
+      // tap is already reflected immediately below, so there is no spinner or
+      // network delay in the customer's feedback.
+      if (wishlistPendingIds.has(productId)) return;
+
+      const queryKey = ['wishlist', user.id] as const;
+      const previous = queryClient.getQueryData<{ productId: string }[]>(queryKey) ?? [];
+      const wasSaved = previous.some((item) => item.productId === productId);
+      const optimistic = wasSaved
+        ? previous.filter((item) => item.productId !== productId)
+        : [{ productId }, ...previous];
+
+      queryClient.setQueryData(queryKey, optimistic);
+      setWishlistPendingIds((current) => new Set(current).add(productId));
+
       try {
-        if (wishlistIds.has(productId)) {
+        if (wasSaved) {
           await api.delete(`/wishlist/${productId}`);
           push('Removed from wishlist', 'info');
         } else {
           await api.post(`/wishlist/${productId}`);
           push('Saved to wishlist', 'success');
         }
-        await queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+        // The account page owns a richer product list. Refresh it in the
+        // background without making the product-card heart wait again.
+        void queryClient.invalidateQueries({ queryKey: ['wishlist-page'] });
       } catch (err) {
+        queryClient.setQueryData(queryKey, previous);
         push(err instanceof ApiError ? err.message : 'Could not update your wishlist', 'error');
+      } finally {
+        setWishlistPendingIds((current) => {
+          const next = new Set(current);
+          next.delete(productId);
+          return next;
+        });
       }
     },
-    [user, wishlistIds, push, queryClient],
+    [user, wishlistPendingIds, push, queryClient],
   );
 
   const wishlistValue = useMemo<WishlistContextValue>(
     () => ({
       ids: wishlistIds,
       isWishlisted: (id: string) => wishlistIds.has(id),
+      isUpdating: (id: string) => wishlistPendingIds.has(id),
       toggle: toggleWishlist,
       count: wishlistIds.size,
       refresh: async () => {
         await queryClient.invalidateQueries({ queryKey: ['wishlist'] });
       },
     }),
-    [wishlistIds, toggleWishlist, queryClient],
+    [wishlistIds, wishlistPendingIds, toggleWishlist, queryClient],
   );
 
   return (

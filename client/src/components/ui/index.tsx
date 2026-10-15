@@ -681,6 +681,7 @@ export const DragIcon = icon(<><circle cx="9" cy="6" r="1" /><circle cx="9" cy="
 export const ArrowRight = icon(<><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></>);
 export const ArrowLeft = icon(<><path d="M19 12H5" /><path d="m11 6-6 6 6 6" /></>);
 export const CopyIcon = icon(<><rect x="9" y="9" width="11" height="11" /><path d="M5 15V5a1 1 0 0 1 1-1h9" /></>);
+export const ShareIcon = icon(<><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5" /><path d="m8.2 13.2 7.6 4.5" /></>);
 export const EyeIcon = icon(<><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" /><circle cx="12" cy="12" r="2.6" /></>);
 export const AlertIcon = icon(<><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5" /><path d="M12 16.2v.1" /></>);
 export const RefreshIcon = icon(<><path d="M20 12a8 8 0 1 1-2.5-5.8" /><path d="M20 4v5h-5" /></>);

@@ -19,7 +19,7 @@ interface Props {
 
 export function ProductCard({ product, className, hideWishlist, priority }: Props) {
   const navigate = useNavigate();
-  const { isWishlisted, toggle } = useWishlist();
+  const { isWishlisted, isUpdating, toggle } = useWishlist();
   const { addItem } = useCart();
   const { get } = useSettings();
   const [adding, setAdding] = useState(false);
@@ -136,10 +136,11 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
         <button
           type="button"
           onClick={() => void toggle(product.id)}
+          disabled={isUpdating(product.id)}
           aria-label={saved ? `Remove ${product.name} from wishlist` : `Save ${product.name} to wishlist`}
           aria-pressed={saved}
           className={clsx(
-            'absolute right-3 top-3 flex h-9 w-9 items-center justify-center border bg-paper/90 backdrop-blur-sm transition-all duration-200',
+            'absolute right-3 top-3 flex h-9 w-9 items-center justify-center border bg-paper/90 backdrop-blur-sm transition-all duration-200 disabled:cursor-wait',
             saved
               ? 'border-ink text-ink'
               : 'border-transparent text-ink-400 hover:text-ink lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100',

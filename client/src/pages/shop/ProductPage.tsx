@@ -7,7 +7,7 @@ import type { Faq, Product } from '../../lib/types';
 import { Seo, breadcrumbSchema, productSchema } from '../../lib/seo';
 import { formatPrice, toNumber } from '../../lib/format';
 import { effectivePrice, sellableVariants, stockState } from '../../lib/pricing';
-import { useCart, useSettings, useWishlist } from '../../context/StoreProvider';
+import { useCart, useSettings, useToast, useWishlist } from '../../context/StoreProvider';
 import { useRecentlyViewed } from '../../hooks/useRecentlyViewed';
 import { ProductCard, ProductGrid } from '../../components/product/ProductCard';
 import { GalleryBadges, ProductGallery } from '../../components/product/ProductGallery';
@@ -21,15 +21,34 @@ import {
 } from '../../components/product/PersonalizationForm';
 import {
   Badge, Button, ButtonLink, CartIcon, CheckIcon, ChevronDown, Drawer, EmptyState,
-  HeartIcon, MinusIcon, PageLoader, PlusIcon,
+  HeartIcon, MinusIcon, PageLoader, PlusIcon, ShareIcon,
 } from '../../components/ui';
+
+async function copyProductLink(url: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(url);
+    return;
+  }
+
+  const input = document.createElement('textarea');
+  input.value = url;
+  input.setAttribute('readonly', '');
+  input.style.position = 'fixed';
+  input.style.opacity = '0';
+  document.body.appendChild(input);
+  input.select();
+  const copied = document.execCommand('copy');
+  input.remove();
+  if (!copied) throw new Error('Copy is unavailable');
+}
 
 export default function ProductPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { settings, get } = useSettings();
+  const { push } = useToast();
   const { addItem } = useCart();
-  const { isWishlisted, toggle } = useWishlist();
+  const { isWishlisted, isUpdating: wishlistUpdating, toggle } = useWishlist();
 
   const [variantId, setVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -132,6 +151,32 @@ export default function ProductPage() {
   const saved = isWishlisted(product.id);
   const wishlistEnabled = get<boolean>('store.enableWishlist', true);
   const previewSlots = buildPreviewSlots(fields, values);
+
+  const shareProduct = async () => {
+    const url = `${window.location.origin}/product/${product.slug}`;
+    const data = {
+      title: product.name,
+      text: `Take a look at ${product.name} from Beyond Walls.`,
+      url,
+    };
+
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share(data);
+        return;
+      }
+      await copyProductLink(url);
+      push('Product link copied — ready to share', 'success');
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      try {
+        await copyProductLink(url);
+        push('Product link copied — ready to share', 'success');
+      } catch {
+        push('Could not share this product. Please copy the page address.', 'error');
+      }
+    }
+  };
 
   const setField = (key: string, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -526,16 +571,6 @@ export default function ProductPage() {
                     </p>
                   ) : null}
 
-                  {wishlistEnabled ? (
-                    <button
-                      type="button"
-                      onClick={() => void toggle(product.id)}
-                      className="flex w-full items-center justify-center gap-2 py-2 text-2xs uppercase tracking-architect text-ink-500 transition-colors hover:text-ink"
-                    >
-                      <HeartIcon size={14} className={saved ? 'fill-current text-ink' : ''} />
-                      {saved ? 'Saved to wishlist' : 'Save to wishlist'}
-                    </button>
-                  ) : null}
                 </div>
               ) : (
                 /*
@@ -557,6 +592,36 @@ export default function ProductPage() {
                   </p>
                 </div>
               )}
+
+              <div
+                className={clsx(
+                  'mt-3 grid divide-x divide-stone-line border-t border-stone-line',
+                  wishlistEnabled ? 'grid-cols-2' : 'grid-cols-1',
+                )}
+              >
+                {wishlistEnabled ? (
+                  <button
+                    type="button"
+                    disabled={wishlistUpdating(product.id)}
+                    onClick={() => void toggle(product.id)}
+                    aria-label={saved ? `Remove ${product.name} from wishlist` : `Save ${product.name} to wishlist`}
+                    aria-pressed={saved}
+                    className="flex items-center justify-center gap-2 px-2 py-3 text-2xs uppercase tracking-architect text-ink-500 transition-colors hover:text-ink disabled:cursor-wait"
+                  >
+                    <HeartIcon size={14} className={saved ? 'fill-current text-ink' : ''} />
+                    {saved ? 'Saved' : 'Save'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  aria-label={`Share ${product.name}`}
+                  onClick={() => void shareProduct()}
+                  className="flex items-center justify-center gap-2 px-2 py-3 text-2xs uppercase tracking-architect text-ink-500 transition-colors hover:text-ink"
+                >
+                  <ShareIcon size={14} />
+                  Share product
+                </button>
+              </div>
 
               {/* Quick reassurance strip — only shows what the admin has filled in */}
               <ul className="mt-6 space-y-2 border-t border-stone-line pt-5 text-xs text-ink-500">
