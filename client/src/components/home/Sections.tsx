@@ -938,10 +938,15 @@ export function ContactBlock({ section }: { section: HomeSection }) {
   };
 
   const phone = str('contact.phone');
+  const whatsapp = str('contact.whatsapp');
   const email = str('contact.email');
-  const address = str('contact.address');
-  const hours = Array.isArray(settings['hours.weekly'])
-    ? (settings['hours.weekly'] as { day: string; open?: string; close?: string; closed?: boolean }[])
+  const addressLines = Array.isArray(settings['contact.addressLines'])
+    ? (settings['contact.addressLines'] as unknown[]).filter((line): line is string => typeof line === 'string' && Boolean(line.trim()))
+    : [];
+  const address = str('contact.address') ?? (addressLines.length ? addressLines.join(', ') : null);
+  const schedule = settings['hours.schedule'] ?? settings['hours.weekly'];
+  const hours = Array.isArray(schedule)
+    ? (schedule as { day: string; open?: string; close?: string; closed?: boolean }[])
     : [];
 
   return (
@@ -970,6 +975,21 @@ export function ContactBlock({ section }: { section: HomeSection }) {
               <dd>
                 <a href={`tel:${phone.replace(/\s/g, '')}`} className="link-underline text-ink">
                   {phone}
+                </a>
+              </dd>
+            </div>
+          ) : null}
+          {whatsapp ? (
+            <div>
+              <dt className="eyebrow mb-1.5 text-ink-300">WhatsApp</dt>
+              <dd>
+                <a
+                  href={`https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="link-underline text-ink"
+                >
+                  {whatsapp}
                 </a>
               </dd>
             </div>

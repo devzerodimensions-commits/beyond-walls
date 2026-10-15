@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { ApiError, request } from '../lib/api';
+import { useQuery } from '@tanstack/react-query';
+import { ApiError, api, request } from '../lib/api';
 import { Seo, localBusinessSchema } from '../lib/seo';
 import { useAuth, useSettings, useToast } from '../context/StoreProvider';
 import { isOpenNow, summariseHours } from '../lib/format';
-import type { BusinessHour } from '../lib/types';
+import type { BusinessHour, HomeSection, Page } from '../lib/types';
 import { Badge, Button, CheckIcon, ClockIcon, Input, MailIcon, PhoneIcon, PinIcon, Textarea } from '../components/ui';
+import { SectionRenderer } from '../components/home/Sections';
 
 export default function ContactPage() {
   const { settings, get } = useSettings();
@@ -14,6 +16,19 @@ export default function ContactPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState(false);
+
+  /*
+   * Contact keeps its purpose-built form below, but its opening blocks come
+   * from the same visual builder as every other content page. The studio can
+   * now change the photograph, headline and promises in Admin, and Contact no
+   * longer appears as an unexplained empty page there.
+   */
+  const { data: cmsPage } = useQuery({
+    queryKey: ['page', 'contact', 'sections'],
+    queryFn: () => api.get<Page & { sections?: HomeSection[] }>('/pages/contact/sections'),
+    retry: false,
+  });
+  const cmsSections = cmsPage?.sections ?? [];
 
   const phone = get<string>('contact.phone', '');
   const whatsapp = get<string>('contact.whatsapp', '');
@@ -50,21 +65,29 @@ export default function ContactPage() {
     <>
       <Seo
         settings={settings}
-        title="Contact"
-        description={`Visit Beyond Walls at ${addressLines.join(', ')}. Call ${phone} or email ${email}.`}
+        title={cmsPage?.seoTitle || cmsPage?.title || 'Contact'}
+        description={
+          cmsPage?.seoDescription ||
+          `Visit Beyond Walls at ${addressLines.join(', ')}. Call ${phone} or email ${email}.`
+        }
+        image={cmsPage?.ogImage || cmsPage?.heroImage}
         canonical="/contact"
         schema={[localBusinessSchema(settings)]}
       />
 
-      <section className="border-b border-stone-line bg-paper">
-        <div className="container-site py-12 lg:py-16">
-          <p className="eyebrow mb-4">Get in touch</p>
-          <h1 className="text-3xl lg:text-4xl">Contact</h1>
-          <p className="mt-4 max-w-xl text-sm leading-relaxed text-ink-500">
-            Visit the studio, call us, or send a message and we will get back to you.
-          </p>
-        </div>
-      </section>
+      {cmsSections.length ? (
+        cmsSections.map((section) => <SectionRenderer key={section.id} section={section} />)
+      ) : (
+        <section className="border-b border-stone-line bg-paper">
+          <div className="container-site py-12 lg:py-16">
+            <p className="eyebrow mb-4">Get in touch</p>
+            <h1 className="text-3xl lg:text-4xl">Contact</h1>
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-ink-500">
+              Visit the studio, call us, or send a message and we will get back to you.
+            </p>
+          </div>
+        </section>
+      )}
 
       <div className="container-site py-12 lg:py-16">
         <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">

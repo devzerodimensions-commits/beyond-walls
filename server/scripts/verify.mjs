@@ -120,6 +120,13 @@ async function main() {
     const demo = (home.data ?? []).find((s) => s.type === 'PERSONALISATION_DEMO');
     check('Personalisation demo resolves a product', (demo?.items ?? []).length === 1);
 
+    const contactPage = await call('/pages/contact/sections');
+    check('Contact page has designed blocks', (contactPage.data?.sections ?? []).length >= 2);
+    const privacyPage = await call('/pages/privacy-policy/sections');
+    check('Privacy page is published and complete', (privacyPage.data?.sections ?? []).length >= 10);
+    const termsPage = await call('/pages/terms-and-conditions/sections');
+    check('Terms page is published and complete', (termsPage.data?.sections ?? []).length >= 10);
+
     const categories = await call('/catalog/categories');
     const slugs = (categories.data ?? []).map((x) => x.slug);
     check('Category tree loads', categories.ok && slugs.length === 4, slugs.join(','));
@@ -614,7 +621,8 @@ async function main() {
     check('sitemap.xml serves XML', sm.status === 200 && smText.includes('<urlset'));
     check('sitemap lists the seeded product', smText.includes('/product/minimal-acrylic-name-plate'));
     check('sitemap excludes the retired category', !smText.includes('/shop/custom-signage'));
-    check('sitemap excludes draft pages', !smText.includes('/privacy-policy'));
+    check('sitemap lists the privacy page', smText.includes('/privacy-policy'));
+    check('sitemap lists the terms page', smText.includes('/terms-and-conditions'));
 
     const robots = await fetch(`${ROOT}/robots.txt`);
     const robotsText = await robots.text();
