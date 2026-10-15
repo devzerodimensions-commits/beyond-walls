@@ -109,6 +109,36 @@ test('the live preview is configurable per product', async ({ page }) => {
   await expect(page.getByText(/following the template/i)).toBeVisible();
 });
 
+test('new products keep images, variants and personalisation available', async ({ page }) => {
+  await page.goto('/admin/products/new');
+
+  for (const tab of ['Images', 'Variants', 'Personalisation']) {
+    const control = page.getByRole('tab', { name: tab });
+    await expect(control).toBeEnabled();
+  }
+
+  await page.getByRole('tab', { name: 'Images' }).click();
+  await expect(page.getByText('Nothing is disabled.')).toBeVisible();
+  await expect(page.getByRole('button', { name: /save draft & add images/i })).toBeVisible();
+});
+
+test('product options and preview colours are editable from the product workflow', async ({ page }) => {
+  await page.goto('/admin/products');
+  await page.getByRole('link', { name: /minimal acrylic name plate/i }).first().click();
+
+  await page.getByRole('tab', { name: 'Organisation' }).click();
+  await expect(page.getByText(/materials, colours, styles & typography/i)).toBeVisible();
+  const addOption = page.getByRole('button', { name: /add option/i }).first();
+  await addOption.click();
+  await expect(page.getByRole('dialog').getByLabel('Option colour')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('tab', { name: 'Details' }).click();
+  await expect(page.getByText('Plate colour choices')).toBeVisible();
+  await expect(page.getByRole('button', { name: /add colour/i }).first()).toBeVisible();
+  await expect(page.getByLabel('Default typography')).toBeEditable();
+});
+
 test('a non-admin cannot reach the admin panel', async ({ page, context }) => {
   await context.clearCookies();
   await page.evaluate(() => window.localStorage.clear()).catch(() => {});

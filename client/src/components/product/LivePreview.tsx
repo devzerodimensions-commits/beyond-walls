@@ -32,9 +32,8 @@ export interface PreviewSlots {
  * as an option and to draw correctly — previously the admin could type any
  * font name and the preview would quietly ignore it.
  *
- * Every face is loaded in styles/index.css. A font that is offered but not
- * loaded falls back to the first entry rather than to whatever the browser
- * happens to have.
+ * Every built-in face is loaded in styles/index.css. Admins may also provide a
+ * custom CSS family/stack; the first built-in face remains the final fallback.
  */
 export interface PlateFont {
   id: string;
@@ -89,7 +88,14 @@ const FONT_STACKS: Record<string, string> = Object.fromEntries(
 
 /** The stack for a chosen font, falling back to the default rather than nothing. */
 export function fontStack(id: string | undefined | null): string {
-  return FONT_STACKS[id ?? ''] ?? PLATE_FONTS[0].stack;
+  const value = id?.trim();
+  if (!value) return PLATE_FONTS[0].stack;
+  if (FONT_STACKS[value]) return FONT_STACKS[value];
+
+  // Admins may enter a custom CSS family/stack for a product. Keep a dependable
+  // loaded face at the end so the preview remains readable when that custom
+  // font is not installed in the customer's browser.
+  return `${value}, ${PLATE_FONTS[0].stack}`;
 }
 
 const COLOR_MAP: Record<string, string> = {

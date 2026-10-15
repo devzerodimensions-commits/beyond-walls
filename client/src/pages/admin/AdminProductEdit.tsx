@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import type {
-  AttributeGroup, Category, ContentStatus, PersonalizationField, PersonalizationType,
+  AttributeGroup, AttributeValue, Category, ContentStatus, PersonalizationField, PersonalizationType,
   Product, ProductImage, ProductVariant,
 } from '../../lib/types';
 import { slugify, toNumber } from '../../lib/format';
@@ -147,14 +147,24 @@ function toForm(product: Product): ProductForm {
 export default function AdminProductEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { push } = useToast();
 
   const isNew = !id || id === 'new';
-  const [tab, setTab] = useState<Tab>('details');
+  const requestedTab = searchParams.get('tab') as Tab | null;
+  const [tab, setTab] = useState<Tab>(TABS.some((item) => item.id === requestedTab) ? requestedTab! : 'details');
   const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [slugTouched, setSlugTouched] = useState(false);
+  const [attributeDraft, setAttributeDraft] = useState<{
+    id?: string;
+    groupId: string;
+    groupName: string;
+    name: string;
+    hexColor: string;
+  } | null>(null);
+  const [deletingAttribute, setDeletingAttribute] = useState<AttributeValue | null>(null);
 
   const productQuery = useQuery({
     queryKey: ['admin-product', id],
@@ -189,7 +199,7 @@ export default function AdminProductEdit() {
   };
 
   const save = useMutation({
-    mutationFn: async (publish?: boolean) => {
+    mutationFn: async ({ publish }: { publish?: boolean; continueTo?: Tab }) => {
       const payload = {
         ...form,
         sku: form.sku || null,
@@ -217,21 +227,70 @@ export default function AdminProductEdit() {
         ? api.post<Product>('/admin/products', payload)
         : api.patch<Product>(`/admin/products/${id}`, payload);
     },
-    onSuccess: async (product) => {
+    onSuccess: async (product, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-product', id] });
       push(isNew ? 'Product created' : 'Product saved', 'success');
-      if (isNew) navigate(`/admin/products/${product.id}`, { replace: true });
+      if (isNew) {
+        const nextTab = variables.continueTo ?? 'details';
+        setTab(nextTab);
+        navigate(`/admin/products/${product.id}?tab=${nextTab}`, { replace: true });
+      }
       else setForm(toForm(product));
     },
     onError: (err) => {
       if (err instanceof ApiError) {
         setErrors(err.fieldErrors);
+        if (isNew && (err.fieldErrors.name || err.fieldErrors.slug)) setTab('details');
         push(err.message, 'error');
       } else {
         push('Could not save the product', 'error');
       }
     },
+  });
+
+  const saveAttribute = useMutation({
+    mutationFn: (draft: NonNullable<typeof attributeDraft>) => {
+      const payload = {
+        groupId: draft.groupId,
+        name: draft.name.trim(),
+        hexColor: draft.hexColor || null,
+        status: 'PUBLISHED',
+      };
+      return draft.id
+        ? api.patch<AttributeValue>(`/admin/attribute-values/${draft.id}`, payload)
+        : api.post<AttributeValue>('/admin/attribute-values', payload);
+    },
+    onSuccess: async (value, draft) => {
+      if (!draft.id) {
+        setForm((prev) => ({
+          ...prev,
+          attributeValueIds: prev.attributeValueIds.includes(value.id)
+            ? prev.attributeValueIds
+            : [...prev.attributeValueIds, value.id],
+        }));
+      }
+      await queryClient.invalidateQueries({ queryKey: ['admin-attribute-groups'] });
+      await queryClient.invalidateQueries({ queryKey: ['catalog-filters'] });
+      setAttributeDraft(null);
+      push(draft.id ? 'Option updated' : 'Option added and selected', 'success');
+    },
+    onError: (err) => push(err instanceof ApiError ? err.message : 'Could not save option', 'error'),
+  });
+
+  const removeAttribute = useMutation({
+    mutationFn: (value: AttributeValue) => api.delete(`/admin/attribute-values/${value.id}`),
+    onSuccess: async (_, value) => {
+      setForm((prev) => ({
+        ...prev,
+        attributeValueIds: prev.attributeValueIds.filter((idValue) => idValue !== value.id),
+      }));
+      await queryClient.invalidateQueries({ queryKey: ['admin-attribute-groups'] });
+      await queryClient.invalidateQueries({ queryKey: ['catalog-filters'] });
+      setDeletingAttribute(null);
+      push('Option deleted', 'info');
+    },
+    onError: (err) => push(err instanceof ApiError ? err.message : 'Could not delete option', 'error'),
   });
 
   if (!isNew && productQuery.isLoading) return <PageLoader label="Loading product" />;
@@ -261,11 +320,11 @@ export default function AdminProductEdit() {
               size="sm"
               variant="secondary"
               loading={save.isPending}
-              onClick={() => save.mutate(false)}
+              onClick={() => save.mutate({ publish: false })}
             >
               Save as draft
             </Button>
-            <Button size="sm" loading={save.isPending} onClick={() => save.mutate(true)}>
+            <Button size="sm" loading={save.isPending} onClick={() => save.mutate({ publish: true })}>
               {form.status === 'PUBLISHED' ? 'Save & keep live' : 'Publish'}
             </Button>
           </>
@@ -295,14 +354,11 @@ export default function AdminProductEdit() {
         role="tablist"
       >
         {TABS.map((item) => {
-          const disabled = isNew && !['details', 'pricing', 'organisation', 'seo'].includes(item.id);
           return (
             <button
               key={item.id}
               type="button"
-              disabled={disabled}
               onClick={() => setTab(item.id)}
-              title={disabled ? 'Save the product first' : undefined}
               role="tab"
               id={`producttab-${item.id}`}
               aria-selected={tab === item.id}
@@ -312,7 +368,6 @@ export default function AdminProductEdit() {
                 tab === item.id
                   ? 'bg-paper text-ink shadow-[var(--a-shadow)]'
                   : 'text-[color:var(--a-muted)] hover:text-ink',
-                disabled && 'cursor-not-allowed opacity-40',
               )}
             >
               {item.label}
@@ -416,13 +471,23 @@ export default function AdminProductEdit() {
       ) : null}
 
       {/* ---------------- Images ---------------- */}
-      {tab === 'media' && !isNew ? (
-        <ImagesTab
-          productId={id!}
-          images={product?.images ?? []}
-          videoUrl={form.videoUrl ?? ''}
-          onVideoChange={(value) => set('videoUrl', value || null)}
-        />
+      {tab === 'media' ? (
+        isNew ? (
+          <UnsavedProductTab
+            title="Add product images"
+            description="Give the product a name, then save one draft so its images have a product to belong to. You will return directly to Images."
+            action="Save draft & add images"
+            loading={save.isPending}
+            onContinue={() => save.mutate({ publish: false, continueTo: 'media' })}
+          />
+        ) : (
+          <ImagesTab
+            productId={id!}
+            images={product?.images ?? []}
+            videoUrl={form.videoUrl ?? ''}
+            onVideoChange={(value) => set('videoUrl', value || null)}
+          />
+        )
       ) : null}
 
       {/* ---------------- Pricing ---------------- */}
@@ -499,18 +564,36 @@ export default function AdminProductEdit() {
       ) : null}
 
       {/* ---------------- Variants ---------------- */}
-      {tab === 'variants' && !isNew ? (
-        <VariantsTab productId={id!} variants={product?.variants ?? []} />
+      {tab === 'variants' ? (
+        isNew ? (
+          <UnsavedProductTab
+            title="Add variants"
+            description="Save one draft first, then add any number of sizes, materials, finishes, prices and stock levels."
+            action="Save draft & add variants"
+            loading={save.isPending}
+            onContinue={() => save.mutate({ publish: false, continueTo: 'variants' })}
+          />
+        ) : <VariantsTab productId={id!} variants={product?.variants ?? []} />
       ) : null}
 
       {/* ---------------- Personalisation ---------------- */}
-      {tab === 'personalisation' && !isNew ? (
-        <PersonalizationTab
-          productId={id!}
-          fields={product?.personalization ?? []}
-          previewTemplate={form.livePreviewTemplate}
-          previewEnabled={form.livePreviewEnabled}
-        />
+      {tab === 'personalisation' ? (
+        isNew ? (
+          <UnsavedProductTab
+            title="Add personalisation choices"
+            description="Save one draft first, then create customer fields for colours, typography, materials, text, artwork and any other choice."
+            action="Save draft & add personalisation"
+            loading={save.isPending}
+            onContinue={() => save.mutate({ publish: false, continueTo: 'personalisation' })}
+          />
+        ) : (
+          <PersonalizationTab
+            productId={id!}
+            fields={product?.personalization ?? []}
+            previewTemplate={form.livePreviewTemplate}
+            previewEnabled={form.livePreviewEnabled}
+          />
+        )
       ) : null}
 
       {/* ---------------- Organisation ---------------- */}
@@ -553,41 +636,99 @@ export default function AdminProductEdit() {
           </AdminCard>
 
           <AdminCard
-            title="Filters"
-            description="These drive the material / style / shape filters on the shop page."
+            title="Materials, colours, styles & typography"
+            description="Select what applies to this product. Add, edit or remove an option here; use the full manager to add or remove whole groups."
             className="lg:col-span-2"
+            actions={
+              <Link
+                to="/admin/attributes"
+                className="text-2xs uppercase tracking-architect text-ink-500 hover:text-ink"
+              >
+                Manage groups
+              </Link>
+            }
           >
             {attributesQuery.data?.data.length ? (
               <div className="space-y-6">
                 {attributesQuery.data.data.map((group) => (
-                  <div key={group.id}>
-                    <p className="mb-2.5 text-2xs font-semibold uppercase tracking-architect">
-                      {group.name}
-                    </p>
+                  <div key={group.id} className="border-b border-stone-line pb-5 last:border-0 last:pb-0">
+                    <div className="mb-2.5 flex items-center justify-between gap-3">
+                      <p className="text-2xs font-semibold uppercase tracking-architect">
+                        {group.name}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setAttributeDraft({
+                          groupId: group.id,
+                          groupName: group.name,
+                          name: '',
+                          hexColor: '',
+                        })}
+                        className="inline-flex items-center gap-1 text-2xs uppercase tracking-architect text-ink-500 hover:text-ink"
+                      >
+                        <PlusIcon size={12} /> Add option
+                      </button>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       {(group.values ?? []).map((value) => {
                         const selected = form.attributeValueIds.includes(value.id);
                         return (
-                          <button
+                          <span
                             key={value.id}
-                            type="button"
-                            onClick={() =>
-                              set(
-                                'attributeValueIds',
-                                selected
-                                  ? form.attributeValueIds.filter((v) => v !== value.id)
-                                  : [...form.attributeValueIds, value.id],
-                              )
-                            }
                             className={clsx(
-                              'border px-3.5 py-2 text-xs transition-colors',
-                              selected ? 'border-ink bg-ink text-paper' : 'border-stone-line hover:border-ink',
+                              'inline-flex items-stretch border text-xs transition-colors',
+                              selected ? 'border-ink bg-ink text-paper' : 'border-stone-line bg-paper',
                             )}
                           >
-                            {value.name}
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                set(
+                                  'attributeValueIds',
+                                  selected
+                                    ? form.attributeValueIds.filter((v) => v !== value.id)
+                                    : [...form.attributeValueIds, value.id],
+                                )
+                              }
+                              className="inline-flex items-center gap-2 px-3 py-2"
+                              aria-pressed={selected}
+                            >
+                              {value.hexColor ? (
+                                <span
+                                  className="h-3.5 w-3.5 border border-current/30"
+                                  style={{ backgroundColor: value.hexColor }}
+                                />
+                              ) : null}
+                              {value.name}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAttributeDraft({
+                                id: value.id,
+                                groupId: group.id,
+                                groupName: group.name,
+                                name: value.name,
+                                hexColor: value.hexColor ?? '',
+                              })}
+                              className="border-l border-current/20 px-2 opacity-65 hover:opacity-100"
+                              aria-label={`Edit ${value.name}`}
+                            >
+                              <EditIcon size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingAttribute(value)}
+                              className="border-l border-current/20 px-2 opacity-65 hover:text-state-danger hover:opacity-100"
+                              aria-label={`Delete ${value.name}`}
+                            >
+                              <TrashIcon size={12} />
+                            </button>
+                          </span>
                         );
                       })}
+                      {(group.values ?? []).length === 0 ? (
+                        <p className="text-xs text-ink-400">No options yet. Add the first one.</p>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -645,6 +786,66 @@ export default function AdminProductEdit() {
       ) : null}
 
       </div>
+
+      <Modal
+        open={Boolean(attributeDraft)}
+        onClose={() => setAttributeDraft(null)}
+        title={attributeDraft?.id ? `Edit ${attributeDraft.groupName} option` : `Add ${attributeDraft?.groupName ?? ''} option`}
+        size="sm"
+      >
+        {attributeDraft ? (
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (attributeDraft.name.trim()) saveAttribute.mutate(attributeDraft);
+            }}
+          >
+            <Input
+              label="Option name"
+              required
+              value={attributeDraft.name}
+              placeholder={`e.g. ${attributeDraft.groupName}`}
+              onChange={(event) => setAttributeDraft({ ...attributeDraft, name: event.target.value })}
+            />
+            <div>
+              <span className="field-label">Colour swatch (optional)</span>
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={attributeDraft.hexColor || '#111111'}
+                  onChange={(event) => setAttributeDraft({ ...attributeDraft, hexColor: event.target.value })}
+                  className="h-10 w-14 cursor-pointer border border-stone-line bg-paper p-1"
+                  aria-label="Option colour"
+                />
+                <input
+                  value={attributeDraft.hexColor}
+                  placeholder="#111111 or leave blank"
+                  className="field flex-1 font-mono"
+                  onChange={(event) => setAttributeDraft({ ...attributeDraft, hexColor: event.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-stone-line pt-4">
+              <Button type="button" variant="ghost" onClick={() => setAttributeDraft(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={saveAttribute.isPending}>
+                {attributeDraft.id ? 'Save option' : 'Add & select'}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deletingAttribute)}
+        title={`Delete “${deletingAttribute?.name ?? ''}”?`}
+        message="This option will be removed from every product that uses it. Existing order records are not changed."
+        loading={removeAttribute.isPending}
+        onCancel={() => setDeletingAttribute(null)}
+        onConfirm={() => deletingAttribute && removeAttribute.mutate(deletingAttribute)}
+      />
     </>
   );
 }
@@ -652,6 +853,33 @@ export default function AdminProductEdit() {
 // ---------------------------------------------------------------------------
 // Images tab
 // ---------------------------------------------------------------------------
+
+function UnsavedProductTab({
+  title, description, action, loading, onContinue,
+}: {
+  title: string;
+  description: string;
+  action: string;
+  loading: boolean;
+  onContinue: () => void;
+}) {
+  return (
+    <AdminCard title={title} description={description}>
+      <div className="flex flex-col items-start gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-ink">Nothing is disabled.</p>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-ink-500">
+            Images and reusable options need a saved product ID. This creates a private draft only;
+            customers cannot see it until you publish.
+          </p>
+        </div>
+        <Button type="button" loading={loading} onClick={onContinue}>
+          {action}
+        </Button>
+      </div>
+    </AdminCard>
+  );
+}
 
 function ImagesTab({
   productId, images, videoUrl, onVideoChange,
@@ -881,36 +1109,36 @@ function PreviewConfigEditor({
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Select
+        <ColourOverrideField
           label="Default plate colour"
           value={String(stored.defaults?.plateColor ?? '')}
-          onChange={(e) => patchGroup('defaults', 'plateColor', e.target.value)}
-          options={[
-            { value: '', label: `From template (${resolved.defaults.plateColor})` },
-            ...resolved.palette.plate.map((c) => ({ value: c.value, label: c.label })),
-          ]}
+          fallback={resolved.defaults.plateColor}
+          palette={resolved.palette.plate}
+          onChange={(value) => patchGroup('defaults', 'plateColor', value)}
         />
-        <Select
+        <ColourOverrideField
           label="Default text colour"
           value={String(stored.defaults?.textColor ?? '')}
-          onChange={(e) => patchGroup('defaults', 'textColor', e.target.value)}
-          options={[
-            { value: '', label: `From template (${resolved.defaults.textColor})` },
-            ...resolved.palette.text.map((c) => ({ value: c.value, label: c.label })),
-          ]}
+          fallback={resolved.defaults.textColor}
+          palette={resolved.palette.text}
+          onChange={(value) => patchGroup('defaults', 'textColor', value)}
         />
-        <Select
-          label="Default font"
-          value={String(stored.defaults?.fontFamily ?? '')}
-          onChange={(e) => patchGroup('defaults', 'fontFamily', e.target.value)}
-          options={[
-            { value: '', label: `From template (${resolved.defaults.fontFamily})` },
-            { value: 'grotesque', label: 'Grotesque' },
-            { value: 'serif', label: 'Serif' },
-            { value: 'condensed', label: 'Condensed' },
-            { value: 'mono', label: 'Mono' },
-          ]}
-        />
+        <label className="block">
+          <span className="field-label">Default typography</span>
+          <input
+            list="preview-font-families"
+            value={String(stored.defaults?.fontFamily ?? '')}
+            placeholder={`From template (${resolved.defaults.fontFamily})`}
+            className="field w-full"
+            onChange={(event) => patchGroup('defaults', 'fontFamily', event.target.value)}
+          />
+          <datalist id="preview-font-families">
+            {PLATE_FONTS.map((face) => <option key={face.id} value={face.id}>{face.label}</option>)}
+          </datalist>
+          <span className="mt-1 block text-2xs text-ink-400">
+            Choose a built-in face or enter a CSS font family/stack.
+          </span>
+        </label>
         <Input
           type="number"
           label="Corner radius"
@@ -964,12 +1192,153 @@ function PreviewConfigEditor({
         />
       </div>
 
+      <div className="grid gap-5 border-t border-stone-line pt-5 sm:grid-cols-2">
+        <PaletteEditor
+          title="Plate colour choices"
+          values={resolved.palette.plate}
+          onChange={(values) => patch('palette', { ...resolved.palette, plate: values })}
+        />
+        <PaletteEditor
+          title="Text colour choices"
+          values={resolved.palette.text}
+          onChange={(values) => patch('palette', { ...resolved.palette, text: values })}
+        />
+        {stored.palette ? (
+          <button
+            type="button"
+            onClick={() => patch('palette', undefined)}
+            className="justify-self-start text-2xs uppercase tracking-architect text-ink-500 hover:text-state-danger sm:col-span-2"
+          >
+            Reset both colour lists to template
+          </button>
+        ) : null}
+      </div>
+
       <LivePreview
         template={template || 'nameplate-minimal'}
         config={config}
         slots={{}}
         className="border border-stone-line"
       />
+    </div>
+  );
+}
+
+type PreviewPaletteValue = PreviewConfig['palette']['plate'][number];
+
+function paletteHex(value: string, palette: PreviewPaletteValue[]): string {
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value;
+  return palette.find((entry) => entry.value === value)?.hex ?? '#111111';
+}
+
+function ColourOverrideField({
+  label, value, fallback, palette, onChange,
+}: {
+  label: string;
+  value: string;
+  fallback: string;
+  palette: PreviewPaletteValue[];
+  onChange: (value: string) => void;
+}) {
+  const effective = value || fallback;
+  return (
+    <div>
+      <span className="field-label">{label}</span>
+      <div className="flex gap-2">
+        <input
+          type="color"
+          value={paletteHex(effective, palette)}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-10 w-14 cursor-pointer border border-stone-line bg-paper p-1"
+          aria-label={`${label} picker`}
+        />
+        <input
+          value={value}
+          placeholder={`From template (${fallback})`}
+          className="field min-w-0 flex-1 font-mono text-xs"
+          onChange={(event) => onChange(event.target.value)}
+        />
+        {value ? (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="border border-stone-line px-3 text-ink-400 hover:border-ink hover:text-ink"
+            aria-label={`Use template ${label.toLowerCase()}`}
+          >
+            <CloseIcon size={14} />
+          </button>
+        ) : null}
+      </div>
+      <p className="mt-1 text-2xs text-ink-400">Pick any colour or enter a saved colour value.</p>
+    </div>
+  );
+}
+
+function PaletteEditor({
+  title, values, onChange,
+}: {
+  title: string;
+  values: PreviewPaletteValue[];
+  onChange: (values: PreviewPaletteValue[]) => void;
+}) {
+  const update = (index: number, patch: Partial<PreviewPaletteValue>) => {
+    const next = [...values];
+    next[index] = { ...next[index], ...patch };
+    onChange(next);
+  };
+
+  return (
+    <div className="border border-stone-line p-4">
+      <p className="field-label">{title}</p>
+      <p className="mb-3 text-2xs leading-relaxed text-ink-400">
+        Save the exact colours used by this product; customer choices are created under Personalisation.
+      </p>
+      <div className="space-y-2">
+        {values.map((entry, index) => (
+          <div key={`${entry.value}-${index}`} className="grid grid-cols-[2.5rem_1fr_1fr_2rem] gap-2">
+            <input
+              type="color"
+              value={paletteHex(entry.hex, values)}
+              onChange={(event) => update(index, { hex: event.target.value })}
+              className="h-10 w-10 cursor-pointer border border-stone-line bg-paper p-1"
+              aria-label={`${entry.label || 'Colour'} swatch`}
+            />
+            <input
+              value={entry.label}
+              placeholder="Label"
+              className="field min-w-0 text-xs"
+              onChange={(event) => update(index, { label: event.target.value })}
+            />
+            <input
+              value={entry.value}
+              placeholder="value"
+              className="field min-w-0 font-mono text-xs"
+              onChange={(event) => update(index, { value: event.target.value })}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(values.filter((_, valueIndex) => valueIndex !== index))}
+              className="text-ink-400 hover:text-state-danger"
+              aria-label={`Remove ${entry.label || 'colour'}`}
+            >
+              <TrashIcon size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="mt-3"
+        icon={<PlusIcon size={13} />}
+        onClick={() => {
+          const suffix = values.length + 1;
+          onChange([...values, { value: `custom-${suffix}`, label: `Custom ${suffix}`, hex: '#777777' }]);
+        }}
+      >
+        Add colour
+      </Button>
     </div>
   );
 }
@@ -1690,8 +2059,8 @@ function FieldForm({
           <p className="field-label">Options</p>
           {form.type === 'FONT' ? (
             <p className="mb-3 text-xs leading-relaxed a-muted">
-              Each face is shown to the customer in its own lettering, and drawn
-              that way on the live preview.
+              Add or remove as many typography choices as needed. Built-in faces render reliably;
+              a custom CSS font family works when that font is available in the customer&apos;s browser.
             </p>
           ) : null}
           {form.options.map((option, index) => (
@@ -1705,14 +2074,12 @@ function FieldForm({
                   setForm({ ...form, options: next });
                 }}
               />
-              {/*
-                For a font, the value has to be one the preview can actually
-                draw — a typed name would be silently ignored — so it is chosen
-                from the faces the site loads. Everything else stays free text.
-              */}
+              {/* Built-in typography is suggested, while a studio may still enter a custom CSS stack. */}
               {form.type === 'FONT' ? (
-                <select
+                <input
+                  list="personalisation-font-families"
                   value={option.value}
+                  placeholder="Font id or CSS stack"
                   className="field col-span-3 text-xs"
                   onChange={(e) => {
                     const next = [...form.options];
@@ -1726,14 +2093,7 @@ function FieldForm({
                     };
                     setForm({ ...form, options: next });
                   }}
-                >
-                  <option value="">Choose a face…</option>
-                  {PLATE_FONTS.map((face) => (
-                    <option key={face.id} value={face.id}>
-                      {face.label}
-                    </option>
-                  ))}
-                </select>
+                />
               ) : (
                 <input
                   value={option.value} placeholder="value" className="field col-span-3 font-mono text-xs"
@@ -1774,6 +2134,11 @@ function FieldForm({
               </button>
             </div>
           ))}
+          {form.type === 'FONT' ? (
+            <datalist id="personalisation-font-families">
+              {PLATE_FONTS.map((face) => <option key={face.id} value={face.id}>{face.label}</option>)}
+            </datalist>
+          ) : null}
           <Button
             type="button" size="sm" variant="ghost"
             onClick={() =>
