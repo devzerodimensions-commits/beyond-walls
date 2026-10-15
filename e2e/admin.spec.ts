@@ -146,17 +146,19 @@ test('a non-admin cannot reach the admin panel', async ({ page, context }) => {
   await expect(page).toHaveURL(/\/admin\/login/);
 });
 
-test('customer and administrator accounts are managed separately', async ({ page }) => {
+test('customers and administrators are managed together under Users', async ({ page }) => {
   await page.goto('/admin/customers');
-  await expect(page.getByRole('heading', { name: 'Customers', exact: true })).toBeVisible();
-  await expect(page.getByText(ADMIN_EMAIL, { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Add customer' })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/users$/);
 
-  await page.goto('/admin/users');
-  await expect(page.getByRole('heading', { name: 'Admin users', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
   await expect(page.getByText(ADMIN_EMAIL, { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Add administrator' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'My profile' }).first()).toBeVisible();
+  await expect(page.getByLabel('Filter by role')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Add user' }).first()).toBeVisible();
+
+  await page.goto('/admin/users/new');
+  await expect(page.getByRole('heading', { name: 'Add user', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Role')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Generate password' })).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------
@@ -165,7 +167,7 @@ test('customer and administrator accounts are managed separately', async ({ page
 
 const ADMIN_SCREENS = [
   '/admin', '/admin/products', '/admin/orders', '/admin/categories',
-  '/admin/customers', '/admin/users', '/admin/profile', '/admin/enquiries', '/admin/design-pages', '/admin/settings',
+  '/admin/users', '/admin/users/new', '/admin/profile', '/admin/enquiries', '/admin/design-pages', '/admin/settings',
   '/admin/media', '/admin/attributes', '/admin/banners', '/admin/gallery',
   '/admin/faqs', '/admin/navigation', '/admin/coupons', '/admin/reviews',
   '/admin/testimonials',

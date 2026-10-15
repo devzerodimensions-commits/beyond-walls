@@ -471,6 +471,7 @@ router.post(
       password: z.string().min(8).max(100),
       phone: z.string().max(20).nullable().optional(),
       role: z.enum(['CUSTOMER', 'ADMIN']).default('CUSTOMER'),
+      isActive: z.boolean().default(true),
     });
     const body = schema.parse(req.body);
 
@@ -483,6 +484,7 @@ router.post(
         email: body.email,
         phone: body.phone ?? null,
         role: body.role,
+        isActive: body.isActive,
         passwordHash: await hashPassword(body.password),
       },
       select: { id: true, name: true, email: true, role: true, createdAt: true },

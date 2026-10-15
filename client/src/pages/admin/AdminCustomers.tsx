@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api';
 import type { AdminCustomer } from '../../lib/types';
@@ -10,52 +10,32 @@ import {
 } from '../../components/admin/AdminKit';
 import {
   Badge, Button, ButtonLink, Checkbox, ConfirmDialog, EditIcon, Input, Modal, Pagination,
-  PlusIcon, TrashIcon,
+  PlusIcon, Select, TrashIcon,
 } from '../../components/ui';
 
 type DirectoryRole = 'CUSTOMER' | 'ADMIN';
 
-const COPY = {
-  CUSTOMER: {
-    title: 'Customers',
-    description: 'Shopper accounts, contact details and order history.',
-    add: 'Add customer',
-    emptyTitle: 'No customers yet',
-    emptyDescription: 'Customer accounts appear here once people register or check out.',
-  },
-  ADMIN: {
-    title: 'Admin users',
-    description: 'People who can sign in to and manage this admin panel.',
-    add: 'Add administrator',
-    emptyTitle: 'No administrators found',
-    emptyDescription: 'Add an administrator to give a trusted team member panel access.',
-  },
-} as const;
-
 export default function AdminCustomers() {
-  return <AdminUserDirectory role="CUSTOMER" />;
+  return <Navigate to="/admin/users" replace />;
 }
 
-export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
+export function AdminUserDirectory() {
   const queryClient = useQueryClient();
   const { push } = useToast();
   const { user } = useAuth();
-  const copy = COPY[role];
-  const isAdminDirectory = role === 'ADMIN';
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [viewing, setViewing] = useState<string | null>(null);
   const [editing, setEditing] = useState<AdminCustomer | null>(null);
-  const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<AdminCustomer | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const directoryKey = role === 'ADMIN' ? 'admin-users' : 'admin-customers';
   const { data, isLoading } = useQuery({
-    queryKey: [directoryKey, page, search],
+    queryKey: ['admin-users', page, search, roleFilter],
     queryFn: () => api.list<AdminCustomer[]>('/admin/customers', {
-      page, perPage: 25, search, role,
+      page, perPage: 25, search, role: roleFilter,
     }),
     placeholderData: keepPreviousData,
   });
@@ -79,9 +59,8 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
     onSuccess: async () => {
       await invalidate();
       setEditing(null);
-      setCreating(false);
       setErrors({});
-      push(`${isAdminDirectory ? 'Administrator' : 'Customer'} saved`, 'success');
+      push('User saved', 'success');
     },
     onError: (err) => {
       if (err instanceof ApiError) {
@@ -96,7 +75,7 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
     onSuccess: async () => {
       await invalidate();
       setDeleting(null);
-      push(`${isAdminDirectory ? 'Administrator' : 'Customer'} removed`, 'info');
+      push('User removed', 'info');
     },
     onError: (err) => {
       push(err instanceof ApiError ? err.message : 'Could not delete account', 'error');
@@ -108,11 +87,12 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
   const columns: Column<AdminCustomer>[] = [
     {
       key: 'name',
-      header: isAdminDirectory ? 'Administrator' : 'Customer',
+      header: 'User',
       render: (account) => (
         <button type="button" onClick={() => setViewing(account.id)} className="text-left">
           <p className="flex items-center gap-2 text-sm font-medium hover:underline">
             {account.name}
+            {account.role === 'ADMIN' ? <Badge tone="dark">Administrator</Badge> : null}
             {!account.isActive ? <Badge tone="danger">Disabled</Badge> : null}
           </p>
           <p className="text-2xs text-ink-400">{account.email}</p>
@@ -120,11 +100,16 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
       ),
     },
     { key: 'phone', header: 'Phone', render: (account) => account.phone ?? '—' },
-    ...(!isAdminDirectory ? [{
+    {
+      key: 'role',
+      header: 'Role',
+      render: (account) => account.role === 'ADMIN' ? 'Administrator' : 'Customer',
+    },
+    {
       key: 'orders',
       header: 'Orders',
       render: (account: AdminCustomer) => <span className="tabular-nums">{account._count?.orders ?? 0}</span>,
-    }] : []),
+    },
     {
       key: 'joined',
       header: 'Joined',
@@ -153,7 +138,7 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
           >
             <EditIcon size={15} />
           </button>
-          {!(isAdminDirectory && account.id === user?.id) ? (
+          {account.id !== user?.id ? (
             <button
               type="button"
               onClick={() => setDeleting(account)}
@@ -171,35 +156,39 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
   return (
     <>
       <AdminPageHeader
-        title={copy.title}
-        description={copy.description}
+        title="Users"
+        description="Manage customer accounts and administrator access in one place."
         actions={
-          <div className="flex flex-wrap gap-2">
-            {isAdminDirectory ? (
-              <ButtonLink to="/admin/profile" size="sm" variant="secondary">My profile</ButtonLink>
-            ) : null}
-            <Button size="sm" icon={<PlusIcon size={14} />} onClick={() => setCreating(true)}>
-              {copy.add}
-            </Button>
-          </div>
+          <ButtonLink to="/admin/users/new" size="sm" icon={<PlusIcon size={14} />}>Add user</ButtonLink>
         }
       />
 
       <AdminCard>
-        <div className="mb-5">
+        <div className="mb-5 flex flex-wrap gap-3">
           <AdminSearch
             value={search}
             onChange={(value) => { setSearch(value); setPage(1); }}
-            placeholder={`Search ${isAdminDirectory ? 'administrators' : 'customers'} by name, email or phone…`}
-            className="w-full"
+            placeholder="Search by name, email or phone…"
+            className="min-w-[240px] flex-1"
+          />
+          <Select
+            value={roleFilter}
+            onChange={(event) => { setRoleFilter(event.target.value); setPage(1); }}
+            aria-label="Filter by role"
+            className="w-auto min-w-[160px]"
+            options={[
+              { value: '', label: 'All roles' },
+              { value: 'CUSTOMER', label: 'Customers' },
+              { value: 'ADMIN', label: 'Administrators' },
+            ]}
           />
         </div>
 
         <DataTable
           rows={accounts}
           loading={isLoading}
-          emptyTitle={copy.emptyTitle}
-          emptyDescription={copy.emptyDescription}
+          emptyTitle="No users found"
+          emptyDescription="Try another search or add a new user account."
           columns={columns}
         />
 
@@ -209,7 +198,7 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
       <Modal
         open={Boolean(viewing)}
         onClose={() => setViewing(null)}
-        title={detail?.name ?? (isAdminDirectory ? 'Administrator' : 'Customer')}
+        title={detail?.name ?? 'User'}
         size="lg"
       >
         {detail ? (
@@ -218,10 +207,10 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
               rows={[
                 { label: 'Email', value: detail.email },
                 { label: 'Phone', value: detail.phone ?? '—' },
-                { label: 'Account type', value: isAdminDirectory ? 'Administrator' : 'Customer' },
+                { label: 'Role', value: detail.role === 'ADMIN' ? 'Administrator' : 'Customer' },
                 { label: 'Status', value: detail.isActive ? 'Active' : 'Disabled' },
                 { label: 'Joined', value: formatDate(detail.createdAt) },
-                ...(isAdminDirectory
+                ...(detail.role === 'ADMIN'
                   ? [{ label: 'Last sign-in', value: detail.lastLoginAt ? relativeTime(detail.lastLoginAt) : 'Never' }]
                   : [
                     { label: 'Paid orders', value: String(detail.paidOrders ?? 0) },
@@ -230,23 +219,22 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
               ]}
             />
 
-            {!isAdminDirectory ? <CustomerCommerce detail={detail} onNavigate={() => setViewing(null)} /> : null}
+            {detail.role === 'CUSTOMER' ? <CustomerCommerce detail={detail} onNavigate={() => setViewing(null)} /> : null}
           </div>
         ) : null}
       </Modal>
 
       <Modal
-        open={Boolean(editing) || creating}
-        onClose={() => { setEditing(null); setCreating(false); setErrors({}); }}
-        title={editing ? `Edit ${editing.name}` : copy.add}
+        open={Boolean(editing)}
+        onClose={() => { setEditing(null); setErrors({}); }}
+        title={editing ? `Edit ${editing.name}` : 'Edit user'}
       >
         <AccountForm
           account={editing}
-          role={role}
-          lockActive={Boolean(isAdminDirectory && editing?.id === user?.id)}
+          lockActive={Boolean(editing?.id === user?.id)}
           errors={errors}
           saving={save.isPending}
-          onCancel={() => { setEditing(null); setCreating(false); setErrors({}); }}
+          onCancel={() => { setEditing(null); setErrors({}); }}
           onSubmit={(payload) => save.mutate({ ...payload, id: editing?.id })}
         />
       </Modal>
@@ -254,7 +242,7 @@ export function AdminUserDirectory({ role }: { role: DirectoryRole }) {
       <ConfirmDialog
         open={Boolean(deleting)}
         title={`Delete ${deleting?.name}?`}
-        message={isAdminDirectory
+        message={deleting?.role === 'ADMIN'
           ? 'This person will immediately lose access to the admin panel. You cannot delete your own account or the last active administrator.'
           : 'If this customer has orders, the account is deactivated instead so order history is preserved.'}
         loading={remove.isPending}
@@ -312,9 +300,8 @@ function CustomerCommerce({ detail, onNavigate }: { detail: AdminCustomer; onNav
   );
 }
 
-function AccountForm({ account, role, lockActive, errors, saving, onSubmit, onCancel }: {
+function AccountForm({ account, lockActive, errors, saving, onSubmit, onCancel }: {
   account: AdminCustomer | null;
-  role: DirectoryRole;
   lockActive: boolean;
   errors: Record<string, string>;
   saving: boolean;
@@ -325,6 +312,7 @@ function AccountForm({ account, role, lockActive, errors, saving, onSubmit, onCa
     name: account?.name ?? '',
     email: account?.email ?? '',
     phone: account?.phone ?? '',
+    role: (account?.role ?? 'CUSTOMER') as DirectoryRole,
     isActive: account?.isActive ?? true,
     password: '',
   });
@@ -336,7 +324,7 @@ function AccountForm({ account, role, lockActive, errors, saving, onSubmit, onCa
         const payload: Record<string, unknown> = {
           name: form.name,
           phone: form.phone || null,
-          role,
+          role: form.role,
           isActive: form.isActive,
         };
         if (!account) payload.email = form.email;
@@ -345,9 +333,6 @@ function AccountForm({ account, role, lockActive, errors, saving, onSubmit, onCa
       }}
       className="space-y-5"
     >
-      <div className="border border-stone-line bg-stone-canvas px-3 py-2 text-xs text-ink-500">
-        Account type: <span className="font-semibold text-ink">{role === 'ADMIN' ? 'Administrator' : 'Customer'}</span>
-      </div>
       <Input
         label="Name" required value={form.name} error={errors.name}
         onChange={(event) => setForm({ ...form, name: event.target.value })}
@@ -361,6 +346,20 @@ function AccountForm({ account, role, lockActive, errors, saving, onSubmit, onCa
       <Input
         label="Phone" type="tel" value={form.phone} error={errors.phone}
         onChange={(event) => setForm({ ...form, phone: event.target.value })}
+      />
+      <Select
+        label="Role"
+        value={form.role}
+        error={errors.role}
+        disabled={lockActive}
+        hint={lockActive
+          ? 'Use another administrator account to change your own access.'
+          : 'Administrators can sign in to and manage this panel.'}
+        onChange={(event) => setForm({ ...form, role: event.target.value as DirectoryRole })}
+        options={[
+          { value: 'CUSTOMER', label: 'Customer' },
+          { value: 'ADMIN', label: 'Administrator' },
+        ]}
       />
       <Input
         label={account ? 'Set a new password (optional)' : 'Password'}

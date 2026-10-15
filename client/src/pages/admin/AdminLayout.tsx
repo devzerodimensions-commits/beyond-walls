@@ -11,7 +11,7 @@ import { ThemeSwitcher } from '../../components/admin/ThemeSwitcher';
 import {
   BoxIcon, CloseIcon, CompassIcon, DashboardIcon, ExternalIcon, HelpIcon, ImageIcon, InboxIcon,
   LayersIcon, LogoutIcon, MenuIcon, PagesIcon, QuoteIcon, ReceiptIcon, SearchIcon, SettingsIcon,
-  SparkIcon, TagIcon, TicketIcon, UserIcon, UsersIcon,
+  PlusIcon, SparkIcon, TagIcon, TicketIcon, UserIcon, UsersIcon,
 } from '../../components/ui';
 
 /**
@@ -43,10 +43,14 @@ interface NavItem {
 const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Overview',
+    items: [{ to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true }],
+  },
+  {
+    group: 'Users',
     items: [
-      { to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true },
-      { to: '/admin/users', label: 'Admin users', icon: UsersIcon },
-      { to: '/admin/profile', label: 'My profile', icon: UserIcon },
+      { to: '/admin/users', label: 'All users', icon: UsersIcon, end: true },
+      { to: '/admin/users/new', label: 'Add user', icon: PlusIcon },
+      { to: '/admin/profile', label: 'Profile', icon: UserIcon },
     ],
   },
   {
@@ -63,7 +67,6 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: 'Sales',
     items: [
       { to: '/admin/orders', label: 'Orders', icon: ReceiptIcon, badge: 'orders' },
-      { to: '/admin/customers', label: 'Customers', icon: UsersIcon },
       { to: '/admin/enquiries', label: 'Enquiries', icon: InboxIcon, badge: 'enquiries' },
     ],
   },
