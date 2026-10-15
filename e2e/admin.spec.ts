@@ -146,13 +146,26 @@ test('a non-admin cannot reach the admin panel', async ({ page, context }) => {
   await expect(page).toHaveURL(/\/admin\/login/);
 });
 
+test('customer and administrator accounts are managed separately', async ({ page }) => {
+  await page.goto('/admin/customers');
+  await expect(page.getByRole('heading', { name: 'Customers', exact: true })).toBeVisible();
+  await expect(page.getByText(ADMIN_EMAIL, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add customer' })).toBeVisible();
+
+  await page.goto('/admin/users');
+  await expect(page.getByRole('heading', { name: 'Admin users', exact: true })).toBeVisible();
+  await expect(page.getByText(ADMIN_EMAIL, { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add administrator' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'My profile' }).first()).toBeVisible();
+});
+
 // ---------------------------------------------------------------------------
 // The redesigned shell
 // ---------------------------------------------------------------------------
 
 const ADMIN_SCREENS = [
   '/admin', '/admin/products', '/admin/orders', '/admin/categories',
-  '/admin/customers', '/admin/enquiries', '/admin/design-pages', '/admin/settings',
+  '/admin/customers', '/admin/users', '/admin/profile', '/admin/enquiries', '/admin/design-pages', '/admin/settings',
   '/admin/media', '/admin/attributes', '/admin/banners', '/admin/gallery',
   '/admin/faqs', '/admin/navigation', '/admin/coupons', '/admin/reviews',
   '/admin/testimonials',

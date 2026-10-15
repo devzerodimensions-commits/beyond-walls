@@ -433,6 +433,13 @@ router.patch(
     });
     const body = schema.parse(req.body);
 
+    if (
+      req.params.id === req.user?.sub
+      && (body.role === 'CUSTOMER' || body.isActive === false)
+    ) {
+      throw ApiError.badRequest('You cannot remove your own administrator access');
+    }
+
     // Never allow the last active admin to be demoted or disabled.
     if (body.role === 'CUSTOMER' || body.isActive === false) {
       const target = await prisma.user.findUnique({ where: { id: req.params.id } });
@@ -492,6 +499,10 @@ router.delete(
       include: { _count: { select: { orders: true } } },
     });
     if (!target) throw ApiError.notFound('Customer not found');
+
+    if (target.id === req.user?.sub) {
+      throw ApiError.badRequest('You cannot delete your own administrator account');
+    }
 
     if (target.role === 'ADMIN') {
       const admins = await prisma.user.count({ where: { role: 'ADMIN', isActive: true } });

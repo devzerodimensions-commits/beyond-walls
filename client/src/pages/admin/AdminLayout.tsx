@@ -11,7 +11,7 @@ import { ThemeSwitcher } from '../../components/admin/ThemeSwitcher';
 import {
   BoxIcon, CloseIcon, CompassIcon, DashboardIcon, ExternalIcon, HelpIcon, ImageIcon, InboxIcon,
   LayersIcon, LogoutIcon, MenuIcon, PagesIcon, QuoteIcon, ReceiptIcon, SearchIcon, SettingsIcon,
-  SparkIcon, TagIcon, TicketIcon, UsersIcon,
+  SparkIcon, TagIcon, TicketIcon, UserIcon, UsersIcon,
 } from '../../components/ui';
 
 /**
@@ -43,7 +43,11 @@ interface NavItem {
 const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Overview',
-    items: [{ to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true }],
+    items: [
+      { to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true },
+      { to: '/admin/users', label: 'Admin users', icon: UsersIcon },
+      { to: '/admin/profile', label: 'My profile', icon: UserIcon },
+    ],
   },
   {
     group: 'Catalogue',
