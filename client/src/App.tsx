@@ -1,13 +1,11 @@
 import { Suspense, lazy, useEffect } from 'react';
-import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
-import { Header } from './components/layout/Header';
-import { Footer } from './components/layout/Footer';
-import { CartDrawer } from './components/layout/CartDrawer';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PageLoader, ToastViewport } from './components/ui';
 import { useAuth } from './context/StoreProvider';
 
 // --- Storefront pages ------------------------------------------------------
-import HomePage from './pages/HomePage';
+const StorefrontLayout = lazy(() => import('./components/layout/StorefrontLayout'));
+const HomePage = lazy(() => import('./pages/HomePage'));
 const ShopPage = lazy(() => import('./pages/shop/ShopPage'));
 const ProductPage = lazy(() => import('./pages/shop/ProductPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
@@ -63,33 +61,6 @@ function ScrollToTop() {
   return null;
 }
 
-function StorefrontLayout() {
-  /*
-   * The header is fixed, so it no longer takes up room of its own. Every page
-   * leaves exactly its height clear -- published as --header-h by the header
-   * itself, which measures rather than guesses, since it is four rows on a
-   * laptop and one on a phone.
-   *
-   * The homepage is the exception: there the header floats on the opening
-   * photograph, which is the whole point of it.
-   */
-  const { pathname } = useLocation();
-  const overlaid = pathname === '/';
-
-  return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1" style={overlaid ? undefined : { paddingTop: 'var(--header-h)' }}>
-        <Suspense fallback={<PageLoader />}>
-          <Outlet />
-        </Suspense>
-      </main>
-      <Footer />
-      <CartDrawer />
-    </div>
-  );
-}
-
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
@@ -116,7 +87,13 @@ export default function App() {
       <ScrollToTop />
       <Routes>
         {/* ---------------- Storefront ---------------- */}
-        <Route element={<StorefrontLayout />}>
+        <Route
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <StorefrontLayout />
+            </Suspense>
+          }
+        >
           <Route index element={<HomePage />} />
           <Route path="shop" element={<ShopPage />} />
           <Route path="shop/:categorySlug" element={<ShopPage />} />

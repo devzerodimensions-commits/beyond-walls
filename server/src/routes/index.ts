@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAdmin } from '../middleware/auth';
+import { invalidatePublicCache } from '../lib/publicCache';
 
 import authRoutes from './public/auth.routes';
 import catalogRoutes from './public/catalog.routes';
@@ -28,6 +29,14 @@ router.use('/', orderRoutes); // /orders, /checkout/*, /payments/*
 // --- Admin API (every route below requires an ADMIN token) -----------------
 const admin = Router();
 admin.use(requireAdmin);
+admin.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.once('finish', () => {
+      if (res.statusCode < 400) invalidatePublicCache();
+    });
+  }
+  next();
+});
 admin.use('/products', adminProductRoutes);
 admin.use('/builder', adminBuilderRoutes);
 admin.use('/', adminContentRoutes);

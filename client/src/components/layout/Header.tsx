@@ -104,18 +104,21 @@ export function Header() {
   const categoriesQuery = useQuery({
     queryKey: ['nav-categories'],
     queryFn: () => api.get<Category[]>('/catalog/categories'),
+    enabled: menuOpen || mobileOpen,
     staleTime: 10 * 60 * 1000,
   });
 
   const filtersQuery = useQuery({
     queryKey: ['catalog-filters', undefined],
     queryFn: () => api.get<CatalogFilters>('/catalog/filters'),
+    enabled: menuOpen || mobileOpen,
     staleTime: 10 * 60 * 1000,
   });
 
   const galleryQuery = useQuery({
     queryKey: ['gallery'],
     queryFn: () => api.get<GalleryItem[]>('/gallery'),
+    enabled: menuOpen,
     staleTime: 10 * 60 * 1000,
   });
 

@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react';
+import { useEffect, useId, useMemo } from 'react';
 import clsx from 'clsx';
 import type { PersonalizationField } from '../../lib/types';
 import { assetUrl } from '../../lib/api';
@@ -85,6 +85,21 @@ export const PLATE_FONTS: PlateFont[] = [
 const FONT_STACKS: Record<string, string> = Object.fromEntries(
   PLATE_FONTS.map((font) => [font.id, font.stack]),
 );
+
+const PLATE_FONT_STYLESHEET_ID = 'bw-plate-fonts';
+const PLATE_FONT_STYLESHEET =
+  'https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Great+Vibes&display=swap';
+
+function usePlateFonts() {
+  useEffect(() => {
+    if (document.getElementById(PLATE_FONT_STYLESHEET_ID)) return;
+    const link = document.createElement('link');
+    link.id = PLATE_FONT_STYLESHEET_ID;
+    link.rel = 'stylesheet';
+    link.href = PLATE_FONT_STYLESHEET;
+    document.head.appendChild(link);
+  }, []);
+}
 
 /** The stack for a chosen font, falling back to the default rather than nothing. */
 export function fontStack(id: string | undefined | null): string {
@@ -254,6 +269,7 @@ interface LivePreviewProps {
 }
 
 export function LivePreview({ template, slots, className, placeholders, config, hideLabel }: LivePreviewProps) {
+  usePlateFonts();
   // Namespaces this instance's SVG defs so two previews on one page cannot
   // steal each other's filters and gradients.
   const uid = useId().replace(/:/g, '');

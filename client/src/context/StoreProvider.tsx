@@ -3,6 +3,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { api, ApiError, clearCartSession, tokenStore } from '../lib/api';
 import type { Cart, SiteSettings, User } from '../lib/types';
 import {
@@ -61,6 +62,28 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const CACHED_USER_KEY = 'bw.cachedUser';
+
+function readCachedUser(): User | null {
+  if (!tokenStore.hasSession) return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CACHED_USER_KEY) ?? 'null') as User | null;
+    if (!parsed?.id || !parsed.email || !['ADMIN', 'CUSTOMER'].includes(parsed.role)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedUser(user: User | null) {
+  try {
+    if (user) localStorage.setItem(CACHED_USER_KEY, JSON.stringify(user));
+    else localStorage.removeItem(CACHED_USER_KEY);
+  } catch {
+    // Storage can be disabled. Authentication still works for this tab.
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Cart
 // ---------------------------------------------------------------------------
@@ -112,6 +135,8 @@ const WishlistContext = createContext<WishlistContextValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const { pathname } = useLocation();
+  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
   const [toasts, dispatchToast] = useReducer(toastReducer, []);
 
   const push = useCallback((message: string, tone: Toast['tone'] = 'info', action?: Toast['action']) => {
@@ -154,8 +179,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [brandColor]);
 
   // --- Auth ----------------------------------------------------------------
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => readCachedUser());
+  const [authLoading, setAuthLoading] = useState(() => !readCachedUser() && Boolean(tokenStore.access || tokenStore.hasSession));
 
   const refreshUser = useCallback(async () => {
     /*
@@ -173,9 +198,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       const me = await api.get<User>('/auth/me');
       setUser(me);
+      writeCachedUser(me);
     } catch {
       tokenStore.clear();
       setUser(null);
+      writeCachedUser(null);
     } finally {
       setAuthLoading(false);
     }
@@ -193,6 +220,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
       tokenStore.set(result.accessToken);
       setUser(result.user);
+      writeCachedUser(result.user);
       // The guest cart merges into the account cart on the next fetch.
       await queryClient.invalidateQueries({ queryKey: ['cart'] });
       await queryClient.invalidateQueries({ queryKey: ['wishlist'] });
@@ -206,6 +234,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const result = await api.post<{ user: User; accessToken: string }>('/auth/register', input);
       tokenStore.set(result.accessToken);
       setUser(result.user);
+      writeCachedUser(result.user);
       await queryClient.invalidateQueries({ queryKey: ['cart'] });
       return result.user;
     },
@@ -215,6 +244,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     tokenStore.clear();
     setUser(null);
+    writeCachedUser(null);
     clearCartSession();
     // The server clears the HttpOnly cookie and revokes the stored token.
     await api.post('/auth/logout').catch(() => undefined);
@@ -224,6 +254,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(async (input: { name?: string; phone?: string | null }) => {
     const updated = await api.patch<User>('/auth/me', input);
     setUser(updated);
+    writeCachedUser(updated);
     return updated;
   }, []);
 
@@ -248,6 +279,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const cartQuery = useQuery({
     queryKey: ['cart', user?.id ?? 'guest'],
     queryFn: () => api.get<Cart>('/cart'),
+    enabled: !isAdminPath,
     staleTime: 15 * 1000,
   });
 
@@ -387,7 +419,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Cards and headers only need IDs. The account wishlist keeps using the
     // full endpoint because it renders product details.
     queryFn: () => api.get<{ productId: string }[]>('/wishlist', { idsOnly: 1 }),
-    enabled: Boolean(user),
+    enabled: Boolean(user && user.role !== 'ADMIN' && !isAdminPath),
     staleTime: 60 * 1000,
   });
 

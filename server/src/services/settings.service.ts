@@ -193,13 +193,39 @@ const PRIVATE_KEYS = new Set<string>(['payment.razorpayKeySecret']);
 
 export type SettingsMap = Record<string, unknown>;
 
+const SETTINGS_TTL_MS = 60_000;
+let settingsCache: { value: SettingsMap; expiresAt: number } | null = null;
+let settingsInFlight: Promise<SettingsMap> | null = null;
+let settingsGeneration = 0;
+
+function clearSettingsCache() {
+  settingsGeneration += 1;
+  settingsCache = null;
+  settingsInFlight = null;
+}
+
 /** Reads all settings, merged over the registry defaults. */
 export async function getAllSettings(): Promise<SettingsMap> {
-  const rows = await prisma.setting.findMany();
-  const map: SettingsMap = {};
-  for (const def of SETTING_DEFINITIONS) map[def.key] = def.value;
-  for (const row of rows) map[row.key] = row.value;
-  return map;
+  if (settingsCache && settingsCache.expiresAt > Date.now()) return settingsCache.value;
+  if (settingsInFlight) return settingsInFlight;
+
+  const startedInGeneration = settingsGeneration;
+  const request = prisma.setting.findMany()
+    .then((rows) => {
+      const map: SettingsMap = {};
+      for (const def of SETTING_DEFINITIONS) map[def.key] = def.value;
+      for (const row of rows) map[row.key] = row.value;
+      if (settingsGeneration === startedInGeneration) {
+        settingsCache = { value: map, expiresAt: Date.now() + SETTINGS_TTL_MS };
+      }
+      return map;
+    })
+    .finally(() => {
+      if (settingsInFlight === request) settingsInFlight = null;
+    });
+
+  settingsInFlight = request;
+  return request;
 }
 
 /** Settings safe to send to the browser. */
@@ -216,10 +242,10 @@ export async function getPublicSettings(): Promise<SettingsMap> {
 }
 
 export async function getSetting<T = unknown>(key: string, fallback?: T): Promise<T> {
-  const row = await prisma.setting.findUnique({ where: { key } });
-  if (row && row.value !== null) return row.value as T;
-  const def = SETTING_DEFINITIONS.find((d) => d.key === key);
-  if (def) return def.value as T;
+  const settings = await getAllSettings();
+  if (Object.prototype.hasOwnProperty.call(settings, key) && settings[key] !== null) {
+    return settings[key] as T;
+  }
   return fallback as T;
 }
 
@@ -235,6 +261,7 @@ export async function setSetting(key: string, value: unknown): Promise<void> {
     },
     update: { value: value as never },
   });
+  clearSettingsCache();
 }
 
 export async function setSettings(values: SettingsMap): Promise<void> {

@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../utils/http';
 import { getSetting } from '../../services/settings.service';
+import { cachedPublic } from '../../lib/publicCache';
 
 const router = Router();
 
@@ -87,7 +88,7 @@ function splitCsv(value: unknown): string[] {
 router.get(
   '/categories',
   asyncHandler(async (_req, res) => {
-    const categories = await prisma.category.findMany({
+    const categories = await cachedPublic('catalog:categories', () => prisma.category.findMany({
       where: { ...PUBLISHED, parentId: null },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: {
@@ -98,7 +99,8 @@ router.get(
         },
         _count: { select: { products: true } },
       },
-    });
+    }));
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
     res.json({ success: true, data: categories });
   }),
 );
@@ -132,76 +134,74 @@ router.get(
   '/filters',
   asyncHandler(async (req, res) => {
     const categorySlug = String(req.query.category ?? '').trim();
-
-    // Restrict attribute values to those actually present in the category.
-    let productScope: Prisma.ProductWhereInput = PUBLISHED;
-    if (categorySlug) {
-      const category = await prisma.category.findUnique({
-        where: { slug: categorySlug },
-        select: { id: true, children: { select: { id: true } } },
-      });
-      if (category) {
-        const ids = [category.id, ...category.children.map((c) => c.id)];
-        productScope = {
-          ...PUBLISHED,
-          OR: [{ categoryId: { in: ids } }, { subcategoryId: { in: ids } }],
-        };
+    const data = await cachedPublic(`catalog:filters:${categorySlug || 'all'}`, async () => {
+      // Restrict attribute values to those actually present in the category.
+      let productScope: Prisma.ProductWhereInput = PUBLISHED;
+      if (categorySlug) {
+        const category = await prisma.category.findUnique({
+          where: { slug: categorySlug },
+          select: { id: true, children: { select: { id: true } } },
+        });
+        if (category) {
+          const ids = [category.id, ...category.children.map((c) => c.id)];
+          productScope = {
+            ...PUBLISHED,
+            OR: [{ categoryId: { in: ids } }, { subcategoryId: { in: ids } }],
+          };
+        }
       }
-    }
 
-    const groups = await prisma.attributeGroup.findMany({
-      where: { ...PUBLISHED, showInFilter: true },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      include: {
-        values: {
-          where: PUBLISHED,
+      // These four queries are independent. Running them together avoids four
+      // consecutive Render-to-Neon network round trips on the shop page.
+      const [groups, scopedCounts, priceRange, bands] = await Promise.all([
+        prisma.attributeGroup.findMany({
+          where: { ...PUBLISHED, showInFilter: true },
           orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
           include: {
-            _count: { select: { products: true } },
+            values: {
+              where: PUBLISHED,
+              orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+              include: { _count: { select: { products: true } } },
+            },
           },
-        },
-      },
-    });
+        }),
+        prisma.productAttribute.groupBy({
+          by: ['valueId'],
+          where: { product: productScope },
+          _count: { valueId: true },
+        }),
+        prisma.product.aggregate({
+          where: { ...productScope, price: { not: null } },
+          _min: { price: true },
+          _max: { price: true },
+        }),
+        budgetBands(),
+      ]);
 
-    // Count only products matching the current scope.
-    const scopedCounts = await prisma.productAttribute.groupBy({
-      by: ['valueId'],
-      where: { product: productScope },
-      _count: { valueId: true },
-    });
-    const countMap = new Map(scopedCounts.map((c) => [c.valueId, c._count.valueId]));
+      const countMap = new Map(scopedCounts.map((c) => [c.valueId, c._count.valueId]));
+      const filters = groups
+        .map((group) => ({
+          id: group.id,
+          name: group.name,
+          slug: group.slug,
+          kind: group.kind,
+          multiSelect: group.multiSelect,
+          helpText: group.helpText,
+          values: group.values
+            .map((v) => ({
+              id: v.id,
+              name: v.name,
+              slug: v.slug,
+              hexColor: v.hexColor,
+              count: countMap.get(v.id) ?? 0,
+            }))
+            .filter((v) => (categorySlug ? v.count > 0 : true)),
+        }))
+        .filter((g) => g.values.length > 0);
 
-    const filters = groups
-      .map((group) => ({
-        id: group.id,
-        name: group.name,
-        slug: group.slug,
-        kind: group.kind,
-        multiSelect: group.multiSelect,
-        helpText: group.helpText,
-        values: group.values
-          .map((v) => ({
-            id: v.id,
-            name: v.name,
-            slug: v.slug,
-            hexColor: v.hexColor,
-            count: countMap.get(v.id) ?? 0,
-          }))
-          .filter((v) => (categorySlug ? v.count > 0 : true)),
-      }))
-      .filter((g) => g.values.length > 0);
-
-    const priceRange = await prisma.product.aggregate({
-      where: { ...productScope, price: { not: null } },
-      _min: { price: true },
-      _max: { price: true },
-    });
-
-    res.json({
-      success: true,
-      data: {
+      return {
         attributes: filters,
-        budgetBands: await budgetBands(),
+        budgetBands: bands,
         priceRange: {
           min: priceRange._min.price ? Number(priceRange._min.price) : 0,
           max: priceRange._max.price ? Number(priceRange._max.price) : 0,
@@ -213,8 +213,11 @@ router.get(
           { value: 'price-desc', label: 'Price: high to low' },
           { value: 'name-asc', label: 'Name: A–Z' },
         ],
-      },
+      };
     });
+
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
+    res.json({ success: true, data });
   }),
 );
 

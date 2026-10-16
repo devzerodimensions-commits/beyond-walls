@@ -8,6 +8,7 @@ import { getPageWithSections } from '../../services/pageSection.service';
 import { sendEnquiryAcknowledgement, sendEnquiryNotification } from '../../services/email.service';
 import { getSetting } from '../../services/settings.service';
 import { env } from '../../config/env';
+import { cachedPublic } from '../../lib/publicCache';
 
 const router = Router();
 const PUBLISHED = { status: 'PUBLISHED' as const };
@@ -16,22 +17,25 @@ const PUBLISHED = { status: 'PUBLISHED' as const };
 router.get(
   '/settings',
   asyncHandler(async (_req, res) => {
-    const [settings, navLinks] = await Promise.all([
-      getPublicSettings(),
-      prisma.navLink.findMany({
-        where: PUBLISHED,
-        orderBy: [{ group: 'asc' }, { sortOrder: 'asc' }],
-        select: { id: true, label: true, href: true, group: true, openInNewTab: true },
-      }),
-    ]);
-
-    const footerPages = await prisma.page.findMany({
-      where: { ...PUBLISHED, showInFooter: true },
-      orderBy: { sortOrder: 'asc' },
-      select: { slug: true, title: true },
+    const data = await cachedPublic('settings', async () => {
+      const [settings, navLinks, footerPages] = await Promise.all([
+        getPublicSettings(),
+        prisma.navLink.findMany({
+          where: PUBLISHED,
+          orderBy: [{ group: 'asc' }, { sortOrder: 'asc' }],
+          select: { id: true, label: true, href: true, group: true, openInNewTab: true },
+        }),
+        prisma.page.findMany({
+          where: { ...PUBLISHED, showInFooter: true },
+          orderBy: { sortOrder: 'asc' },
+          select: { slug: true, title: true },
+        }),
+      ]);
+      return { settings, navLinks, footerPages };
     });
 
-    res.json({ success: true, data: { settings, navLinks, footerPages } });
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
+    res.json({ success: true, data });
   }),
 );
 
@@ -44,7 +48,8 @@ router.get(
 router.get(
   '/home',
   asyncHandler(async (_req, res) => {
-    const page = await getPageWithSections('home');
+    const page = await cachedPublic('page:home', () => getPageWithSections('home'));
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
     res.json({ success: true, data: page?.sections ?? [] });
   }),
 );
@@ -58,8 +63,10 @@ router.get(
 router.get(
   '/pages/:slug/sections',
   asyncHandler(async (req, res) => {
-    const page = await getPageWithSections(req.params.slug);
+    const slug = req.params.slug;
+    const page = await cachedPublic(`page:${slug}`, () => getPageWithSections(slug));
     if (!page) throw ApiError.notFound('Page not found');
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
     res.json({ success: true, data: page });
   }),
 );
@@ -105,10 +112,11 @@ router.get(
   '/gallery',
   asyncHandler(async (req, res) => {
     const tag = String(req.query.tag ?? '').trim();
-    const items = await prisma.galleryItem.findMany({
+    const items = await cachedPublic(`gallery:${tag}`, () => prisma.galleryItem.findMany({
       where: { ...PUBLISHED, ...(tag ? { tag } : {}) },
       orderBy: { sortOrder: 'asc' },
-    });
+    }));
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
     res.json({ success: true, data: items });
   }),
 );

@@ -21,6 +21,43 @@ function extractToken(req: Request): string | null {
   return cookieToken ?? null;
 }
 
+interface AdminAccessCheck {
+  valid?: boolean;
+  expiresAt: number;
+  inFlight?: Promise<boolean>;
+}
+
+const ADMIN_ACCESS_TTL_MS = 15_000;
+const adminAccessChecks = new Map<string, AdminAccessCheck>();
+
+/**
+ * Admin pages issue several API requests together. Collapse their identical
+ * account checks and retain the answer briefly instead of adding one Neon
+ * round trip to every request. The access JWT itself lasts longer than this;
+ * the short cache only preserves the extra disabled/demoted-account check.
+ */
+async function hasActiveAdminAccess(userId: string): Promise<boolean> {
+  const now = Date.now();
+  const existing = adminAccessChecks.get(userId);
+  if (existing?.valid !== undefined && existing.expiresAt > now) return existing.valid;
+  if (existing?.inFlight) return existing.inFlight;
+
+  const inFlight = prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, isActive: true },
+  }).then((user) => {
+    const valid = Boolean(user?.isActive && user.role === 'ADMIN');
+    adminAccessChecks.set(userId, { valid, expiresAt: Date.now() + ADMIN_ACCESS_TTL_MS });
+    return valid;
+  }).catch((error) => {
+    adminAccessChecks.delete(userId);
+    throw error;
+  });
+
+  adminAccessChecks.set(userId, { expiresAt: 0, inFlight });
+  return inFlight;
+}
+
 /** Attaches req.user when a valid token is present; never rejects. */
 export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   const token = extractToken(req);
@@ -47,7 +84,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   }
 }
 
-/** Requires an authenticated ADMIN, re-checked against the database. */
+/** Requires an authenticated ADMIN, periodically re-checked against the database. */
 export async function requireAdmin(req: Request, _res: Response, next: NextFunction) {
   const token = extractToken(req);
   if (!token) return next(ApiError.unauthorized());
@@ -55,12 +92,9 @@ export async function requireAdmin(req: Request, _res: Response, next: NextFunct
     const payload = verifyAccessToken(token);
     if (payload.role !== 'ADMIN') return next(ApiError.forbidden('Admin access required'));
 
-    // Re-verify against the DB so a demoted/disabled admin loses access immediately.
-    const user = await prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, role: true, isActive: true },
-    });
-    if (!user || !user.isActive || user.role !== 'ADMIN') {
+    // Re-verify against the DB so a demoted/disabled admin loses access within
+    // the short cache window rather than for the lifetime of the access token.
+    if (!(await hasActiveAdminAccess(payload.sub))) {
       return next(ApiError.forbidden('Admin access required'));
     }
 

@@ -226,8 +226,20 @@ export function createApp() {
         '      Run "npm run build" in the client workspace, or set CLIENT_DIST.',
       );
     }
-    app.use(express.static(clientDist, { index: false, maxAge: '7d' }));
+    app.use(express.static(clientDist, {
+      index: false,
+      maxAge: '7d',
+      setHeaders(res, filePath) {
+        // Vite filenames contain a content hash. They can be cached forever:
+        // a changed file receives a different URL on the next deployment.
+        if (/\-[A-Za-z0-9_-]{8,}\.(?:js|css)$/i.test(path.basename(filePath))) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      },
+    }));
     app.get(/^\/(?!api|uploads).*/, (_req, res, next) => {
+      // The HTML points at the latest hashed assets and must be revalidated.
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(clientDist, 'index.html'), (err) => {
         if (err) next();
       });
