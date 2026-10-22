@@ -67,8 +67,18 @@ test.beforeAll(async () => {
  */
 async function restock() {
   const products = await adminFetch('/admin/products?perPage=100');
-  for (const product of products.data ?? []) {
-    for (const variant of product.variants ?? []) {
+
+  for (const summary of products.data ?? []) {
+    /*
+     * The list stopped carrying variants when it was slimmed down for speed,
+     * and this went on reading product.variants -- which was then always
+     * empty, so it quietly restocked nothing. Stock drained to zero over the
+     * following runs and every checkout test started failing on "out of
+     * stock", which reads like a bug in the cart and is a bug in this fixture.
+     * The detail endpoint still carries them.
+     */
+    const product = (await adminFetch(`/admin/products/${summary.id}`)).data;
+    for (const variant of product?.variants ?? []) {
       if ((variant.stock ?? 0) >= 10) continue;
       await adminFetch(`/admin/products/${product.id}/variants/${variant.id}`, {
         method: 'PATCH',
@@ -108,6 +118,10 @@ test('a customer can register, apply a coupon and pay cash on delivery', async (
    */
   await page.goto('/product/no-smoking-sign');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+  // Every published personalisation field is part of the production brief now,
+  // so even a stock sign has to be answered before it can enter the cart.
+  await fillPersonalisation(page, 'E2E Customer');
 
   // Options are buttons in a radiogroup, not native radios.
   const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
@@ -267,6 +281,7 @@ test('checkout does not ask for a GSTIN the studio cannot invoice against', asyn
    * verify.mjs, where it keeps working whether the section is shown or not.
    */
   await page.goto('/product/no-smoking-sign');
+  await fillPersonalisation(page, 'GST Tester');
   const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
   if (await options.count()) await options.first().click();
   await page.getByRole('button', { name: /^add to cart$/i }).first().click();

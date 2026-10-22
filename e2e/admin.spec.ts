@@ -151,9 +151,33 @@ test('customers and administrators are managed together under Users', async ({ p
   await expect(page).toHaveURL(/\/admin\/users$/);
 
   await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
-  await expect(page.getByText(ADMIN_EMAIL, { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Filter by role')).toBeVisible();
+
+  const roleFilter = page.getByLabel('Filter by role');
+  await expect(roleFilter).toBeVisible();
   await expect(page.getByRole('link', { name: 'Add user' }).first()).toBeVisible();
+
+  /*
+   * Narrowed to administrators before looking for one.
+   *
+   * This used to read the unfiltered first page, which held the admin only
+   * while the shop was new: the suite registers a customer every time it buys
+   * something and never removes them, so after a few hundred runs the list
+   * opens on hundreds of e2e.* accounts, newest first, and the one account
+   * that ships with the shop is pages away. Filtering says what the test
+   * means -- an administrator is in the same list as the customers -- and
+   * exercises the filter while it is here.
+   */
+  await roleFilter.selectOption('ADMIN');
+  // Scoped to the table: the signed-in administrator is also named in the
+  // shell around it, and that is not what this is asking about.
+  // Scoped to the page body: the signed-in administrator is also named in the
+  // shell around it, and that is not what this is asking about. Not scoped to a
+  // table, because at phone width the list is cards.
+  // Asserted on the content of the page rather than one node of it. The list
+  // ships a table and a set of cards, one hidden at each width, so the email is
+  // in the document more than once and picking a single node picks the hidden
+  // one half the time.
+  await expect(page.locator('main')).toContainText(ADMIN_EMAIL);
 
   await page.goto('/admin/users/new');
   await expect(page.getByRole('heading', { name: 'Add user', exact: true })).toBeVisible();

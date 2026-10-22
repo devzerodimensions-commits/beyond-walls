@@ -228,6 +228,9 @@ test.describe('Storefront', () => {
 
     // And on a page with no opening photograph, nothing hides underneath.
     await page.goto('/contact');
+    // goto resolves on load, which is before React has put anything in the
+    // document. Measuring then reads a page that does not exist yet.
+    await expect(page.locator('main').locator(':scope > *').first()).toBeVisible();
     const gap = await page.evaluate(() => {
       const h = document.querySelector('header')!;
       const first = document.querySelector('main')!.firstElementChild!;

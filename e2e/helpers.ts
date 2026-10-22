@@ -18,11 +18,44 @@ export const isMobile = (page: Page) => page.viewportSize()!.width < 768;
  * sheet, so that the price and the buy button fit on the first screen.
  */
 export async function fillPersonalisation(page: Page, name: string) {
+  /*
+   * Wait for the purchase panel before deciding which layout we are in.
+   *
+   * On a phone the form is behind a sheet, and the button that opens it
+   * arrives with the panel. Asking whether it is visible the instant after
+   * goto answers "no" — not because this is a laptop, but because nothing has
+   * rendered yet — and the fill then goes looking in the laptop's inline form,
+   * which is hidden at that width. Add to cart is what the panel is for, so it
+   * is the thing to wait for.
+   */
+  await page
+    .getByRole('button', { name: /^add to cart$/i })
+    .first()
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .catch(() => undefined);
+
   const sheetTrigger = page.getByRole('button', { name: /personalise/i }).first();
   const opensInSheet = await sheetTrigger.isVisible().catch(() => false);
   if (opensInSheet) await sheetTrigger.click();
 
   const scope = opensInSheet ? page.getByRole('dialog') : page.locator('#personalise');
+
+  /*
+   * Wait for the form before looking for it.
+   *
+   * page.goto resolves on load, which is before React has rendered the
+   * product. A caller that filled immediately after goto found no controls
+   * here and this returned having filled nothing — silently, so it surfaced
+   * much later as an add-to-cart that appeared to do nothing, with every
+   * field red. Products that genuinely have no personalisation still fall
+   * through, a few seconds later.
+   */
+  await scope
+    .locator('input, textarea, select')
+    .first()
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .catch(() => undefined);
+
   const field = scope.getByLabel('Name', { exact: true });
   const hasNameField = Boolean(await field.count());
   const controls = scope.locator('input[required], textarea[required], select[required]');
