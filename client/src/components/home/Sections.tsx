@@ -1062,16 +1062,33 @@ export function GuidedFinder({ section }: { section: HomeSection }) {
             to={route.href!}
             className="group/route flex flex-col border border-stone-line bg-paper transition-colors duration-300 hover:border-ink"
           >
-            {route.image ? (
-              <div className="aspect-[4/3] overflow-hidden bg-paper-warm">
+            {/*
+              The picture area is always here, with or without a picture.
+
+              It used to be dropped entirely when a category had no image, so a
+              row of four cards came out as two with a photograph on top and two
+              that started straight into text — different shapes side by side,
+              which reads as broken rather than as a card without a picture.
+              Two of the four categories have no image set to this day.
+
+              Without one the name stands in, on a tinted panel. Every card
+              keeps the same shape, and each becomes a photograph on its own the
+              moment somebody sets that category's image.
+            */}
+            <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-paper-warm">
+              {route.image ? (
                 <img
                   src={assetUrl(route.image)}
                   alt=""
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-700 ease-architect group-hover/route:scale-[1.05]"
                 />
-              </div>
-            ) : null}
+              ) : (
+                <span className="px-4 text-center text-sm leading-snug text-ink-400 transition-colors duration-300 group-hover/route:text-ink">
+                  {route.title}
+                </span>
+              )}
+            </div>
 
             <div className="flex flex-1 flex-col p-5">
               <p className="text-base font-medium leading-snug text-ink">{route.title}</p>
