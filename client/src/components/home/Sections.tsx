@@ -445,23 +445,30 @@ export function GallerySection({ section }: { section: HomeSection }) {
         ctaLink={section.ctaLink ?? '/gallery'}
       />
 
-      {/* CSS columns give a true masonry flow without a layout library. */}
-      <div className="columns-2 gap-3 lg:columns-4 lg:gap-4 [&>*]:mb-3 lg:[&>*]:mb-4">
-        {items.map((item, index) => (
+      {/*
+        One height for every tile.
+
+        This was a masonry flow, alternating three aspect ratios down a set of
+        CSS columns. That reads well when there are enough photographs to fill
+        several rows and the staggering becomes a rhythm. With the four the
+        studio has it is a single row of mismatched heights ending on a ragged
+        edge, which looks like a mistake rather than a layout.
+
+        A photograph fills its tile rather than being letterboxed, so a portrait
+        and a landscape shot sit side by side without either being squashed.
+      */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+        {items.map((item) => (
           <Link
             key={item.id}
             to="/gallery"
-            className="group relative block break-inside-avoid overflow-hidden bg-paper-warm"
+            className="group relative block overflow-hidden bg-paper-warm"
           >
             <img
               src={assetUrl(item.image)}
               alt={item.title ?? ''}
               loading="lazy"
-              className={clsx(
-                'w-full object-cover transition-transform duration-700 ease-architect group-hover:scale-105',
-                // Alternating heights create the masonry rhythm.
-                index % 3 === 0 ? 'aspect-[4/5]' : index % 3 === 1 ? 'aspect-square' : 'aspect-[4/3]',
-              )}
+              className="aspect-[4/5] w-full object-cover transition-transform duration-700 ease-architect group-hover:scale-105"
             />
             {/* Says there is a video behind the still; it plays on the gallery page. */}
             {resolveVideo(item.videoUrl) ? (
@@ -544,46 +551,88 @@ export function FaqSection({ section }: { section: HomeSection }) {
   if (!items?.length) return null;
 
   return (
-    <section className="container-site py-14 lg:py-18">
-      <div className="grid gap-8 lg:grid-cols-12 lg:gap-14">
+    <section className="bg-paper-warm py-14 lg:py-18">
+      <div className="container-site grid gap-10 lg:grid-cols-12 lg:gap-14">
+        {/*
+          The column on the left stays put while the questions scroll past it.
+          Somebody who reads to the fourth answer and still has not found what
+          they came for should not have to scroll back up to find out how to
+          ask — which is what the single underlined link at the top used to
+          require.
+        */}
         <div className="lg:col-span-4">
-          <h2 className="text-2xl sm:text-[1.75rem]">{section.title}</h2>
-          {section.subtitle ? (
-            <p className="mt-3 text-sm text-ink-500">{section.subtitle}</p>
-          ) : null}
-          <Link
-            to="/contact"
-            className="link-underline mt-5 inline-block text-2xs uppercase tracking-architect"
-          >
-            Still have a question? →
-          </Link>
+          <div className="lg:sticky" style={{ top: 'calc(var(--header-h, 76px) + 2rem)' }}>
+            <p className="eyebrow text-ink-400">Before you order</p>
+            <h2 className="mt-3 text-2xl leading-tight sm:text-[1.75rem]">{section.title}</h2>
+            {section.subtitle ? (
+              <p className="mt-3 text-sm leading-relaxed text-ink-500">{section.subtitle}</p>
+            ) : null}
+
+            <div className="mt-7 border border-stone-line bg-paper p-5">
+              <p className="text-sm font-medium text-ink">Not answered here?</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
+                Tell us what you are making and we will come back to you.
+              </p>
+              <Link
+                to="/contact"
+                className="mt-4 inline-flex items-center gap-1.5 text-2xs uppercase tracking-architect text-ink"
+              >
+                Ask the studio
+                <ArrowRight size={13} />
+              </Link>
+            </div>
+          </div>
         </div>
 
         <div className="lg:col-span-8">
-          <div className="border-t border-stone-line">
-            {items.map((faq) => (
-              <div key={faq.id} className="border-b border-stone-line">
+          {items.map((faq, index) => {
+            const isOpen = open === faq.id;
+            return (
+              <div
+                key={faq.id}
+                className={clsx(
+                  'border-b transition-colors duration-300',
+                  isOpen ? 'border-ink' : 'border-stone-line',
+                )}
+              >
                 <button
                   type="button"
-                  onClick={() => setOpen(open === faq.id ? null : faq.id)}
-                  aria-expanded={open === faq.id}
-                  className="flex w-full items-center justify-between gap-4 py-4.5 text-left"
+                  onClick={() => setOpen(isOpen ? null : faq.id)}
+                  aria-expanded={isOpen}
+                  aria-controls={`faq-${faq.id}`}
+                  className="flex w-full items-start gap-4 py-5 text-left"
                 >
-                  <span className="py-0.5 text-sm font-medium">{faq.question}</span>
-                  <ChevronDown
-                    size={15}
+                  {/* Numbered, so a long list reads as a sequence with an end. */}
+                  <span
                     className={clsx(
-                      'shrink-0 text-ink-400 transition-transform duration-300',
-                      open === faq.id && 'rotate-180',
+                      'mt-0.5 shrink-0 text-2xs font-semibold tabular-nums transition-colors duration-300',
+                      isOpen ? 'text-ink' : 'text-ink-300',
+                    )}
+                  >
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span className="flex-1 text-[0.95rem] font-medium leading-snug text-ink">
+                    {faq.question}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={clsx(
+                      'mt-0.5 shrink-0 transition-transform duration-300',
+                      isOpen ? 'rotate-180 text-ink' : 'text-ink-400',
                     )}
                   />
                 </button>
-                {open === faq.id ? (
-                  <p className="-mt-1 pb-5 pr-8 text-sm leading-relaxed text-ink-500">{faq.answer}</p>
+
+                {isOpen ? (
+                  <div id={`faq-${faq.id}`} className="pb-6 pl-9 pr-8">
+                    <p className="border-l border-stone-line pl-5 text-sm leading-relaxed text-ink-500">
+                      {faq.answer}
+                    </p>
+                  </div>
                 ) : null}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -1046,6 +1095,21 @@ export function GuidedFinder({ section }: { section: HomeSection }) {
   );
   if (!routes.length) return null;
 
+  /*
+   * Pictures for all of them, or for none.
+   *
+   * Two of the four categories have no image set, and a row that mixes the two
+   * cannot be made to look deliberate: with the picture area dropped the cards
+   * are different shapes, and with it kept the ones without a photograph are a
+   * large empty panel. Either way it reads as unfinished, because it is.
+   *
+   * So the row commits. Every route has a picture and they are shown; one does
+   * not and the whole row is set as type instead, which is a composition
+   * rather than an apology. It turns into the photographic version by itself
+   * the day the last category gets an image, with nothing to change here.
+   */
+  const everyRouteHasAPicture = routes.every((r) => Boolean(r.image));
+
   return (
     <section className="container-site py-14 lg:py-18">
       <SectionHeading
@@ -1060,35 +1124,31 @@ export function GuidedFinder({ section }: { section: HomeSection }) {
           <Link
             key={`${route.href}-${index}`}
             to={route.href!}
-            className="group/route flex flex-col border border-stone-line bg-paper transition-colors duration-300 hover:border-ink"
+            className={clsx(
+              'group/route flex flex-col border bg-paper transition-colors duration-300',
+              everyRouteHasAPicture
+                ? 'border-stone-line hover:border-ink'
+                : 'border-stone-line hover:border-ink hover:bg-paper-warm',
+            )}
           >
-            {/*
-              The picture area is always here, with or without a picture.
-
-              It used to be dropped entirely when a category had no image, so a
-              row of four cards came out as two with a photograph on top and two
-              that started straight into text — different shapes side by side,
-              which reads as broken rather than as a card without a picture.
-              Two of the four categories have no image set to this day.
-
-              Without one the name stands in, on a tinted panel. Every card
-              keeps the same shape, and each becomes a photograph on its own the
-              moment somebody sets that category's image.
-            */}
-            <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-paper-warm">
-              {route.image ? (
+            {everyRouteHasAPicture ? (
+              <div className="aspect-[4/3] overflow-hidden bg-paper-warm">
                 <img
                   src={assetUrl(route.image)}
                   alt=""
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-700 ease-architect group-hover/route:scale-[1.05]"
                 />
-              ) : (
-                <span className="px-4 text-center text-sm leading-snug text-ink-400 transition-colors duration-300 group-hover/route:text-ink">
-                  {route.title}
+              </div>
+            ) : (
+              /* A rule and a number, so the four read as a set to choose from. */
+              <div className="flex items-center gap-3 border-b border-stone-line px-5 pb-3 pt-5">
+                <span className="text-2xs font-semibold tabular-nums text-ink-300">
+                  {String(index + 1).padStart(2, '0')}
                 </span>
-              )}
-            </div>
+                <span className="h-px flex-1 bg-stone-line transition-colors duration-300 group-hover/route:bg-ink" />
+              </div>
+            )}
 
             <div className="flex flex-1 flex-col p-5">
               <p className="text-base font-medium leading-snug text-ink">{route.title}</p>
