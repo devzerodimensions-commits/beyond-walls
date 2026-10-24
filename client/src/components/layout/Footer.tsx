@@ -117,63 +117,81 @@ export function Footer() {
 
   return (
     <footer className="mt-24 border-t border-stone-line bg-paper">
-      <div className="container-site py-12 lg:py-18">
-        <div className="grid gap-x-8 gap-y-2 md:grid-cols-2 md:gap-y-10 lg:grid-cols-12">
-          {/* Brand */}
-          <div className="pb-8 md:pb-0 lg:col-span-3">
+      {/*
+        ---- The band across the top ----
+
+        The footer used to open with the logo and a paragraph in a narrow
+        column, which left a tall empty space beside it: the other columns are
+        lists and lists are long. Putting the studio's line across the full
+        width at a size worth reading turns that emptiness into the thing the
+        eye lands on, and gives the one action worth offering down here a place
+        to sit — somebody who has read to the bottom of a page without buying
+        is exactly who should be asked whether they want something made.
+      */}
+      <div className="border-b border-stone-line">
+        <div className="container-site flex flex-col gap-7 py-12 lg:flex-row lg:items-end lg:justify-between lg:gap-12 lg:py-14">
+          <div className="max-w-2xl">
             <Logo />
             {about ? (
-              <p className="mt-5 max-w-sm text-sm leading-relaxed text-ink-500">{about}</p>
-            ) : null}
-
-            {socials.length ? (
-              <div className="mt-6 flex flex-wrap gap-4">
-                {socials.map((social) => (
-                  <a
-                    key={social.key}
-                    href={social.url as string}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="link-underline text-2xs uppercase tracking-architect text-ink-500"
-                  >
-                    {social.label}
-                  </a>
-                ))}
-              </div>
-            ) : null}
-
-            {/*
-              The phone number and the address, on a phone, without a tap.
-
-              Below this width the columns fold, which puts the studio's number
-              behind "Visit the studio" — and a number somebody has to go
-              looking for is the one thing a footer should never hide from
-              somebody holding a telephone. Shown here, and only here: on a
-              laptop the column beside this one already has them open.
-            */}
-            {phone || email ? (
-              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 lg:hidden">
-                {phone ? (
-                  <a
-                    href={`tel:${phone.replace(/\s/g, '')}`}
-                    className="inline-flex items-center gap-2 text-sm text-ink"
-                  >
-                    <PhoneIcon size={15} className="shrink-0 text-ink-300" />
-                    {phone}
-                  </a>
-                ) : null}
-                {email ? (
-                  <a
-                    href={`mailto:${email}`}
-                    className="inline-flex items-center gap-2 text-sm text-ink"
-                  >
-                    <MailIcon size={15} className="shrink-0 text-ink-300" />
-                    {email}
-                  </a>
-                ) : null}
-              </div>
+              <p className="mt-6 text-xl leading-snug text-ink sm:text-2xl">{about}</p>
             ) : null}
           </div>
+
+          <Link
+            to="/custom-order"
+            className="group/cta inline-flex shrink-0 items-center justify-between gap-6 border border-ink px-6 py-4 transition-colors duration-300 hover:bg-ink lg:min-w-[280px]"
+          >
+            <span className="text-left">
+              <span className="block text-2xs uppercase tracking-architect text-ink-400 transition-colors duration-300 group-hover/cta:text-paper/60">
+                Something of your own
+              </span>
+              <span className="mt-1 block text-sm font-medium text-ink transition-colors duration-300 group-hover/cta:text-paper">
+                Start a custom order
+              </span>
+            </span>
+            <span
+              aria-hidden="true"
+              className="text-ink transition-all duration-300 group-hover/cta:translate-x-1 group-hover/cta:text-paper"
+            >
+              →
+            </span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="container-site py-12 lg:py-14">
+        <div className="grid gap-x-8 gap-y-2 md:grid-cols-2 md:gap-y-10 lg:grid-cols-12">
+          {/*
+            The number and the email, on a phone, without a tap.
+
+            Below this width the columns fold, which puts the studio's number
+            behind "Visit the studio" — and a number somebody has to go looking
+            for is the one thing a footer should never hide from somebody
+            holding a telephone. Shown here and only here: on a laptop the
+            column at the end of the row already has them open.
+          */}
+          {phone || email ? (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pb-7 md:col-span-2 lg:hidden">
+              {phone ? (
+                <a
+                  href={`tel:${phone.replace(/\s/g, '')}`}
+                  className="inline-flex items-center gap-2 text-sm text-ink"
+                >
+                  <PhoneIcon size={15} className="shrink-0 text-ink-300" />
+                  {phone}
+                </a>
+              ) : null}
+              {email ? (
+                <a
+                  href={`mailto:${email}`}
+                  className="inline-flex items-center gap-2 text-sm text-ink"
+                >
+                  <MailIcon size={15} className="shrink-0 text-ink-300" />
+                  {email}
+                </a>
+              ) : null}
+            </div>
+          ) : null}
 
           {/*
             Collections, which the footer never carried. The foot of a page is
@@ -181,7 +199,7 @@ export function Footer() {
             thing to offer there is the way back into the shop.
           */}
           {collections.length ? (
-            <FooterColumn title="Shop" className="lg:col-span-2">
+            <FooterColumn title="Shop" className="lg:col-span-3">
               <ul className="space-y-2.5">
                 {collections.map((category) => (
                   <li key={category.id}>
@@ -203,7 +221,7 @@ export function Footer() {
           ) : null}
 
           {footerLinks.length ? (
-            <FooterColumn title="Studio" className="lg:col-span-2">
+            <FooterColumn title="Studio" className="lg:col-span-3">
               <ul className="space-y-2.5">
                 {footerLinks.map((link) => (
                   <li key={link.id}>
@@ -219,7 +237,7 @@ export function Footer() {
             </FooterColumn>
           ) : null}
 
-          <FooterColumn title="Information" className="lg:col-span-2">
+          <FooterColumn title="Information" className="lg:col-span-3">
             <ul className="space-y-2.5">
               {informationPages.map((page) => (
                 <li key={page.slug}>
@@ -300,11 +318,39 @@ export function Footer() {
         </div>
       </div>
 
+      {/*
+        The bottom bar carries the social links now.
+
+        They used to sit under the brand paragraph, where nothing else was, so
+        on a site that has not filled them in yet — this one — the column was a
+        logo, a sentence and a hole. Down here their absence costs nothing: the
+        bar simply has the copyright at one end and the payment line at the
+        other, which is what it had anyway.
+      */}
       <div className="border-t border-stone-line">
-        <div className="container-site flex flex-col items-center justify-between gap-3 py-5 sm:flex-row">
-          <p className="text-2xs text-ink-400">{copyright}</p>
+        <div className="container-site flex flex-col items-center gap-4 py-5 sm:flex-row sm:justify-between">
+          <p className="order-3 text-2xs text-ink-400 sm:order-1">{copyright}</p>
+
+          {socials.length ? (
+            <div className="order-1 flex flex-wrap items-center justify-center gap-5 sm:order-2">
+              {socials.map((social) => (
+                <a
+                  key={social.key}
+                  href={social.url as string}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-2xs uppercase tracking-architect text-ink-400 transition-colors hover:text-ink"
+                >
+                  {social.label}
+                </a>
+              ))}
+            </div>
+          ) : null}
+
           {/* Only names payment methods that are actually live. */}
-          {methodsLine ? <p className="text-2xs text-ink-300">{methodsLine}</p> : null}
+          {methodsLine ? (
+            <p className="order-2 text-2xs text-ink-300 sm:order-3">{methodsLine}</p>
+          ) : null}
         </div>
       </div>
     </footer>
