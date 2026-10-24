@@ -92,6 +92,21 @@ export function Footer() {
     .filter((l) => l.group === 'footer')
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
+  /*
+   * The two lists overlap.
+   *
+   * "Studio" comes from the nav links an admin arranges; "Information" from
+   * the published content pages. Contact exists in both, so the footer listed
+   * it twice, one column apart — which reads as a mistake and makes a reader
+   * wonder whether the two go to different places.
+   *
+   * The nav links win, because somebody chose their order deliberately. A page
+   * already linked from there is dropped from this column rather than the
+   * other way round.
+   */
+  const linkedHrefs = new Set(footerLinks.map((l) => l.href));
+  const informationPages = footerPages.filter((p) => !linkedHrefs.has(`/${p.slug}`));
+
   const collections = (categories ?? [])
     .filter((c) => c.status === 'PUBLISHED')
     .slice(0, 6);
@@ -105,7 +120,7 @@ export function Footer() {
       <div className="container-site py-12 lg:py-18">
         <div className="grid gap-x-8 gap-y-2 md:grid-cols-2 md:gap-y-10 lg:grid-cols-12">
           {/* Brand */}
-          <div className="pb-8 md:pb-0 lg:col-span-4">
+          <div className="pb-8 md:pb-0 lg:col-span-3">
             <Logo />
             {about ? (
               <p className="mt-5 max-w-sm text-sm leading-relaxed text-ink-500">{about}</p>
@@ -124,6 +139,38 @@ export function Footer() {
                     {social.label}
                   </a>
                 ))}
+              </div>
+            ) : null}
+
+            {/*
+              The phone number and the address, on a phone, without a tap.
+
+              Below this width the columns fold, which puts the studio's number
+              behind "Visit the studio" — and a number somebody has to go
+              looking for is the one thing a footer should never hide from
+              somebody holding a telephone. Shown here, and only here: on a
+              laptop the column beside this one already has them open.
+            */}
+            {phone || email ? (
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 lg:hidden">
+                {phone ? (
+                  <a
+                    href={`tel:${phone.replace(/\s/g, '')}`}
+                    className="inline-flex items-center gap-2 text-sm text-ink"
+                  >
+                    <PhoneIcon size={15} className="shrink-0 text-ink-300" />
+                    {phone}
+                  </a>
+                ) : null}
+                {email ? (
+                  <a
+                    href={`mailto:${email}`}
+                    className="inline-flex items-center gap-2 text-sm text-ink"
+                  >
+                    <MailIcon size={15} className="shrink-0 text-ink-300" />
+                    {email}
+                  </a>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -174,7 +221,7 @@ export function Footer() {
 
           <FooterColumn title="Information" className="lg:col-span-2">
             <ul className="space-y-2.5">
-              {footerPages.map((page) => (
+              {informationPages.map((page) => (
                 <li key={page.slug}>
                   <Link
                     to={`/${page.slug}`}
@@ -203,7 +250,7 @@ export function Footer() {
           </FooterColumn>
 
           {/* Visit */}
-          <FooterColumn title="Visit the studio" className="lg:col-span-2">
+          <FooterColumn title="Visit the studio" className="lg:col-span-3">
             <address className="space-y-3 not-italic">
               {addressLines.length ? (
                 <div className="flex gap-2.5 text-sm text-ink-500">
