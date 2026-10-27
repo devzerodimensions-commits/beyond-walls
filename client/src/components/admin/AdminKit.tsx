@@ -238,7 +238,7 @@ export function AdminSearch({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="field pl-9"
+        className={clsx('field field-icon', value && 'field-clearable')}
         aria-label={placeholder}
       />
       {value ? (

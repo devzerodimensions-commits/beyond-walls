@@ -332,6 +332,12 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
 }
 
+/* A field with an icon drawn inside it on the left (search boxes). The
+   padding above outweighs Tailwind's pl-* utilities, so the room for the
+   icon has to be made here or the text runs underneath it. */
+.admin-ui .field.field-icon { padding-left: 2.25rem; }
+.admin-ui .field.field-clearable { padding-right: 2.25rem; }
+
 .admin-ui .field::placeholder { color: var(--a-faint); }
 
 .admin-ui .field:focus {

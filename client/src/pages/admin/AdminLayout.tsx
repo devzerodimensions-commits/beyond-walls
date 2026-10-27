@@ -369,7 +369,7 @@ function MenuSearch({ query, setQuery }: { query: string; setQuery: (v: string) 
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Jump to…"
         aria-label="Search the admin menu"
-        className="field w-56 py-1.5 pl-9 pr-3 text-sm"
+        className="field field-icon w-56 py-1.5 pr-3 text-sm"
         style={{ background: 'var(--a-sunken)' }}
       />
     </div>
