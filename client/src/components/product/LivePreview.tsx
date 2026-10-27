@@ -214,7 +214,20 @@ const BASE_CONFIG: PreviewConfig = {
 
 /** The shipped templates, expressed as configuration. */
 export const PREVIEW_PRESETS: Record<string, Partial<PreviewConfig>> = {
-  'nameplate-minimal': {},
+  /*
+   * The empty plate shows a number as well as a name.
+   *
+   * With only "YOUR NAME" on it, the preview filled the whole plate with one
+   * line and never showed what the plate is actually for. The studio asked for
+   * the two-line arrangement to be what you see before typing, so the shape of
+   * the thing is obvious the moment the page loads.
+   *
+   * Both strings are placeholders in the strict sense: drawn, never submitted,
+   * and replaced by the first character typed into either field.
+   */
+  'nameplate-minimal': {
+    placeholders: { number: 'A 01', line1: 'YOUR NAME' },
+  },
   'nameplate-classic': {
     plate: { inset: 30, radius: 4, showScrews: false, borderOnLight: true },
     placeholders: { line1: 'Your Name' },
