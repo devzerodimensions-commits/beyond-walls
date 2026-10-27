@@ -8,7 +8,7 @@ const router = Router();
 const PUBLISHED = { status: 'PUBLISHED' as const };
 
 async function siteUrl(): Promise<string> {
-  const url = await getSetting<string>('seo.siteUrl', 'https://beyondwall.in');
+  const url = await getSetting<string>('seo.siteUrl', 'https://thebeyondwalls.com');
   return String(url).replace(/\/+$/, '');
 }
 

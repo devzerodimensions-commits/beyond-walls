@@ -37,7 +37,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   // --- Contact ---------------------------------------------------------------
   { key: 'contact.phone', group: 'contact', label: 'Phone', value: '+91 7600738785' },
   { key: 'contact.whatsapp', group: 'contact', label: 'WhatsApp number', value: '+91 7600738785' },
-  { key: 'contact.email', group: 'contact', label: 'Email', value: 'info@beyondwall.in' },
+  { key: 'contact.email', group: 'contact', label: 'Email', value: 'info@thebeyondwalls.com' },
   {
     key: 'contact.addressLines',
     group: 'contact',
@@ -149,16 +149,16 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'seo.siteUrl',
     group: 'seo',
     label: 'Canonical site URL',
-    // Inferred from the business email address, NOT confirmed by the client.
-    // Every canonical tag, sitemap entry and share link is built from this, so
-    // it must be checked before launch — see seo.domainConfirmed.
-    value: 'https://beyondwall.in',
+    // Every canonical tag, sitemap entry and share link is built from this.
+    // This is the domain the site is actually served on, confirmed rather than
+    // inferred — see seo.domainConfirmed below.
+    value: 'https://thebeyondwalls.com',
   },
   {
     key: 'seo.domainConfirmed',
     group: 'seo',
     label: 'Canonical site URL confirmed',
-    value: false,
+    value: true,
   },
   { key: 'seo.googleSiteVerification', group: 'seo', label: 'Google site verification token', value: '' },
   { key: 'seo.robots', group: 'seo', label: 'Robots directive', value: 'index, follow' },

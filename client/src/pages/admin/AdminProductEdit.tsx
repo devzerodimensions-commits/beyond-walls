@@ -771,7 +771,7 @@ export default function AdminProductEdit() {
                 {form.seoTitle || form.name || 'Product name'} | Beyond Walls
               </p>
               <p className="mt-0.5 truncate font-mono text-2xs text-[#006621]">
-                beyondwall.in/product/{form.slug || 'slug'}
+                thebeyondwalls.com/product/{form.slug || 'slug'}
               </p>
               <p className="mt-1 line-clamp-2 text-2xs leading-relaxed text-[#4D5156]">
                 {form.seoDescription || form.shortDescription || 'Add a description so search results read well.'}

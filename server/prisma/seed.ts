@@ -1011,7 +1011,7 @@ async function seedPages() {
         'Monday to Saturday, 10 AM to 8 PM.\n\n' +
         '## Get in touch\n\n' +
         'Phone: +91 7600738785\n' +
-        'Email: info@beyondwall.in\n',
+        'Email: info@thebeyondwalls.com\n',
     },
     { slug: 'shipping-policy', title: 'Shipping Policy', status: DRAFT, showInFooter: true, sortOrder: 2, content: POLICY_PLACEHOLDER },
     { slug: 'returns-and-refunds', title: 'Returns & Refunds', status: DRAFT, showInFooter: true, sortOrder: 3, content: POLICY_PLACEHOLDER },
@@ -1049,7 +1049,7 @@ async function seedFaqs() {
     },
     {
       question: 'How do I get in touch?',
-      answer: 'Call us on +91 7600738785 or email info@beyondwall.in.',
+      answer: 'Call us on +91 7600738785 or email info@thebeyondwalls.com.',
       group: 'General',
       status: PUBLISHED,
     },
