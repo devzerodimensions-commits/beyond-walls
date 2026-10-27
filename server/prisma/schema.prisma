@@ -66,6 +66,9 @@ enum OrderStatus {
   IN_PRODUCTION
   READY_TO_SHIP
   SHIPPED
+  /// With the rider, on the day. The courier reports it, the studio sets it,
+  /// and the customer is told -- it is the update people actually wait for.
+  OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
   REFUNDED

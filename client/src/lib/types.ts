@@ -6,7 +6,7 @@ export type PersonalizationType =
 
 export type OrderStatus =
   | 'PENDING' | 'CONFIRMED' | 'IN_PRODUCTION' | 'READY_TO_SHIP'
-  | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'REFUNDED';
+  | 'SHIPPED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'REFUNDED';
 
 export type PaymentStatus =
   | 'PENDING' | 'AUTHORIZED' | 'PAID' | 'FAILED'

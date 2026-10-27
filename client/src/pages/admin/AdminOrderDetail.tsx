@@ -13,7 +13,7 @@ import {
 
 const ORDER_STATUSES: OrderStatus[] = [
   'PENDING', 'CONFIRMED', 'IN_PRODUCTION', 'READY_TO_SHIP',
-  'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED',
+  'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'REFUNDED',
 ];
 
 function whatsappNumber(phone: string): string {

@@ -38,6 +38,17 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'contact.phone', group: 'contact', label: 'Phone', value: '+91 7600738785' },
   { key: 'contact.whatsapp', group: 'contact', label: 'WhatsApp number', value: '+91 7600738785' },
   { key: 'contact.email', group: 'contact', label: 'Email', value: 'info@thebeyondwalls.com' },
+  /*
+   * A second address, shown beneath the first wherever the site lists the
+   * studio's contact details. The studio keeps two mailboxes and wanted both
+   * reachable from the site.
+   *
+   * Deliberately unlabelled on the page. Calling one "sales" and the other
+   * "support" would be inventing a promise about who answers what, and
+   * nobody has made that promise. Two addresses, both real, in the order the
+   * studio put them. Blank hides it entirely.
+   */
+  { key: 'contact.emailSecondary', group: 'contact', label: 'Second email', value: 'socials@thebeyondwalls.com' },
   {
     key: 'contact.addressLines',
     group: 'contact',

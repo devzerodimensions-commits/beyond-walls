@@ -201,6 +201,7 @@ export function statusMeta(status: string): { label: string; tone: 'neutral' | '
     IN_PRODUCTION: { label: 'In production', tone: 'info' },
     READY_TO_SHIP: { label: 'Ready to ship', tone: 'info' },
     SHIPPED: { label: 'Shipped', tone: 'info' },
+    OUT_FOR_DELIVERY: { label: 'Out for delivery', tone: 'info' },
     DELIVERED: { label: 'Delivered', tone: 'success' },
     CANCELLED: { label: 'Cancelled', tone: 'danger' },
     REFUNDED: { label: 'Refunded', tone: 'neutral' },

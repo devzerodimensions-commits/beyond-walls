@@ -32,7 +32,10 @@ export default function ContactPage() {
 
   const phone = get<string>('contact.phone', '');
   const whatsapp = get<string>('contact.whatsapp', '');
-  const email = get<string>('contact.email', '');
+  const emails = [
+    get<string>('contact.email', ''),
+    get<string>('contact.emailSecondary', ''),
+  ].filter(Boolean);
   const addressLines = get<string[]>('contact.addressLines', []);
   const mapUrl = get<string | null>('contact.mapEmbedUrl', null);
   const hours = get<BusinessHour[]>('hours.schedule', []);
@@ -68,7 +71,7 @@ export default function ContactPage() {
         title={cmsPage?.seoTitle || cmsPage?.title || 'Contact'}
         description={
           cmsPage?.seoDescription ||
-          `Visit Beyond Walls at ${addressLines.join(', ')}. Call ${phone} or email ${email}.`
+          `Visit Beyond Walls at ${addressLines.join(', ')}. Call ${phone} or email ${emails[0] ?? ''}.`
         }
         image={cmsPage?.ogImage || cmsPage?.heroImage}
         canonical="/contact"
@@ -121,11 +124,15 @@ export default function ContactPage() {
               ) : null}
             </ContactBlock>
 
-            <ContactBlock icon={<MailIcon size={17} />} title="Email">
-              <a href={`mailto:${email}`} className="link-underline">
-                {email}
-              </a>
-            </ContactBlock>
+            {emails.length ? (
+              <ContactBlock icon={<MailIcon size={17} />} title="Email">
+                {emails.map((address) => (
+                  <a key={address} href={`mailto:${address}`} className="link-underline block">
+                    {address}
+                  </a>
+                ))}
+              </ContactBlock>
+            ) : null}
 
             {hoursRows.length ? (
               <ContactBlock

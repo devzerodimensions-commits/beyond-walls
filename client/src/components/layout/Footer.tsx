@@ -78,7 +78,10 @@ export function Footer() {
   });
 
   const phone = get<string>('contact.phone', '');
-  const email = get<string>('contact.email', '');
+  const emails = [
+    get<string>('contact.email', ''),
+    get<string>('contact.emailSecondary', ''),
+  ].filter(Boolean);
   const addressLines = get<string[]>('contact.addressLines', []);
   const hours = get<BusinessHour[]>('hours.schedule', []);
   const hoursSummary = summariseHours(hours);
@@ -206,7 +209,7 @@ export function Footer() {
             holding a telephone. Shown here and only here: on a laptop the
             column at the end of the row already has them open.
           */}
-          {phone || email ? (
+          {phone || emails.length ? (
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pb-7 md:col-span-2 lg:hidden">
               {phone ? (
                 <a
@@ -217,14 +220,17 @@ export function Footer() {
                   {phone}
                 </a>
               ) : null}
-              {email ? (
-                <a
-                  href={`mailto:${email}`}
-                  className="inline-flex items-center gap-2 text-sm text-paper/80"
-                >
-                  <MailIcon size={15} className="shrink-0 text-paper/40" />
-                  {email}
-                </a>
+              {emails.length ? (
+                <span className="inline-flex items-start gap-2 text-sm text-paper/80">
+                  <MailIcon size={15} className="mt-[3px] shrink-0 text-paper/40" />
+                  <span className="flex flex-col gap-1">
+                    {emails.map((address) => (
+                      <a key={address} href={`mailto:${address}`}>
+                        {address}
+                      </a>
+                    ))}
+                  </span>
+                </span>
               ) : null}
             </div>
           ) : null}
@@ -316,12 +322,20 @@ export function Footer() {
                 </div>
               ) : null}
 
-              {email ? (
-                <div className="flex items-center gap-2.5 text-sm">
-                  <MailIcon size={15} className="shrink-0 text-paper/40" />
-                  <a href={`mailto:${email}`} className="link-underline text-paper/60">
-                    {email}
-                  </a>
+              {emails.length ? (
+                <div className="flex gap-2.5 text-sm">
+                  <MailIcon size={15} className="mt-0.5 shrink-0 text-paper/40" />
+                  <span className="flex flex-col gap-1">
+                    {emails.map((address) => (
+                      <a
+                        key={address}
+                        href={`mailto:${address}`}
+                        className="link-underline text-paper/60"
+                      >
+                        {address}
+                      </a>
+                    ))}
+                  </span>
                 </div>
               ) : null}
 

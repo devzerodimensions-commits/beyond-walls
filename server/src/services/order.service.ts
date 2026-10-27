@@ -293,5 +293,6 @@ export const ORDER_STATUS_FLOW = [
   'IN_PRODUCTION',
   'READY_TO_SHIP',
   'SHIPPED',
+  'OUT_FOR_DELIVERY',
   'DELIVERED',
 ] as const;

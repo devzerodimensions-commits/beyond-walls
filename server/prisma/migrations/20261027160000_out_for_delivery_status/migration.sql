@@ -1,0 +1,12 @@
+-- "Out for delivery", between SHIPPED and DELIVERED.
+--
+-- The studio asked for the customer to be told on the morning the parcel is
+-- with the rider. That is the update people actually wait for, and there was
+-- no status that meant it: an order sat on "Shipped" from the day it left the
+-- workshop until the day it arrived.
+--
+-- Added on its own, in its own migration, and never used in the same
+-- transaction that creates it -- PostgreSQL refuses to read a new enum label
+-- inside the transaction that added it, so anything that writes this value
+-- has to come later. IF NOT EXISTS makes a re-run a no-op.
+ALTER TYPE "OrderStatus" ADD VALUE IF NOT EXISTS 'OUT_FOR_DELIVERY' AFTER 'SHIPPED';

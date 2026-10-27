@@ -10,7 +10,7 @@ import { Badge, Button, Input, Pagination, Select } from '../../components/ui';
 
 const ORDER_STATUSES = [
   'PENDING', 'CONFIRMED', 'IN_PRODUCTION', 'READY_TO_SHIP',
-  'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED',
+  'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'REFUNDED',
 ];
 
 const PAYMENT_STATUSES = [

@@ -130,25 +130,65 @@ const btn = (href: string, label: string) =>
 
 const money = (n: number | string) => `₹${Number(n).toLocaleString('en-IN')}`;
 
-interface OrderForEmail {
-  orderNumber: string;
-  customerName: string;
-  customerEmail: string;
-  total: number | string;
-  paymentMethod: string;
-  paymentStatus: string;
-  items: {
-    productName: string;
-    variantLabel: string | null;
-    quantity: number;
-    lineTotal: number | string;
-    personalization?: { label: string; value: string; displayValue?: string }[];
-  }[];
-  shippingAddress: Record<string, unknown>;
+/*
+ * Readable names for the two status enums.
+ *
+ * The storefront has its own copy in client/src/lib/format.ts, which an email
+ * cannot import — a message has to carry its own words. Anything missing falls
+ * through to the raw enum rather than printing nothing, so a status added later
+ * still reads as something.
+ */
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Pending',
+  CONFIRMED: 'Confirmed',
+  IN_PRODUCTION: 'In production',
+  READY_TO_SHIP: 'Ready to ship',
+  SHIPPED: 'Shipped',
+  OUT_FOR_DELIVERY: 'Out for delivery',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
+  REFUNDED: 'Refunded',
+};
+
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Pending',
+  AUTHORISED: 'Authorised',
+  AUTHORIZED: 'Authorised',
+  PAID: 'Paid',
+  FAILED: 'Failed',
+  REFUNDED: 'Refunded',
+  PARTIALLY_REFUNDED: 'Partly refunded',
+  CANCELLED: 'Cancelled',
+};
+
+const statusLabel = (status: string) => ORDER_STATUS_LABEL[status] ?? status;
+const paymentLabel = (status: string) => PAYMENT_STATUS_LABEL[status] ?? status;
+const methodLabel = (method: string) => (method === 'COD' ? 'Cash on delivery' : 'Online payment');
+
+/** One label/value line. The value is inserted as-is, so escape it first. */
+const metaRow = (label: string, value: string) =>
+  `<tr>
+     <td style="padding:10px 0;border-bottom:1px solid #EDEAE4;font-size:12px;color:#6B6B6B;">${escapeHtml(label)}</td>
+     <td style="padding:10px 0;border-bottom:1px solid #EDEAE4;text-align:right;font-size:13px;color:#111111;">${value}</td>
+   </tr>`;
+
+interface OrderItemForEmail {
+  productName: string;
+  variantLabel: string | null;
+  quantity: number;
+  lineTotal: number | string;
+  personalization?: { label: string; value: string; displayValue?: string }[];
 }
 
-export async function sendOrderConfirmation(order: OrderForEmail, siteUrl: string): Promise<void> {
-  const rows = order.items
+/**
+ * The ordered lines, with whatever the customer personalised shown underneath.
+ *
+ * Shared by the customer's confirmation and the studio's alert, because the
+ * two must never disagree about what was bought — the studio makes the piece
+ * from this list and the customer checks their copy against it.
+ */
+function itemRows(items: OrderItemForEmail[]): string {
+  return items
     .map((item) => {
       const custom = (item.personalization ?? [])
         .filter((p) => p.value)
@@ -165,7 +205,24 @@ export async function sendOrderConfirmation(order: OrderForEmail, siteUrl: strin
       </tr>`;
     })
     .join('');
+}
 
+interface OrderForEmail {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string | null;
+  status?: string;
+  total: number | string;
+  paymentMethod: string;
+  paymentStatus: string;
+  items: OrderItemForEmail[];
+  shippingAddress: Record<string, unknown>;
+}
+
+export async function sendOrderConfirmation(order: OrderForEmail, siteUrl: string): Promise<void> {
+  const rows = itemRows(order.items);
   const address = order.shippingAddress as Record<string, string>;
 
   const body = `
@@ -177,6 +234,11 @@ export async function sendOrderConfirmation(order: OrderForEmail, siteUrl: strin
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}
       <tr><td style="padding:14px 0;font-size:15px;font-weight:600;">Total</td>
           <td style="padding:14px 0;text-align:right;font-size:15px;font-weight:600;">${money(order.total)}</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:26px 0 0;">
+      ${metaRow('Order number', escapeHtml(order.orderNumber))}
+      ${metaRow('Payment', `${escapeHtml(methodLabel(order.paymentMethod))} · ${escapeHtml(paymentLabel(order.paymentStatus))}`)}
+      ${order.status ? metaRow('Order status', escapeHtml(statusLabel(order.status))) : ''}
     </table>
     <div style="margin:28px 0;">${btn(`${siteUrl}/order/${order.orderNumber}?email=${encodeURIComponent(order.customerEmail)}`, 'View your order')}</div>
     <p style="margin:0;font-size:12px;color:#6B6B6B;line-height:1.8;">
@@ -193,6 +255,60 @@ export async function sendOrderConfirmation(order: OrderForEmail, siteUrl: strin
   });
 }
 
+/**
+ * Tells the studio that a sale has happened.
+ *
+ * Until now a new order was visible only to somebody who thought to open the
+ * admin panel and look, so an order placed on a Saturday evening could sit
+ * unnoticed until Monday. This arrives the moment the order is paid for or
+ * placed on delivery, and carries everything needed to start making the piece
+ * without opening anything: what was bought, what was personalised, where it
+ * goes, and how it was paid for.
+ *
+ * Reply-To is the customer, so answering the alert reaches the person who
+ * ordered rather than the studio's own inbox.
+ *
+ * Fire-and-forget like every other send here. The studio not hearing about an
+ * order is a nuisance; a checkout failing because a mail server is down is a
+ * lost sale, and the second must never be the price of the first.
+ */
+export async function sendNewOrderAlert(
+  order: OrderForEmail,
+  adminEmail: string,
+  siteUrl: string,
+): Promise<void> {
+  const address = order.shippingAddress as Record<string, string>;
+
+  const body = `
+    <h1 style="margin:0 0 6px;font-size:20px;font-weight:500;">New order ${escapeHtml(order.orderNumber)}</h1>
+    <p style="margin:0 0 22px;font-size:14px;color:#4A4A4A;">
+      ${money(order.total)} · ${escapeHtml(methodLabel(order.paymentMethod))} · ${escapeHtml(paymentLabel(order.paymentStatus))}
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${itemRows(order.items)}
+      <tr><td style="padding:14px 0;font-size:15px;font-weight:600;">Total</td>
+          <td style="padding:14px 0;text-align:right;font-size:15px;font-weight:600;">${money(order.total)}</td></tr>
+    </table>
+    <div style="margin:26px 0;">${btn(`${siteUrl}/admin/orders/${order.id}`, 'Open in admin')}</div>
+    <p style="margin:0 0 18px;font-size:12px;color:#6B6B6B;line-height:1.8;">
+      <strong style="color:#111;">Customer</strong><br>
+      ${escapeHtml(order.customerName)}<br>
+      ${escapeHtml(order.customerEmail)}${order.customerPhone ? `<br>${escapeHtml(order.customerPhone)}` : ''}
+    </p>
+    <p style="margin:0;font-size:12px;color:#6B6B6B;line-height:1.8;">
+      <strong style="color:#111;">Deliver to</strong><br>
+      ${escapeHtml(address.fullName ?? '')}<br>
+      ${escapeHtml(address.line1 ?? '')}${address.line2 ? `<br>${escapeHtml(address.line2)}` : ''}<br>
+      ${escapeHtml(address.city ?? '')}, ${escapeHtml(address.state ?? '')} ${escapeHtml(address.pincode ?? '')}
+    </p>`;
+
+  sendMailAsync({
+    to: adminEmail,
+    replyTo: order.customerEmail,
+    subject: `New order ${order.orderNumber} — ${money(order.total)}`,
+    html: await shell(`New order ${order.orderNumber}`, body),
+  });
+}
+
 export async function sendOrderStatusUpdate(
   order: { orderNumber: string; customerName: string; customerEmail: string; status: string; trackingNumber?: string | null; courierName?: string | null; trackingUrl?: string | null },
   siteUrl: string,
@@ -202,6 +318,7 @@ export async function sendOrderStatusUpdate(
     IN_PRODUCTION: 'is now in production',
     READY_TO_SHIP: 'is ready to ship',
     SHIPPED: 'has shipped',
+    OUT_FOR_DELIVERY: 'is out for delivery',
     DELIVERED: 'has been delivered',
     CANCELLED: 'has been cancelled',
     REFUNDED: 'has been refunded',
@@ -209,8 +326,11 @@ export async function sendOrderStatusUpdate(
   const phrase = readable[order.status];
   if (!phrase) return; // nothing worth emailing about
 
+  // Carried on both legs of the journey: once when it leaves the studio, and
+  // again on the morning it is out with the rider, when it is the detail the
+  // customer most wants in front of them.
   const tracking =
-    order.status === 'SHIPPED' && order.trackingNumber
+    (order.status === 'SHIPPED' || order.status === 'OUT_FOR_DELIVERY') && order.trackingNumber
       ? `<p style="margin:0 0 24px;font-size:14px;color:#4A4A4A;">
            ${order.courierName ? `${escapeHtml(order.courierName)} · ` : ''}<strong>${escapeHtml(order.trackingNumber)}</strong>
            ${order.trackingUrl ? `<br><a href="${escapeHtml(order.trackingUrl)}" style="color:#111;">Track your shipment</a>` : ''}

@@ -5,7 +5,7 @@ import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../ut
 import { optionalAuth, requireAuth } from '../../middleware/auth';
 import { priceCart, resolveCart } from '../../services/cart.service';
 import { ORDER_INCLUDE, placeOrder, restoreStockForOrder, summariseOrder } from '../../services/order.service';
-import { boolSetting, getAllSettings, numberSetting } from '../../services/settings.service';
+import { boolSetting, getAllSettings, getSetting, numberSetting } from '../../services/settings.service';
 import { createRazorpayOrder, razorpayConfigured } from '../../services/razorpay.service';
 import {
   assertOrderAccess,
@@ -14,7 +14,28 @@ import {
   recordPaymentFailure,
 } from '../../services/payment.service';
 import { env } from '../../config/env';
-import { sendOrderConfirmation } from '../../services/email.service';
+import { sendNewOrderAlert, sendOrderConfirmation } from '../../services/email.service';
+
+/**
+ * Announces a new order to the customer and to the studio, together.
+ *
+ * Both calls live here rather than at each call site so the two can never
+ * drift apart: whenever a customer is told their order exists, the people who
+ * have to make it are told as well.
+ *
+ * The studio's address is the same one enquiries go to — a single setting the
+ * owner edits in the admin panel, with the env var as an override for a
+ * dedicated operations inbox.
+ */
+async function announceOrder(order: unknown): Promise<void> {
+  await sendOrderConfirmation(order as never, env.publicSiteUrl);
+
+  const adminEmail =
+    env.adminNotificationEmail || (await getSetting<string>('contact.email', ''));
+  if (adminEmail) {
+    await sendNewOrderAlert(order as never, adminEmail, env.publicSiteUrl);
+  }
+}
 
 const router = Router();
 router.use(optionalAuth);
@@ -178,7 +199,7 @@ router.post(
         data: { status: 'CONFIRMED', confirmedAt: new Date() },
         include: ORDER_INCLUDE,
       });
-      await sendOrderConfirmation(confirmed as never, env.publicSiteUrl);
+      await announceOrder(confirmed);
 
       return res.status(201).json({
         success: true,
@@ -287,7 +308,7 @@ router.post(
 
     // Only on the first successful confirmation, never on a repeat callback.
     if (order && !result.alreadyPaid) {
-      await sendOrderConfirmation(order as never, env.publicSiteUrl);
+      await announceOrder(order);
     }
 
     res.json({
