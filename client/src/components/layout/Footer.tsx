@@ -116,30 +116,41 @@ export function Footer() {
   );
 
   return (
-    <footer className="mt-24 border-t border-stone-line bg-paper">
+    <footer className="border-t border-stone-line bg-paper">
       {/*
         ---- The band across the top ----
 
-        The footer used to open with the logo and a paragraph in a narrow
-        column, which left a tall empty space beside it: the other columns are
-        lists and lists are long. Putting the studio's line across the full
-        width at a size worth reading turns that emptiness into the thing the
-        eye lands on, and gives the one action worth offering down here a place
-        to sit — somebody who has read to the bottom of a page without buying
-        is exactly who should be asked whether they want something made.
+        The studio's line, and the one action worth offering to somebody who
+        has read to the bottom of a page without buying.
+
+        It used to float: the footer was pushed down by a 96px margin, so on
+        the home page a pale stripe sat between the questions block and the
+        footer and belonged to neither. Inside, the line and the button were
+        thrown to opposite ends of a flex row, which at 1440px left 352px of
+        nothing between them -- a quarter of the screen. Together that read as
+        a section that had come loose, which is exactly what the studio said
+        about it.
+
+        Both are fixed by alignment rather than by decoration. The margin is
+        gone, so the border alone divides the page from the footer. The band
+        now uses the same twelve columns as the links below it, and the button
+        sits in columns 10-12 -- directly above "Visit the studio", the same
+        width, the same edges. The gap in the middle is still there, but it is
+        now a column gap that lines up with everything under it, which reads as
+        a grid instead of as a mistake.
       */}
       <div className="border-b border-stone-line">
-        <div className="container-site flex flex-col gap-7 py-12 lg:flex-row lg:items-end lg:justify-between lg:gap-12 lg:py-14">
-          <div className="max-w-2xl">
+        <div className="container-site grid gap-x-8 gap-y-8 py-10 lg:grid-cols-12 lg:py-12">
+          <div className="lg:col-span-6">
             <Logo />
             {about ? (
-              <p className="mt-6 text-xl leading-snug text-ink sm:text-2xl">{about}</p>
+              <p className="mt-5 max-w-xl text-lg leading-snug text-ink sm:text-xl">{about}</p>
             ) : null}
           </div>
 
           <Link
             to="/custom-order"
-            className="group/cta inline-flex shrink-0 items-center justify-between gap-6 border border-ink px-6 py-4 transition-colors duration-300 hover:bg-ink lg:min-w-[280px]"
+            className="group/cta flex items-center justify-between gap-6 border border-ink px-6 py-4 transition-colors duration-300 hover:bg-ink lg:col-span-3 lg:col-start-10 lg:self-end"
           >
             <span className="text-left">
               <span className="block text-2xs uppercase tracking-architect text-ink-400 transition-colors duration-300 group-hover/cta:text-paper/60">
