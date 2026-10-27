@@ -102,18 +102,91 @@ export function summariseHours(schedule: BusinessHour[]): { days: string; hours:
   }));
 }
 
+/**
+ * The studio's own clock.
+ *
+ * "Open now" has to mean open in Ahmedabad, not on the reader's wrist. This
+ * used to be read from the visitor's local time, which is right for most of
+ * the customers and wrong for anyone abroad -- an NRI ordering a plate for a
+ * family house at 11pm their time was told the studio was open.
+ */
+const STUDIO_TIME_ZONE = 'Asia/Kolkata';
+
+function studioClock(): { day: string; minutes: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: STUDIO_TIME_ZONE,
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  // hour12:false yields "24" at midnight in some engines.
+  const hour = Number(part('hour')) % 24;
+  return { day: part('weekday'), minutes: hour * 60 + Number(part('minute')) };
+}
+
+/** "09:30" → minutes past midnight. */
+function minutesOfDay(value: string | null): number | null {
+  if (!value) return null;
+  const [h, m] = value.split(':').map(Number);
+  if (!Number.isFinite(h)) return null;
+  return h * 60 + (Number.isFinite(m) ? m : 0);
+}
+
 /** Is the studio open right now, per the configured schedule? */
 export function isOpenNow(schedule: BusinessHour[]): boolean | null {
   if (!Array.isArray(schedule) || !schedule.length) return null;
-  const now = new Date();
-  const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
-  const today = schedule.find((s) => s.day === dayName);
-  if (!today || today.closed || !today.open || !today.close) return false;
+  const { day, minutes } = studioClock();
+  const today = schedule.find((s) => s.day === day);
+  if (!today || today.closed) return false;
 
-  const [oh, om] = today.open.split(':').map(Number);
-  const [ch, cm] = today.close.split(':').map(Number);
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  return minutes >= oh * 60 + (om || 0) && minutes < ch * 60 + (cm || 0);
+  const open = minutesOfDay(today.open);
+  const close = minutesOfDay(today.close);
+  if (open === null || close === null) return false;
+  return minutes >= open && minutes < close;
+}
+
+/**
+ * Open or closed, and the next thing that happens.
+ *
+ * The schedule is already kept in the admin for the contact page; this reads
+ * the same rows so the footer can say something true and current rather than
+ * something decorative. Returns null when no hours are configured, so the
+ * caller draws nothing rather than guessing.
+ */
+export function studioStatus(schedule: BusinessHour[]): { open: boolean; label: string } | null {
+  if (!Array.isArray(schedule) || !schedule.length) return null;
+
+  const { day, minutes } = studioClock();
+  const index = schedule.findIndex((s) => s.day === day);
+  if (index === -1) return null;
+
+  const today = schedule[index];
+  const openAt = minutesOfDay(today.open);
+  const closeAt = minutesOfDay(today.close);
+
+  if (!today.closed && openAt !== null && closeAt !== null && minutes >= openAt && minutes < closeAt) {
+    return { open: true, label: `Studio open now · until ${formatTime(today.close)}` };
+  }
+
+  /*
+   * Walk forward for the next day that opens, starting with today in case it
+   * has not opened yet. The schedule is stored one row per weekday in order,
+   * so stepping through it with a wrap is stepping through the week.
+   */
+  for (let step = 0; step < schedule.length; step += 1) {
+    const entry = schedule[(index + step) % schedule.length];
+    const entryOpen = minutesOfDay(entry.open);
+    if (entry.closed || entryOpen === null) continue;
+    if (step === 0 && minutes >= entryOpen) continue; // today's hours have been and gone
+
+    const when = step === 0 ? 'today' : step === 1 ? 'tomorrow' : entry.day;
+    return { open: false, label: `Studio closed · opens ${when} at ${formatTime(entry.open)}` };
+  }
+
+  return { open: false, label: 'Studio closed' };
 }
 
 export function pluralise(count: number, singular: string, plural?: string): string {

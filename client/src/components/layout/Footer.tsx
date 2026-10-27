@@ -4,8 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../../lib/api';
 import { useSettings } from '../../context/StoreProvider';
-import { usePaymentConfig } from '../../hooks/usePaymentConfig';
-import { summariseHours } from '../../lib/format';
+import { studioStatus, summariseHours } from '../../lib/format';
 import type { BusinessHour, Category } from '../../lib/types';
 import { Logo } from './Header';
 import { ChevronDown, ClockIcon, MailIcon, PhoneIcon, PinIcon } from '../ui';
@@ -69,7 +68,6 @@ const linkClass = 'text-sm text-paper/60 transition-colors duration-200 hover:te
 
 export function Footer() {
   const { get, navLinks, footerPages } = useSettings();
-  const { methodsLine } = usePaymentConfig();
 
   // The same query the header runs, so this is served from cache rather than
   // costing the foot of every page a second request.
@@ -84,6 +82,7 @@ export function Footer() {
   const addressLines = get<string[]>('contact.addressLines', []);
   const hours = get<BusinessHour[]>('hours.schedule', []);
   const hoursSummary = summariseHours(hours);
+  const status = studioStatus(hours);
   const about = get<string>('footer.about', '');
   const copyright = get<string>('footer.copyright', '© {year} Beyond Walls.').replace(
     '{year}',
@@ -350,8 +349,31 @@ export function Footer() {
       <div className="border-t border-white/10 bg-ink-900">
         <div className="container-site flex flex-col items-center gap-3 py-5 sm:flex-row sm:justify-between">
           <p className="text-2xs text-paper/40">{copyright}</p>
-          {/* Only names payment methods that are actually live. */}
-          {methodsLine ? <p className="text-2xs text-paper/40">{methodsLine}</p> : null}
+
+          {/*
+            Not a payment badge.
+
+            This slot used to read "Cash on delivery" -- a checkout detail,
+            already said on the cart where it matters, and nothing anybody
+            needs at the foot of a gallery page. The opening hours are kept in
+            the admin for the contact page anyway, so the same rows can say
+            whether the studio is open right now: true, current, and worth a
+            glance to somebody deciding whether to ring.
+
+            On the studio's clock, not the reader's.
+          */}
+          {status ? (
+            <p className="inline-flex items-center gap-2 text-2xs text-paper/50">
+              <span
+                aria-hidden="true"
+                className={clsx(
+                  'h-1.5 w-1.5 shrink-0 rounded-full',
+                  status.open ? 'bg-[#6FBF8F]' : 'bg-paper/25',
+                )}
+              />
+              {status.label}
+            </p>
+          ) : null}
         </div>
       </div>
     </footer>
