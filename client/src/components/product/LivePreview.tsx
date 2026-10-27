@@ -359,21 +359,83 @@ interface TemplateProps {
   uid: string;
 }
 
-/** Matches the supplied product: number top-right, rule, name lines below. */
+/**
+ * Matches the supplied product: number top-right, rule, name lines below.
+ *
+ * The plate is cut to its contents rather than drawn at one fixed size.
+ *
+ * It used to be a 600x300 rectangle whatever was in it, so a name on its own
+ * sat in the lower half with the entire top half empty -- which does not read
+ * as a design choice, it reads as something that failed to load. Now the rows
+ * are laid out in order and measured as they go, and the plate is however tall
+ * that came to, with equal margins above and below. Add a line and it grows by
+ * exactly that line.
+ *
+ * Only the height moves. The width stays as the product's configuration asks,
+ * because a plate that changed shape sideways on every keystroke would be
+ * horrible to type into, and real plates come in fixed widths anyway.
+ */
 function NameplateMinimal({ slots, plate, text, font, config, isLight, uid }: TemplateProps) {
-  const hasNumber = Boolean(slots.number);
+  const number = (slots.number ?? '').toUpperCase();
   const name = (slots.line1 ?? '').toUpperCase();
   const family = (slots.line2 ?? '').toUpperCase();
+  const detail = (slots.line3 ?? '').toUpperCase();
 
-  // Shrink the name as it lengthens so it never overflows the plate.
-  const nameSize = name.length > 22 ? 22 : name.length > 16 ? 26 : 32;
-
-  const { width: vw, height: vh } = config.aspect;
+  const vw = config.aspect.width;
   const inset = config.plate.inset;
   const plateW = vw - inset * 2;
-  const plateH = vh - inset * 2;
   const right = vw - inset - 40;
-  const midY = vh / 2;
+  const ruleLeft = inset + 58;
+
+  /** Steps a size down as the text lengthens, so nothing runs off the plate. */
+  const fit = (value: string, [big, mid, small]: [number, number, number]) =>
+    value.length > 22 ? small : value.length > 16 ? mid : big;
+
+  // Breathing room around the block, and between the rows inside it.
+  const PAD = 38;
+  const RULE_ABOVE = 20;
+  const RULE_BELOW = 28;
+  const LINE_GAP = 12;
+  /** Below this a plate stops looking like a plate and starts looking like a strip. */
+  const MIN_PLATE_H = 150;
+
+  type Row =
+    | { kind: 'rule'; y: number }
+    | { kind: 'text'; y: number; text: string; size: number; weight: number; spacing: number };
+
+  const rows: Row[] = [];
+  let y = 0;
+
+  if (number) {
+    const size = fit(number, [56, 46, 38]);
+    rows.push({ kind: 'text', y: y + size * 0.78, text: number, size, weight: 600, spacing: 2 });
+    y += size * 0.92 + RULE_ABOVE;
+  }
+
+  // The rule is the one constant: it is the plate's spine, and with no number
+  // above it the block simply starts there.
+  rows.push({ kind: 'rule', y });
+  y += RULE_BELOW;
+
+  const lines = [
+    name && { text: name, size: fit(name, [32, 26, 22]), weight: 500, spacing: 1.5 },
+    family && { text: family, size: fit(family, [28, 24, 20]), weight: 500, spacing: 1.5 },
+    detail && { text: detail, size: fit(detail, [22, 20, 18]), weight: 400, spacing: 2 },
+  ].filter(Boolean) as { text: string; size: number; weight: number; spacing: number }[];
+
+  lines.forEach((line, index) => {
+    if (index) y += LINE_GAP;
+    rows.push({ kind: 'text', y: y + line.size * 0.78, ...line });
+    y += line.size * 0.92;
+  });
+
+  const contentH = y;
+  const plateH = Math.max(contentH + PAD * 2, MIN_PLATE_H);
+  const vh = plateH + inset * 2;
+  const midY = inset + plateH / 2;
+  // Centred rather than padded from the top, which only makes a difference
+  // once the minimum height has taken over from the content.
+  const blockTop = inset + (plateH - contentH) / 2;
 
   return (
     <svg viewBox={`0 0 ${vw} ${vh}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
@@ -417,34 +479,24 @@ function NameplateMinimal({ slots, plate, text, font, config, isLight, uid }: Te
         />
       ) : null}
 
-      {hasNumber ? (
-        <text
-          x={right} y={midY - 22} textAnchor="end"
-          fill={text} fontFamily={font} fontSize="56" fontWeight="600" letterSpacing="2"
-        >
-          {slots.number?.toUpperCase()}
-        </text>
-      ) : null}
-
-      <line x1={inset + 58} y1={midY} x2={right} y2={midY} stroke={text} strokeWidth="3" strokeLinecap="square" />
-
-      {name ? (
-        <text
-          x={right} y={midY + 46} textAnchor="end"
-          fill={text} fontFamily={font} fontSize={nameSize} fontWeight="500" letterSpacing="1.5"
-        >
-          {name}
-        </text>
-      ) : null}
-
-      {family ? (
-        <text
-          x={right} y={midY + 88} textAnchor="end"
-          fill={text} fontFamily={font} fontSize="28" fontWeight="500" letterSpacing="1.5"
-        >
-          {family}
-        </text>
-      ) : null}
+      {rows.map((row, index) =>
+        row.kind === 'rule' ? (
+          <line
+            key={index}
+            x1={ruleLeft} y1={blockTop + row.y} x2={right} y2={blockTop + row.y}
+            stroke={text} strokeWidth="3" strokeLinecap="square"
+          />
+        ) : (
+          <text
+            key={index}
+            x={right} y={blockTop + row.y} textAnchor="end"
+            fill={text} fontFamily={font}
+            fontSize={row.size} fontWeight={row.weight} letterSpacing={row.spacing}
+          >
+            {row.text}
+          </text>
+        ),
+      )}
     </svg>
   );
 }
