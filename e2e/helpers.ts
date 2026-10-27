@@ -67,9 +67,10 @@ export async function fillPersonalisation(page: Page, name: string) {
 
   if (hasNameField) await field.fill(name);
 
-  // Every published field is a required part of the production brief. Fill
-  // the remaining native controls with valid test values; visual option
-  // groups in the seeded product already carry configured defaults.
+  // Only the fields the studio marked compulsory carry the required
+  // attribute, so this fills exactly those -- which is also the smallest
+  // order a real customer could place. Visual option groups in the seeded
+  // product already carry configured defaults.
   for (let index = 0; index < await controls.count(); index += 1) {
     const control = controls.nth(index);
     if (!(await control.isVisible()) || (await control.isDisabled())) continue;

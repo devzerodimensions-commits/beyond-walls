@@ -125,9 +125,14 @@ function PersonalizationInput({
   onChange: (value: string) => void;
 }) {
   const label = `${field.label}${priceSuffix(field.priceDelta)}`;
-  // A published personalization field is part of the production brief. The
-  // customer must answer every one before the item can enter the cart.
-  const required = true;
+  // Whether an answer is compulsory is the admin's call, field by field, and
+  // it is stored on the field itself.
+  //
+  // This was hardcoded to true, which put a red asterisk on every input and
+  // refused the cart until all of them were filled -- including the ones the
+  // studio had deliberately marked optional, like the family name and the
+  // free-text instructions.
+  const required = field.required;
 
   switch (field.type) {
     case 'TEXTAREA':
@@ -192,13 +197,19 @@ function PersonalizationInput({
           <label className="flex cursor-pointer items-start gap-2.5">
             <input
               type="checkbox"
-              required
+              required={required}
               checked={value === 'yes'}
               onChange={(e) => onChange(e.target.checked ? 'yes' : '')}
               className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer appearance-none border border-ink-300 bg-paper checked:border-ink checked:bg-ink"
             />
             <span className="text-sm text-ink-700">
-              {label} <span aria-hidden="true" className="text-state-danger">*</span>
+              {label}
+              {required ? (
+                <span aria-hidden="true" className="text-state-danger">
+                  {' '}
+                  *
+                </span>
+              ) : null}
             </span>
           </label>
         </FieldWrap>
@@ -399,7 +410,12 @@ function FileField({
   const isImage = /\.(png|jpe?g|webp|gif|svg)$/i.test(value);
 
   return (
-    <FieldWrap label={label} required error={error ?? uploadError ?? undefined} hint={field.helpText ?? undefined}>
+    <FieldWrap
+      label={label}
+      required={field.required}
+      error={error ?? uploadError ?? undefined}
+      hint={field.helpText ?? undefined}
+    >
       {value ? (
         <div className="flex items-center gap-3 border border-stone-line bg-paper p-3">
           {isImage ? (
@@ -470,7 +486,8 @@ export function validatePersonalizationValues(
     const value = (values[field.key] ?? '').trim();
 
     if (!value) {
-      errors[field.key] = `${field.label} is required`;
+      if (field.required) errors[field.key] = `${field.label} is required`;
+      // Left blank and allowed to be: there is nothing further to check.
       continue;
     }
     if (field.maxLength && value.length > field.maxLength) {

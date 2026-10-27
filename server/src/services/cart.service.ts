@@ -79,10 +79,14 @@ export function validatePersonalization(
     const value = raw === null || raw === undefined ? '' : String(raw).trim();
 
     if (!value) {
-      // Every published personalization field is production-critical. This
-      // server-side check prevents a caller from bypassing the storefront and
-      // adding an incomplete custom item directly through the API.
-      throw ApiError.unprocessable(`"${field.label}" is required`, { field: field.key });
+      if (field.required) {
+        // Mirrors the storefront, so a caller cannot bypass it and add an
+        // incomplete custom item straight through the API.
+        throw ApiError.unprocessable(`"${field.label}" is required`, { field: field.key });
+      }
+      // Optional and left blank: nothing to put in the production brief, and
+      // no price delta to add for an answer that was never given.
+      continue;
     }
 
     if (field.maxLength && value.length > field.maxLength) {

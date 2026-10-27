@@ -358,7 +358,11 @@ test.describe('Storefront', () => {
     await expect.poll(() => saveFinished).toBeTruthy();
   });
 
-  test('personalised products cannot be added before every field is completed', async ({ page }) => {
+  /*
+   * Optional fields -- the family name, the free-text instructions -- may be
+   * left blank, so this proves the compulsory ones still hold the cart shut.
+   */
+  test('personalised products cannot be added before the required fields are completed', async ({ page }) => {
     await page.goto('/product/minimal-acrylic-name-plate');
 
     const options = page.getByRole('radio').and(page.locator(':not([disabled])'));
