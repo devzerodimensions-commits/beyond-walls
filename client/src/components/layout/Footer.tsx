@@ -21,7 +21,7 @@ const SOCIALS = [
 /**
  * A column of links.
  *
- * Open on a laptop, where four columns sit side by side and cost nothing. On a
+ * Open on a laptop, where the columns sit side by side and cost nothing. On a
  * phone they stack, and four open columns put the address and the opening
  * hours a long scroll below the fold — so there each heading collapses and the
  * whole footer is a screen you can read.
@@ -41,8 +41,8 @@ function FooterColumn({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className={clsx('border-b border-stone-line pb-4 md:border-0 md:pb-0', className)}>
-      <h3 className="eyebrow mb-0 md:mb-4">
+    <div className={clsx('border-b border-white/10 pb-4 md:border-0 md:pb-0', className)}>
+      <h3 className="eyebrow mb-0 text-paper/40 md:mb-5">
         <button
           type="button"
           onClick={() => setOpen(!open)}
@@ -54,7 +54,7 @@ function FooterColumn({
             size={14}
             aria-hidden="true"
             className={clsx(
-              'text-ink-300 transition-transform duration-300 md:hidden',
+              'text-paper/40 transition-transform duration-300 md:hidden',
               open && 'rotate-180',
             )}
           />
@@ -64,6 +64,8 @@ function FooterColumn({
     </div>
   );
 }
+
+const linkClass = 'text-sm text-paper/60 transition-colors duration-200 hover:text-paper';
 
 export function Footer() {
   const { get, navLinks, footerPages } = useSettings();
@@ -115,63 +117,87 @@ export function Footer() {
     (s) => Boolean(s.url),
   );
 
+  /*
+   * ---- Why the footer is dark ----
+   *
+   * It was the same off-white as the page above it, so it read as more page
+   * rather than the end of one, and the studio said twice that it looked out
+   * of place. Two attempts at rearranging the light version did not fix that,
+   * because the problem was not the arrangement.
+   *
+   * Ink closes the page. It is also the colour the site already uses for its
+   * most deliberate moments — the hero, the header once you scroll, the plate
+   * itself — so the foot of the page now belongs to the same design rather
+   * than trailing off into white. The mark has a dark-background version in
+   * the brand book, which is what `inverted` draws.
+   */
   return (
-    <footer className="border-t border-stone-line bg-paper">
+    <footer className="bg-ink text-paper">
       {/*
-        ---- The band across the top ----
+        ---- The custom-order strip ----
 
-        The studio's line, and the one action worth offering to somebody who
-        has read to the bottom of a page without buying.
-
-        It used to float: the footer was pushed down by a 96px margin, so on
-        the home page a pale stripe sat between the questions block and the
-        footer and belonged to neither. Inside, the line and the button were
-        thrown to opposite ends of a flex row, which at 1440px left 352px of
-        nothing between them -- a quarter of the screen. Together that read as
-        a section that had come loose, which is exactly what the studio said
-        about it.
-
-        Both are fixed by alignment rather than by decoration. The margin is
-        gone, so the border alone divides the page from the footer. The band
-        now uses the same twelve columns as the links below it, and the button
-        sits in columns 10-12 -- directly above "Visit the studio", the same
-        width, the same edges. The gap in the middle is still there, but it is
-        now a column gap that lines up with everything under it, which reads as
-        a grid instead of as a mistake.
+        This used to be a bordered box floating at the right-hand end of a
+        flex row, with a quarter of the screen empty beside it. Given the full
+        width it stops being a box that has to be placed and becomes the first
+        thing the footer says — which is right, because somebody who has read
+        to the bottom of a page without buying is exactly who should be asked
+        whether they want something made.
       */}
-      <div className="border-b border-stone-line">
-        <div className="container-site grid gap-x-8 gap-y-8 py-10 lg:grid-cols-12 lg:py-12">
-          <div className="lg:col-span-6">
-            <Logo />
+      <Link
+        to="/custom-order"
+        className="group/cta block border-b border-white/10 transition-colors duration-300 hover:bg-white/[0.04]"
+      >
+        <div className="container-site flex items-center justify-between gap-6 py-9 lg:py-11">
+          <span>
+            <span className="eyebrow block text-paper/40">Something of your own</span>
+            <span className="mt-2 block text-2xl font-medium leading-tight text-paper sm:text-3xl">
+              Start a custom order
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            className="shrink-0 text-2xl text-paper/70 transition-all duration-300 group-hover/cta:translate-x-1 group-hover/cta:text-paper sm:text-3xl"
+          >
+            →
+          </span>
+        </div>
+      </Link>
+
+      {/*
+        ---- One row, five columns ----
+
+        3 + 2 + 2 + 2 + 3. The studio's line sits in the first column instead
+        of in a band of its own above everything, so there is no longer a
+        stretch of empty footer anywhere: every column has something in it and
+        they all start on the same line. The social links live under the
+        statement rather than in the bottom bar, which gives that column a
+        second thing to hold once the studio fills them in.
+      */}
+      <div className="container-site py-12 lg:py-16">
+        <div className="grid gap-x-8 gap-y-2 md:grid-cols-2 md:gap-y-12 lg:grid-cols-12">
+          <div className="pb-8 md:col-span-2 md:pb-0 lg:col-span-3">
+            <Logo inverted />
             {about ? (
-              <p className="mt-5 max-w-xl text-lg leading-snug text-ink sm:text-xl">{about}</p>
+              <p className="mt-5 max-w-sm text-sm leading-relaxed text-paper/60">{about}</p>
+            ) : null}
+
+            {socials.length ? (
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2">
+                {socials.map((social) => (
+                  <a
+                    key={social.key}
+                    href={social.url as string}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-2xs uppercase tracking-architect text-paper/50 transition-colors hover:text-paper"
+                  >
+                    {social.label}
+                  </a>
+                ))}
+              </div>
             ) : null}
           </div>
 
-          <Link
-            to="/custom-order"
-            className="group/cta flex items-center justify-between gap-6 border border-ink px-6 py-4 transition-colors duration-300 hover:bg-ink lg:col-span-3 lg:col-start-10 lg:self-end"
-          >
-            <span className="text-left">
-              <span className="block text-2xs uppercase tracking-architect text-ink-400 transition-colors duration-300 group-hover/cta:text-paper/60">
-                Something of your own
-              </span>
-              <span className="mt-1 block text-sm font-medium text-ink transition-colors duration-300 group-hover/cta:text-paper">
-                Start a custom order
-              </span>
-            </span>
-            <span
-              aria-hidden="true"
-              className="text-ink transition-all duration-300 group-hover/cta:translate-x-1 group-hover/cta:text-paper"
-            >
-              →
-            </span>
-          </Link>
-        </div>
-      </div>
-
-      <div className="container-site py-12 lg:py-14">
-        <div className="grid gap-x-8 gap-y-2 md:grid-cols-2 md:gap-y-10 lg:grid-cols-12">
           {/*
             The number and the email, on a phone, without a tap.
 
@@ -186,18 +212,18 @@ export function Footer() {
               {phone ? (
                 <a
                   href={`tel:${phone.replace(/\s/g, '')}`}
-                  className="inline-flex items-center gap-2 text-sm text-ink"
+                  className="inline-flex items-center gap-2 text-sm text-paper/80"
                 >
-                  <PhoneIcon size={15} className="shrink-0 text-ink-300" />
+                  <PhoneIcon size={15} className="shrink-0 text-paper/40" />
                   {phone}
                 </a>
               ) : null}
               {email ? (
                 <a
                   href={`mailto:${email}`}
-                  className="inline-flex items-center gap-2 text-sm text-ink"
+                  className="inline-flex items-center gap-2 text-sm text-paper/80"
                 >
-                  <MailIcon size={15} className="shrink-0 text-ink-300" />
+                  <MailIcon size={15} className="shrink-0 text-paper/40" />
                   {email}
                 </a>
               ) : null}
@@ -210,20 +236,17 @@ export function Footer() {
             thing to offer there is the way back into the shop.
           */}
           {collections.length ? (
-            <FooterColumn title="Shop" className="lg:col-span-3">
+            <FooterColumn title="Shop" className="lg:col-span-2">
               <ul className="space-y-2.5">
                 {collections.map((category) => (
                   <li key={category.id}>
-                    <Link
-                      to={`/shop/${category.slug}`}
-                      className="text-sm text-ink-500 transition-colors hover:text-ink"
-                    >
+                    <Link to={`/shop/${category.slug}`} className={linkClass}>
                       {category.name}
                     </Link>
                   </li>
                 ))}
                 <li>
-                  <Link to="/shop" className="text-sm text-ink-500 transition-colors hover:text-ink">
+                  <Link to="/shop" className={linkClass}>
                     View everything
                   </Link>
                 </li>
@@ -232,14 +255,11 @@ export function Footer() {
           ) : null}
 
           {footerLinks.length ? (
-            <FooterColumn title="Studio" className="lg:col-span-3">
+            <FooterColumn title="Studio" className="lg:col-span-2">
               <ul className="space-y-2.5">
                 {footerLinks.map((link) => (
                   <li key={link.id}>
-                    <Link
-                      to={link.href}
-                      className="text-sm text-ink-500 transition-colors hover:text-ink"
-                    >
+                    <Link to={link.href} className={linkClass}>
                       {link.label}
                     </Link>
                   </li>
@@ -248,14 +268,11 @@ export function Footer() {
             </FooterColumn>
           ) : null}
 
-          <FooterColumn title="Information" className="lg:col-span-3">
+          <FooterColumn title="Information" className="lg:col-span-2">
             <ul className="space-y-2.5">
               {informationPages.map((page) => (
                 <li key={page.slug}>
-                  <Link
-                    to={`/${page.slug}`}
-                    className="text-sm text-ink-500 transition-colors hover:text-ink"
-                  >
+                  <Link to={`/${page.slug}`} className={linkClass}>
                     {page.title}
                   </Link>
                 </li>
@@ -267,10 +284,7 @@ export function Footer() {
               */}
               {footerLinks.some((l) => l.href === '/track-order') ? null : (
                 <li>
-                  <Link
-                    to="/track-order"
-                    className="text-sm text-ink-500 transition-colors hover:text-ink"
-                  >
+                  <Link to="/track-order" className={linkClass}>
                     Track an order
                   </Link>
                 </li>
@@ -282,8 +296,8 @@ export function Footer() {
           <FooterColumn title="Visit the studio" className="lg:col-span-3">
             <address className="space-y-3 not-italic">
               {addressLines.length ? (
-                <div className="flex gap-2.5 text-sm text-ink-500">
-                  <PinIcon size={15} className="mt-0.5 shrink-0 text-ink-300" />
+                <div className="flex gap-2.5 text-sm text-paper/60">
+                  <PinIcon size={15} className="mt-0.5 shrink-0 text-paper/40" />
                   <span className="leading-relaxed">
                     {addressLines.map((line) => (
                       <span key={line} className="block">
@@ -296,8 +310,8 @@ export function Footer() {
 
               {phone ? (
                 <div className="flex items-center gap-2.5 text-sm">
-                  <PhoneIcon size={15} className="shrink-0 text-ink-300" />
-                  <a href={`tel:${phone.replace(/\s/g, '')}`} className="link-underline text-ink-500">
+                  <PhoneIcon size={15} className="shrink-0 text-paper/40" />
+                  <a href={`tel:${phone.replace(/\s/g, '')}`} className="link-underline text-paper/60">
                     {phone}
                   </a>
                 </div>
@@ -305,16 +319,16 @@ export function Footer() {
 
               {email ? (
                 <div className="flex items-center gap-2.5 text-sm">
-                  <MailIcon size={15} className="shrink-0 text-ink-300" />
-                  <a href={`mailto:${email}`} className="link-underline text-ink-500">
+                  <MailIcon size={15} className="shrink-0 text-paper/40" />
+                  <a href={`mailto:${email}`} className="link-underline text-paper/60">
                     {email}
                   </a>
                 </div>
               ) : null}
 
               {hoursSummary.length ? (
-                <div className="flex gap-2.5 text-sm text-ink-500">
-                  <ClockIcon size={15} className="mt-0.5 shrink-0 text-ink-300" />
+                <div className="flex gap-2.5 text-sm text-paper/60">
+                  <ClockIcon size={15} className="mt-0.5 shrink-0 text-paper/40" />
                   <span>
                     {hoursSummary.map((row) => (
                       <span key={row.days} className="block leading-relaxed">
@@ -330,38 +344,14 @@ export function Footer() {
       </div>
 
       {/*
-        The bottom bar carries the social links now.
-
-        They used to sit under the brand paragraph, where nothing else was, so
-        on a site that has not filled them in yet — this one — the column was a
-        logo, a sentence and a hole. Down here their absence costs nothing: the
-        bar simply has the copyright at one end and the payment line at the
-        other, which is what it had anyway.
+        A shade darker than the footer above it, so the last line of the site
+        settles rather than stopping dead.
       */}
-      <div className="border-t border-stone-line">
-        <div className="container-site flex flex-col items-center gap-4 py-5 sm:flex-row sm:justify-between">
-          <p className="order-3 text-2xs text-ink-400 sm:order-1">{copyright}</p>
-
-          {socials.length ? (
-            <div className="order-1 flex flex-wrap items-center justify-center gap-5 sm:order-2">
-              {socials.map((social) => (
-                <a
-                  key={social.key}
-                  href={social.url as string}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="text-2xs uppercase tracking-architect text-ink-400 transition-colors hover:text-ink"
-                >
-                  {social.label}
-                </a>
-              ))}
-            </div>
-          ) : null}
-
+      <div className="border-t border-white/10 bg-ink-900">
+        <div className="container-site flex flex-col items-center gap-3 py-5 sm:flex-row sm:justify-between">
+          <p className="text-2xs text-paper/40">{copyright}</p>
           {/* Only names payment methods that are actually live. */}
-          {methodsLine ? (
-            <p className="order-2 text-2xs text-ink-300 sm:order-3">{methodsLine}</p>
-          ) : null}
+          {methodsLine ? <p className="text-2xs text-paper/40">{methodsLine}</p> : null}
         </div>
       </div>
     </footer>
