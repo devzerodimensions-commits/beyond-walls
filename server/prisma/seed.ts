@@ -123,7 +123,7 @@ const CATEGORY_TREE: CategorySeed[] = [
   },
   {
     slug: 'for-offices',
-    name: 'For Offices',
+    name: 'For Business',
     shortText: 'Office nameplates, branding, GST plates, QR stands and desk plates.',
     description:
       'Signage for offices, clinics and retail spaces — office branding, GST plates, QR stands and desk plates, made for doctors, chartered accountants, advocates, corporations and retail stores.',
@@ -1091,11 +1091,12 @@ async function seedNavigation() {
   const links = [
     { label: 'Shop', href: '/shop', group: 'header', sortOrder: 0 },
     { label: 'For Home', href: '/shop/for-home', group: 'header', sortOrder: 1 },
-    { label: 'For Offices', href: '/shop/for-offices', group: 'header', sortOrder: 2 },
+    { label: 'For Business', href: '/shop/for-offices', group: 'header', sortOrder: 2 },
     { label: 'Signs', href: '/shop/informative-signs', group: 'header', sortOrder: 3 },
-    { label: 'Gallery', href: '/gallery', group: 'header', sortOrder: 4 },
-    { label: 'Custom Order', href: '/custom-order', group: 'header', sortOrder: 5 },
-    { label: 'Contact', href: '/contact', group: 'header', sortOrder: 6 },
+    { label: 'Prints', href: '/shop/prints', group: 'header', sortOrder: 4 },
+    { label: 'Gallery', href: '/gallery', group: 'header', sortOrder: 5 },
+    { label: 'Custom Order', href: '/custom-order', group: 'header', sortOrder: 6 },
+    { label: 'Contact', href: '/contact', group: 'header', sortOrder: 7 },
 
     { label: 'All products', href: '/shop', group: 'footer', sortOrder: 0 },
     { label: 'Custom order', href: '/custom-order', group: 'footer', sortOrder: 1 },
