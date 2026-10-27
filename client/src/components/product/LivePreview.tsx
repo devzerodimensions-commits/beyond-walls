@@ -362,18 +362,23 @@ interface TemplateProps {
 /**
  * Matches the supplied product: number top-right, rule, name lines below.
  *
- * The plate is cut to its contents rather than drawn at one fixed size.
+ * ---- The plate never changes size. The lettering does. ----
  *
- * It used to be a 600x300 rectangle whatever was in it, so a name on its own
- * sat in the lower half with the entire top half empty -- which does not read
- * as a design choice, it reads as something that failed to load. Now the rows
- * are laid out in order and measured as they go, and the plate is however tall
- * that came to, with equal margins above and below. Add a line and it grows by
- * exactly that line.
+ * A first attempt cut the plate down to whatever was in it, because a name on
+ * its own left the top half black and empty. The studio stopped that straight
+ * away, and they were right: a nameplate is a manufactured object bought in a
+ * size, so a preview whose proportions move as you type is showing you
+ * something you cannot order. Their instruction was to change the size of the
+ * text, not the plate.
  *
- * Only the height moves. The width stays as the product's configuration asks,
- * because a plate that changed shape sideways on every keystroke would be
- * horrible to type into, and real plates come in fixed widths anyway.
+ * So the rows are measured, and then the whole block of lettering is scaled to
+ * fill the plate: up when there is little to say, down when there is a lot. An
+ * empty plate is no longer mostly black, a fourth line costs nothing, and the
+ * outline stays exactly as it was in every case.
+ *
+ * The scale is whichever of three limits bites first -- the height between the
+ * margins, the width of the rule, or a ceiling that stops two words becoming a
+ * billboard.
  */
 function NameplateMinimal({ slots, plate, text, font, config, isLight, uid }: TemplateProps) {
   const number = (slots.number ?? '').toUpperCase();
@@ -381,40 +386,46 @@ function NameplateMinimal({ slots, plate, text, font, config, isLight, uid }: Te
   const family = (slots.line2 ?? '').toUpperCase();
   const detail = (slots.line3 ?? '').toUpperCase();
 
-  const vw = config.aspect.width;
+  const { width: vw, height: vh } = config.aspect;
   const inset = config.plate.inset;
   const plateW = vw - inset * 2;
+  const plateH = vh - inset * 2;
   const right = vw - inset - 40;
   const ruleLeft = inset + 58;
 
-  /** Steps a size down as the text lengthens, so nothing runs off the plate. */
+  /** Steps a size down as the text lengthens, so one long line cannot shrink the rest. */
   const fit = (value: string, [big, mid, small]: [number, number, number]) =>
     value.length > 22 ? small : value.length > 16 ? mid : big;
 
-  // Breathing room around the block, and between the rows inside it.
-  const PAD = 38;
+  const PAD = 30;
   const RULE_ABOVE = 20;
   const RULE_BELOW = 28;
   const LINE_GAP = 12;
-  /** Below this a plate stops looking like a plate and starts looking like a strip. */
-  const MIN_PLATE_H = 150;
+  /** Two short words should fill the plate, not become a billboard. */
+  const MAX_SCALE = 1.5;
+  /** Advance width of a capital in these faces, as a fraction of the size. */
+  const CAP_WIDTH = 0.62;
 
-  type Row =
-    | { kind: 'rule'; y: number }
-    | { kind: 'text'; y: number; text: string; size: number; weight: number; spacing: number };
+  interface TextRow {
+    text: string;
+    size: number;
+    weight: number;
+    spacing: number;
+    y: number;
+  }
 
-  const rows: Row[] = [];
+  const rows: TextRow[] = [];
   let y = 0;
 
   if (number) {
     const size = fit(number, [56, 46, 38]);
-    rows.push({ kind: 'text', y: y + size * 0.78, text: number, size, weight: 600, spacing: 2 });
+    rows.push({ text: number, size, weight: 600, spacing: 2, y: y + size * 0.78 });
     y += size * 0.92 + RULE_ABOVE;
   }
 
-  // The rule is the one constant: it is the plate's spine, and with no number
-  // above it the block simply starts there.
-  rows.push({ kind: 'rule', y });
+  // The rule is the spine of the plate, and with no number above it the block
+  // simply starts here.
+  const ruleY = y;
   y += RULE_BELOW;
 
   const lines = [
@@ -425,17 +436,26 @@ function NameplateMinimal({ slots, plate, text, font, config, isLight, uid }: Te
 
   lines.forEach((line, index) => {
     if (index) y += LINE_GAP;
-    rows.push({ kind: 'text', y: y + line.size * 0.78, ...line });
+    rows.push({ ...line, y: y + line.size * 0.78 });
     y += line.size * 0.92;
   });
 
   const contentH = y;
-  const plateH = Math.max(contentH + PAD * 2, MIN_PLATE_H);
-  const vh = plateH + inset * 2;
-  const midY = inset + plateH / 2;
-  // Centred rather than padded from the top, which only makes a difference
-  // once the minimum height has taken over from the content.
-  const blockTop = inset + (plateH - contentH) / 2;
+  const contentW = rows.reduce(
+    (widest, row) =>
+      Math.max(widest, row.text.length * row.size * CAP_WIDTH + Math.max(0, row.text.length - 1) * row.spacing),
+    0,
+  );
+
+  const ruleSpan = right - ruleLeft;
+  const scale = Math.min(
+    (plateH - PAD * 2) / contentH,
+    contentW ? ruleSpan / contentW : Number.POSITIVE_INFINITY,
+    MAX_SCALE,
+  );
+
+  const blockTop = inset + (plateH - contentH * scale) / 2;
+  const ruleAtY = blockTop + ruleY * scale;
 
   return (
     <svg viewBox={`0 0 ${vw} ${vh}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
@@ -462,41 +482,46 @@ function NameplateMinimal({ slots, plate, text, font, config, isLight, uid }: Te
         fill={`url(#sheen-${uid})`}
       />
 
+      {/*
+        The fixings sit on the rule rather than at the plate's midpoint, so the
+        line always runs from one to the other however the block has settled.
+      */}
       {config.plate.showScrews ? (
         <>
-          <circle cx={inset + 26} cy={midY} r="6" fill="#A8A8A8" />
-          <circle cx={inset + 26} cy={midY} r="2.4" fill="#787878" />
-          <circle cx={vw - inset - 26} cy={midY} r="6" fill="#A8A8A8" />
-          <circle cx={vw - inset - 26} cy={midY} r="2.4" fill="#787878" />
+          <circle cx={inset + 26} cy={ruleAtY} r="6" fill="#A8A8A8" />
+          <circle cx={inset + 26} cy={ruleAtY} r="2.4" fill="#787878" />
+          <circle cx={vw - inset - 26} cy={ruleAtY} r="6" fill="#A8A8A8" />
+          <circle cx={vw - inset - 26} cy={ruleAtY} r="2.4" fill="#787878" />
         </>
       ) : null}
 
       {slots.logo ? (
         <image
           href={assetUrl(slots.logo)}
-          x={inset + 40} y={inset + 28} height="52" width="120"
+          x={inset + 40} y={inset + 24} height="52" width="120"
           preserveAspectRatio="xMinYMid meet"
         />
       ) : null}
 
-      {rows.map((row, index) =>
-        row.kind === 'rule' ? (
-          <line
-            key={index}
-            x1={ruleLeft} y1={blockTop + row.y} x2={right} y2={blockTop + row.y}
-            stroke={text} strokeWidth="3" strokeLinecap="square"
-          />
-        ) : (
+      {/* Drawn at full width and full weight: the rule is part of the plate, not of the lettering. */}
+      <line x1={ruleLeft} y1={ruleAtY} x2={right} y2={ruleAtY} stroke={text} strokeWidth="3" strokeLinecap="square" />
+
+      {/*
+        Laid out against x=0 as the right margin, so one transform both places
+        the block and scales it without disturbing the alignment.
+      */}
+      <g transform={`translate(${right} ${blockTop}) scale(${scale})`}>
+        {rows.map((row, index) => (
           <text
             key={index}
-            x={right} y={blockTop + row.y} textAnchor="end"
+            x={0} y={row.y} textAnchor="end"
             fill={text} fontFamily={font}
             fontSize={row.size} fontWeight={row.weight} letterSpacing={row.spacing}
           >
             {row.text}
           </text>
-        ),
-      )}
+        ))}
+      </g>
     </svg>
   );
 }
