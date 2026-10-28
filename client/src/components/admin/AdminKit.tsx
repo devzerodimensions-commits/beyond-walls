@@ -158,8 +158,22 @@ function RowTick({
       }}
       onChange={(e) => onChange(e.target.checked)}
       onClick={(e) => e.stopPropagation()}
-      className="tickbox h-4 w-4 shrink-0 cursor-pointer appearance-none border border-ink-300 bg-paper
-                 transition-colors checked:border-ink checked:bg-ink indeterminate:border-ink indeterminate:bg-ink"
+      className="tickbox h-4 w-4 shrink-0 cursor-pointer appearance-none border transition-colors"
+      /*
+       * Painted from the props rather than from Tailwind's `checked:` variant.
+       *
+       * The variant works, but its colour is the storefront's ink, which the
+       * admin remaps everywhere else -- so a ticked box was the one thing on
+       * the screen that ignored the theme, and on a busy row it read as empty.
+       * The accent is what every other "this is chosen" state here uses.
+       *
+       * `tickbox` still draws the white check on top, from one rule shared
+       * with every other checkbox in the project.
+       */
+      style={{
+        backgroundColor: checked || indeterminate ? 'var(--a-accent)' : 'var(--a-surface)',
+        borderColor: checked || indeterminate ? 'var(--a-accent)' : 'var(--a-line)',
+      }}
     />
   );
 }
