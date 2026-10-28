@@ -2238,6 +2238,7 @@ function FieldForm({
  */
 function VideoField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [draft, setDraft] = useState(value);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   useEffect(() => setDraft(value), [value]);
 
   const trimmed = draft.trim();
@@ -2263,16 +2264,39 @@ function VideoField({ value, onChange }: { value: string; onChange: (v: string) 
           }}
         />
 
-        {value ? (
-          <button
-            type="button"
-            className="a-btn a-btn-ghost mt-2 text-state-danger"
-            onClick={() => { setDraft(''); onChange(''); }}
-          >
-            <TrashIcon size={13} />
-            Remove the video
-          </button>
-        ) : null}
+        {/*
+          A link is still the first-class way in -- YouTube and Vimeo carry the
+          bandwidth and do the transcoding, which this server does neither of.
+          The library is for the short clips that have been uploaded here.
+        */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={() => setLibraryOpen(true)}>
+            Choose from media library
+          </Button>
+          {value ? (
+            <button
+              type="button"
+              className="a-btn a-btn-ghost text-state-danger"
+              onClick={() => { setDraft(''); onChange(''); }}
+            >
+              <TrashIcon size={13} />
+              Remove the video
+            </button>
+          ) : null}
+        </div>
+
+        <MediaPicker
+          accept="video"
+          open={libraryOpen}
+          onClose={() => setLibraryOpen(false)}
+          onPick={(assets) => {
+            setLibraryOpen(false);
+            const picked = assets[0];
+            if (!picked) return;
+            setDraft(picked.url);
+            onChange(picked.url);
+          }}
+        />
       </div>
 
       <div>

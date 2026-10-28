@@ -687,12 +687,17 @@ export function ImageField({
 }
 
 export function MediaPicker({
-  open, onClose, onPick, multiple = false,
+  open, onClose, onPick, multiple = false, accept = 'image',
 }: {
   open: boolean;
   onClose: () => void;
   /** The chosen files, in the order they were ticked. */
   onPick: (assets: MediaAsset[]) => void;
+  /**
+   * Which half of the library to show. A field that can only hold a picture
+   * should not be offered footage, and the other way round.
+   */
+  accept?: 'image' | 'video';
   /**
    * Lets several files be ticked and added in one go, which is what a product
    * gallery wants. Off by default: a field that holds one image should close
@@ -709,11 +714,11 @@ export function MediaPicker({
     if (!open) return;
     setLoading(true);
     api
-      .list<MediaAsset[]>('/admin/media', { perPage: 60, search })
+      .list<MediaAsset[]>('/admin/media', { perPage: 60, search, type: accept })
       .then((result) => setAssets(result.data))
       .catch(() => setAssets([]))
       .finally(() => setLoading(false));
-  }, [open, search]);
+  }, [open, search, accept]);
 
   // Start empty every time it opens. Last time's ticks are never what somebody
   // means to add this time, and a stale selection added silently is worse than
@@ -774,7 +779,9 @@ export function MediaPicker({
         </div>
       ) : assets.length === 0 ? (
         <p className="py-10 text-center text-sm text-ink-400">
-          No files yet. Upload one from Admin → Media.
+          {accept === 'video'
+            ? 'No videos yet. Upload one from Admin → Media, or paste a YouTube or Vimeo link instead.'
+            : 'No files yet. Upload one from Admin → Media.'}
         </p>
       ) : (
         <div className="grid max-h-[55vh] grid-cols-3 gap-3 overflow-y-auto sm:grid-cols-5">
@@ -792,12 +799,33 @@ export function MediaPicker({
                 )}
                 title={asset.filename}
               >
-                <img
-                  src={assetUrl(asset.url)}
-                  alt={asset.alt ?? asset.filename}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
+                {/*
+                  A <video> with no autoplay and no controls paints its first
+                  frame and nothing else, which is the thumbnail we want. The
+                  filename sits under it because one frame of footage is often
+                  not enough to tell two clips apart.
+                */}
+                {asset.mimeType?.startsWith('video/') ? (
+                  <>
+                    <video
+                      src={assetUrl(asset.url)}
+                      className="h-full w-full bg-ink object-cover"
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 truncate bg-ink/80 px-1.5 py-1 text-2xs text-paper">
+                      {asset.filename}
+                    </span>
+                  </>
+                ) : (
+                  <img
+                    src={assetUrl(asset.url)}
+                    alt={asset.alt ?? asset.filename}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                )}
                 {/* The tick order is the order they will be added, so it is
                     worth showing rather than just marking them chosen. */}
                 {position >= 0 ? (
@@ -817,10 +845,15 @@ export function MediaPicker({
 /** Multi-image uploader used on the product editor. */
 export function MultiImageUpload({
   onUpload, uploading, label = 'Upload images',
+  accept = '.jpg,.jpeg,.png,.webp,.gif,.avif',
+  hint = 'JPG, PNG, WEBP, GIF or AVIF — up to 12 at a time',
 }: {
   onUpload: (files: FileList) => void;
   uploading: boolean;
   label?: string;
+  /** File picker filter. Widened where video is also allowed. */
+  accept?: string;
+  hint?: string;
 }) {
   return (
     <label
@@ -832,11 +865,11 @@ export function MultiImageUpload({
     >
       {uploading ? <Spinner size={20} /> : <UploadIcon size={20} className="text-ink-300" />}
       <span className="text-xs text-ink-600">{uploading ? 'Uploading…' : label}</span>
-      <span className="text-2xs text-ink-300">JPG, PNG, WEBP, GIF or AVIF — up to 12 at a time</span>
+      <span className="text-2xs text-ink-300">{hint}</span>
       <input
         type="file"
         multiple
-        accept=".jpg,.jpeg,.png,.webp,.gif,.avif"
+        accept={accept}
         className="hidden"
         onChange={(e) => {
           if (e.target.files?.length) onUpload(e.target.files);

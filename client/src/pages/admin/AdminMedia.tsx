@@ -64,10 +64,28 @@ export default function AdminMedia() {
   const upload = async (files: FileList) => {
     setUploading(true);
     try {
-      const form = new FormData();
-      Array.from(files).forEach((file) => form.append('files', file));
-      form.append('folder', uploadFolder);
-      await api.upload('/admin/media', form);
+      /*
+       * Pictures and footage are checked against different allowlists, and the
+       * endpoint validates one batch against one of them. Rather than refuse a
+       * mixed drop, split it and send each kind on its own -- whoever is
+       * uploading should not have to know the server works that way.
+       */
+      const all = Array.from(files);
+      const isVideoFile = (file: File) => /\.(mp4|webm)$/i.test(file.name);
+      const batches: { kind: string; items: File[] }[] = [
+        { kind: 'video', items: all.filter(isVideoFile) },
+        { kind: 'image', items: all.filter((file) => !isVideoFile(file)) },
+      ];
+
+      for (const batch of batches) {
+        if (!batch.items.length) continue;
+        const form = new FormData();
+        batch.items.forEach((file) => form.append('files', file));
+        form.append('folder', uploadFolder);
+        form.append('kind', batch.kind);
+        await api.upload('/admin/media', form);
+      }
+
       await invalidate();
       push(`${files.length} file${files.length === 1 ? '' : 's'} uploaded`, 'success');
     } catch (err) {
@@ -153,7 +171,13 @@ export default function AdminMedia() {
           />
           <div className="flex items-end">
             <div className="w-full">
-              <MultiImageUpload onUpload={(files) => void upload(files)} uploading={uploading} label="Upload files" />
+              <MultiImageUpload
+                onUpload={(files) => void upload(files)}
+                uploading={uploading}
+                label="Upload files"
+                accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.mp4,.webm"
+                hint="Images, or MP4 and WEBM video — up to 12 at a time"
+              />
             </div>
           </div>
         </div>
@@ -324,6 +348,16 @@ export default function AdminMedia() {
                       className="h-full w-full object-cover"
                       loading="lazy"
                     />
+                  ) : asset.mimeType.startsWith('video/') ? (
+                    // First frame only: no controls and no autoplay, so a page
+                    // of clips stays still and silent.
+                    <video
+                      src={assetUrl(asset.url)}
+                      className="h-full w-full bg-ink object-cover"
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
                   ) : (
                     <span className="flex h-full items-center justify-center text-2xs uppercase text-ink-400">
                       {asset.filename.split('.').pop()}
@@ -380,6 +414,16 @@ export default function AdminMedia() {
                 src={assetUrl(viewing.url)}
                 alt={viewing.alt ?? ''}
                 className="max-h-[50vh] w-full bg-paper-warm object-contain"
+              />
+            ) : viewing.mimeType.startsWith('video/') ? (
+              // Playable here, so a clip can be checked before it is put on a
+              // product page rather than after.
+              <video
+                src={assetUrl(viewing.url)}
+                className="max-h-[50vh] w-full bg-ink"
+                controls
+                playsInline
+                preload="metadata"
               />
             ) : null}
 

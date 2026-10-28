@@ -700,6 +700,14 @@ router.get(
     if (req.query.folder) where.folder = String(req.query.folder);
     if (req.query.search) where.filename = { contains: String(req.query.search), mode: 'insensitive' };
 
+    /*
+     * `type=image` or `type=video`, so a field that can only hold one of them
+     * is not offered the other. Matched on the stored MIME rather than the
+     * extension, which is the canonical value the upload was validated down to.
+     */
+    const type = String(req.query.type ?? '');
+    if (type === 'image' || type === 'video') where.mimeType = { startsWith: `${type}/` };
+
     const [items, total, trashCount] = await Promise.all([
       prisma.mediaAsset.findMany({
         where,
@@ -727,7 +735,10 @@ router.post(
     if (!files.length) throw ApiError.badRequest('No files were uploaded');
 
     const folder = resolveFolder(req.body?.folder);
-    const stored = await persistUploads(files, 'image', folder);
+    // Anything but an explicit "video" stays an image upload, so every caller
+    // written before video existed keeps the behaviour it was written against.
+    const kind = String(req.body?.kind ?? '') === 'video' ? 'video' : 'image';
+    const stored = await persistUploads(files, kind, folder);
 
     const created = [];
     for (const item of stored) {

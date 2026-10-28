@@ -91,11 +91,16 @@ export async function persistUpload(
    * from it rather than looked at on a screen. A PDF is not a raster image and
    * passes straight through.
    */
-  const optimized = await optimizeImage(
-    file.buffer,
-    validated.mimeType,
-    kind === 'image' ? 'catalogue' : 'original',
-  );
+  // Video is stored exactly as it arrived. There is no transcoder here, and
+  // handing footage to an image optimiser would at best waste the work.
+  const optimized =
+    kind === 'video'
+      ? null
+      : await optimizeImage(
+          file.buffer,
+          validated.mimeType,
+          kind === 'image' ? 'catalogue' : 'original',
+        );
 
   const buffer = optimized?.converted ? optimized.buffer : file.buffer;
   const mimeType = optimized?.converted ? optimized.mimeType : validated.mimeType;

@@ -15,7 +15,7 @@ import { ApiError } from '../utils/http';
  *    .svg, .xml) regardless of what it claims to be.
  */
 
-export type UploadKind = 'image' | 'artwork';
+export type UploadKind = 'image' | 'artwork' | 'video';
 
 /** ext -> canonical mime, for the types we accept. */
 const ALLOWED: Record<UploadKind, Record<string, string>> = {
@@ -37,6 +37,13 @@ const ALLOWED: Record<UploadKind, Record<string, string>> = {
     '.gif': 'image/gif',
     '.avif': 'image/avif',
     '.pdf': 'application/pdf',
+  },
+  // Short product footage shown as the last slide in a gallery. Deliberately
+  // only two formats: both play in every current browser without a plugin or
+  // a transcode step, which this server has no way to perform.
+  video: {
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
   },
 };
 
@@ -77,6 +84,20 @@ const SIGNATURES: Signature[] = [
   { mime: 'image/webp', magic: [0x57, 0x45, 0x42, 0x50], offset: 8 },
   // ....ftypavif
   { mime: 'image/avif', magic: [0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66], offset: 4 },
+  /*
+   * ....ftyp — any ISO base media file. The brand that follows varies far too
+   * much to enumerate (isom, mp42, avc1, iso5, dash and more), so only the box
+   * type is matched. AVIF is the same container and is listed above, where it
+   * is caught first by its longer signature.
+   *
+   * This does mean a QuickTime .mov renamed to .mp4 is accepted. That is a
+   * media container either way, never something the server can execute, and
+   * the browser will simply decline to play it -- a far smaller problem than
+   * refusing legitimate footage because its brand was not on a list.
+   */
+  { mime: 'video/mp4', magic: [0x66, 0x74, 0x79, 0x70], offset: 4 },
+  // EBML header, shared by WebM and Matroska.
+  { mime: 'video/webm', magic: [0x1a, 0x45, 0xdf, 0xa3] },
 ];
 
 /** Identifies a buffer by its leading bytes, or null when unrecognised. */

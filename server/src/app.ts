@@ -191,10 +191,46 @@ export function createApp() {
       if (!blob) return next();
 
       res.setHeader('Content-Type', blob.mimeType);
-      res.setHeader('Content-Length', String(blob.size));
       // Filenames carry a content hash, so a stored file never changes under
       // its key and can be cached as long as the ones served from disk.
       res.setHeader('Cache-Control', env.isProduction ? 'public, max-age=2592000, immutable' : 'no-store');
+      res.setHeader('Accept-Ranges', 'bytes');
+
+      /*
+       * Partial content, which is what makes stored video usable.
+       *
+       * A <video> element asks for a byte range to read the container's header,
+       * then more as it plays, and it will not let anyone drag the scrubber
+       * unless the server says it can serve ranges. Answering every request
+       * with the whole file also meant a ten-megabyte clip crossed the wire in
+       * full before the first frame appeared, and again on every seek.
+       *
+       * Images never send a Range header, so they take the same path they
+       * always did.
+       */
+      const range = req.headers.range;
+      const match = typeof range === 'string' ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null;
+
+      if (match) {
+        const size = blob.bytes.length;
+        const hasStart = match[1] !== '';
+        // "bytes=-500" means the last 500 bytes, not from 0 to 500.
+        const start = hasStart ? Number(match[1]) : Math.max(0, size - Number(match[2] || 0));
+        const end = hasStart ? Math.min(Number(match[2] || size - 1), size - 1) : size - 1;
+
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) {
+          res.setHeader('Content-Range', `bytes */${size}`);
+          return res.status(416).end();
+        }
+
+        res.status(206);
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
+        res.setHeader('Content-Length', String(end - start + 1));
+        if (req.method === 'HEAD') return res.end();
+        return res.end(blob.bytes.subarray(start, end + 1));
+      }
+
+      res.setHeader('Content-Length', String(blob.size));
       if (req.method === 'HEAD') return res.end();
       return res.end(blob.bytes);
     } catch (error) {
