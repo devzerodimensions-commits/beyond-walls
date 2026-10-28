@@ -669,6 +669,9 @@ export const TrashIcon = icon(
 );
 export const EditIcon = icon(<><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 5 4 4" /></>);
 export const CheckIcon = icon(<path d="m5 12 5 5L19 7" />);
+/* Outlined, and filled by the caller when it is on. */
+export const StarIcon = icon(<path d="m12 3.6 2.6 5.3 5.9.9-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.8l5.9-.9z" />);
+export const DownloadIcon = icon(<><path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M4 18v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1" /></>);
 export const ExternalIcon = icon(<><path d="M14 4h6v6" /><path d="M20 4 10 14" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>);
 export const FilterIcon = icon(<><path d="M4 6h16" /><path d="M7 12h10" /><path d="M10 18h4" /></>);
 export const GridIcon = icon(<><rect x="4" y="4" width="7" height="7" /><rect x="13" y="4" width="7" height="7" /><rect x="4" y="13" width="7" height="7" /><rect x="13" y="13" width="7" height="7" /></>);

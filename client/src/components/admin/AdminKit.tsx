@@ -129,6 +129,12 @@ export interface Column<T> {
   render: (row: T) => ReactNode;
   className?: string;
   width?: string;
+  /**
+   * The field the server sorts by. Present means the header becomes a button;
+   * absent means the column is not sortable, which is the right answer for
+   * anything the database cannot order by — a count, or a rendered summary.
+   */
+  sortKey?: string;
 }
 
 /**
@@ -180,7 +186,7 @@ function RowTick({
 
 export function DataTable<T extends { id: string }>({
   columns, rows, loading, emptyTitle = 'Nothing here yet', emptyDescription, emptyAction, skeletonRows = 6,
-  selection,
+  selection, sort,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -199,6 +205,12 @@ export function DataTable<T extends { id: string }>({
     onChange: (ids: string[]) => void;
     /** Describes a row in the tick's aria-label, e.g. order number. */
     label?: (row: T) => string;
+  };
+  /** Makes any column carrying a sortKey clickable. */
+  sort?: {
+    by: string;
+    dir: 'asc' | 'desc';
+    onChange: (by: string, dir: 'asc' | 'desc') => void;
   };
 }) {
   const selected = selection?.selected ?? [];
@@ -264,8 +276,35 @@ export function DataTable<T extends { id: string }>({
                   key={column.key}
                   className={column.className}
                   style={column.width ? { width: column.width } : undefined}
+                  aria-sort={
+                    sort && column.sortKey === sort.by
+                      ? sort.dir === 'asc' ? 'ascending' : 'descending'
+                      : undefined
+                  }
                 >
-                  {column.header}
+                  {sort && column.sortKey ? (
+                    <button
+                      type="button"
+                      // Clicking the column already in use flips it; any other
+                      // column starts ascending, which is what reading order
+                      // means for a name and is the least surprising for the
+                      // rest.
+                      onClick={() =>
+                        sort.onChange(
+                          column.sortKey as string,
+                          column.sortKey === sort.by && sort.dir === 'asc' ? 'desc' : 'asc',
+                        )
+                      }
+                      className="inline-flex items-center gap-1 transition-colors hover:text-ink"
+                    >
+                      {column.header}
+                      <span aria-hidden="true" className={clsx('text-2xs', column.sortKey === sort.by ? 'opacity-100' : 'opacity-30')}>
+                        {column.sortKey === sort.by && sort.dir === 'desc' ? '▼' : '▲'}
+                      </span>
+                    </button>
+                  ) : (
+                    column.header
+                  )}
                 </th>
               ))}
             </tr>

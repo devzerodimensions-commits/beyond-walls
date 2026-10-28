@@ -178,7 +178,16 @@ router.get(
       where.AND = [{ trackInventory: true }, { stock: { lte: 5 } }];
     }
 
-    const orderField = String(q.orderBy ?? 'createdAt');
+    /*
+     * Only columns the list actually shows can be sorted by.
+     *
+     * The field went straight into Prisma's orderBy, so any string in the
+     * query became a database error -- a 500 from a URL anyone could type,
+     * and nothing in the UI had to be wrong for it to happen.
+     */
+    const SORTABLE = new Set(['name', 'sku', 'price', 'stock', 'status', 'createdAt', 'updatedAt']);
+    const requested = String(q.orderBy ?? '');
+    const orderField = SORTABLE.has(requested) ? requested : 'createdAt';
     const orderDir = String(q.order ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
     const [items, total] = await Promise.all([
@@ -228,6 +237,186 @@ router.get(
       data: items,
       meta: { ...buildPageMeta(page, perPage, total), counts },
     });
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// CSV in and out
+//
+// Both sit above the /:id routes on purpose: Express matches in order, and
+// "export.csv" would otherwise be read as a product id.
+// ---------------------------------------------------------------------------
+
+/** The columns, in order. Export writes them; import reads the ones it can act on. */
+const CSV_COLUMNS = [
+  'SKU', 'Name', 'Price', 'Compare At', 'Cost', 'Stock', 'Status', 'Featured', 'Category',
+] as const;
+
+/** GET /admin/products/export.csv */
+router.get(
+  '/export.csv',
+  asyncHandler(async (req, res) => {
+    const where: Prisma.ProductWhereInput = {};
+    if (req.query.status) where.status = String(req.query.status) as never;
+    else where.status = { not: 'ARCHIVED' };
+    if (req.query.categoryId) where.categoryId = String(req.query.categoryId);
+
+    const products = await prisma.product.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      include: { category: { select: { name: true } } },
+      take: 5000,
+    });
+
+    /*
+     * Every field is quoted, and a quote inside one is doubled. A product name
+     * with a comma in it is ordinary, and unquoted it would silently shift
+     * every later column on that row.
+     */
+    const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+    const rows = products.map((p) =>
+      [
+        p.sku ?? '',
+        p.name,
+        p.price ?? '',
+        p.compareAtPrice ?? '',
+        p.costPrice ?? '',
+        p.trackInventory ? p.stock : '',
+        p.status,
+        p.featured ? 'yes' : 'no',
+        p.category?.name ?? '',
+      ]
+        .map(escape)
+        .join(','),
+    );
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="beyond-walls-products.csv"');
+    // A BOM, so Excel opens rupee amounts and accented names as UTF-8 rather
+    // than as the local code page.
+    res.send(`﻿${[CSV_COLUMNS.join(','), ...rows].join('\n')}`);
+  }),
+);
+
+/**
+ * POST /admin/products/import
+ *
+ * Rows are matched on SKU: a known SKU is updated, an unknown one with a name
+ * is created as a draft. Nothing is ever deleted, and nothing is created
+ * already live — a catalogue arriving from a spreadsheet gets looked at before
+ * customers see it.
+ *
+ * Each row stands alone. One bad price does not abandon the other four
+ * hundred, and the response says what happened to every row so the person who
+ * uploaded it can fix that line and send it again.
+ */
+router.post(
+  '/import',
+  asyncHandler(async (req, res) => {
+    const rowSchema = z.object({
+      sku: z.string().trim().min(1).max(64),
+      name: z.string().trim().max(160).optional(),
+      price: z.coerce.number().nonnegative().optional(),
+      compareAtPrice: z.coerce.number().nonnegative().optional(),
+      costPrice: z.coerce.number().nonnegative().optional(),
+      stock: z.coerce.number().int().min(0).optional(),
+      status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
+      featured: z.boolean().optional(),
+    });
+
+    const rows = z.array(z.unknown()).max(2000).parse(req.body?.rows ?? []);
+
+    const results: { row: number; sku: string; outcome: string; message?: string }[] = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const lineNumber = index + 2; // 1 is the header, and that is how a spreadsheet counts
+      const parsed = rowSchema.safeParse(rows[index]);
+
+      if (!parsed.success) {
+        const raw = rows[index] as { sku?: unknown } | null;
+        results.push({
+          row: lineNumber,
+          sku: String(raw?.sku ?? ''),
+          outcome: 'skipped',
+          message: parsed.error.issues[0]?.message ?? 'Could not be read',
+        });
+        continue;
+      }
+
+      const { sku, ...fields } = parsed.data;
+
+      try {
+        const existing = await prisma.product.findFirst({ where: { sku } });
+
+        if (!existing) {
+          if (!fields.name) {
+            results.push({ row: lineNumber, sku, outcome: 'skipped', message: 'New product needs a name' });
+            continue;
+          }
+          const created = await prisma.product.create({
+            data: {
+              ...fields,
+              name: fields.name,
+              sku,
+              slug: await uniqueSlug('product', fields.name),
+              // Always a draft, whatever the file said.
+              status: 'DRAFT',
+            } as never,
+          });
+          results.push({ row: lineNumber, sku, outcome: 'created', message: created.name });
+          continue;
+        }
+
+        const updated = await prisma.product.update({
+          where: { id: existing.id },
+          data: {
+            ...fields,
+            ...(fields.status === 'PUBLISHED' && existing.status !== 'PUBLISHED'
+              ? { publishedAt: new Date() }
+              : {}),
+          } as never,
+        });
+
+        // Publishing from a spreadsheet answers to the same rule as the toggle.
+        if (updated.status === 'PUBLISHED' && existing.status !== 'PUBLISHED') {
+          try {
+            await assertPublishable(updated.id);
+          } catch (err) {
+            await prisma.product.update({
+              where: { id: updated.id },
+              data: { status: existing.status },
+            });
+            results.push({
+              row: lineNumber,
+              sku,
+              outcome: 'updated',
+              message: `Saved, but left as ${existing.status.toLowerCase()}: ${
+                err instanceof Error ? err.message : 'cannot be published yet'
+              }`,
+            });
+            continue;
+          }
+        }
+
+        results.push({ row: lineNumber, sku, outcome: 'updated', message: updated.name });
+      } catch (err) {
+        results.push({
+          row: lineNumber,
+          sku,
+          outcome: 'skipped',
+          message: err instanceof Error ? err.message : 'Could not be saved',
+        });
+      }
+    }
+
+    const summary = {
+      created: results.filter((r) => r.outcome === 'created').length,
+      updated: results.filter((r) => r.outcome === 'updated').length,
+      skipped: results.filter((r) => r.outcome === 'skipped').length,
+    };
+
+    res.json({ success: true, data: { summary, results } });
   }),
 );
 
