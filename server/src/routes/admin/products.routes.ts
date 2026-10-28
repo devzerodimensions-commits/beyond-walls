@@ -196,7 +196,38 @@ router.get(
       prisma.product.count({ where }),
     ]);
 
-    res.json({ success: true, data: items, meta: buildPageMeta(page, perPage, total) });
+    /*
+     * Totals for the status tabs.
+     *
+     * Counted over the same search and category the list is using, but with
+     * the status condition dropped — the tabs exist to switch status, so each
+     * one has to report what it would show rather than what is showing now.
+     * Archived is included here even though the list hides it by default,
+     * which is the only way anyone discovers the archive exists.
+     */
+    const countWhere: Prisma.ProductWhereInput = { ...where };
+    delete countWhere.status;
+
+    const grouped = await prisma.product.groupBy({
+      by: ['status'],
+      where: countWhere,
+      _count: { _all: true },
+    });
+
+    const counts = grouped.reduce<Record<string, number>>(
+      (acc, row) => {
+        acc[row.status] = row._count._all;
+        acc.ALL += row._count._all;
+        return acc;
+      },
+      { ALL: 0, PUBLISHED: 0, DRAFT: 0, ARCHIVED: 0 },
+    );
+
+    res.json({
+      success: true,
+      data: items,
+      meta: { ...buildPageMeta(page, perPage, total), counts },
+    });
   }),
 );
 

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import clsx from 'clsx';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import type { Category, ContentStatus, Product } from '../../lib/types';
@@ -23,7 +24,12 @@ export default function AdminProducts() {
   const [categoryId, setCategoryId] = useState('');
   const [deleting, setDeleting] = useState<Product | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulkAction, setBulkAction] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [applying, setApplying] = useState(false);
+
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-products', page, search, status, categoryId],
     queryFn: () =>
       api.list<Product[]>('/admin/products', { page, perPage: 25, search, status, categoryId }),
@@ -70,6 +76,73 @@ export default function AdminProducts() {
   });
 
   const products = data?.data ?? [];
+  const counts = (data?.meta as { counts?: Record<string, number> } | undefined)?.counts;
+
+  // Ticks on rows that have been filtered away are invisible, and acting on
+  // what nobody can see is how a bulk tool causes an accident.
+  useEffect(() => {
+    setSelected([]);
+  }, [search, status, categoryId]);
+
+  const isDelete = bulkAction === 'DELETE';
+  const isDuplicate = bulkAction === 'DUPLICATE';
+
+  /*
+   * Applied one product at a time, through the endpoints a single product
+   * already uses. Deleting therefore keeps its most important behaviour: a
+   * product that appears on an order is archived instead of destroyed, so the
+   * order it belongs to still knows what was bought.
+   *
+   * One failure does not stop the rest, and the first refusal is reported
+   * verbatim because it explains itself.
+   */
+  const applyBulk = async () => {
+    setConfirming(false);
+    setApplying(true);
+
+    const ids = [...selected];
+    let done = 0;
+    let firstProblem = '';
+
+    for (const id of ids) {
+      try {
+        if (isDelete) await api.delete(`/admin/products/${id}`);
+        else if (isDuplicate) await api.post(`/admin/products/${id}/duplicate`);
+        else await api.patch(`/admin/products/${id}/status`, { status: bulkAction });
+        done += 1;
+      } catch (err) {
+        if (!firstProblem) firstProblem = err instanceof ApiError ? err.message : 'Could not be updated';
+      }
+    }
+
+    const skipped = ids.length - done;
+    setSelected([]);
+    setBulkAction('');
+    await refetch();
+    setApplying(false);
+
+    if (!done) push(firstProblem || 'Nothing was changed', 'error');
+    else if (skipped) push(`${done} done · ${skipped} skipped — ${firstProblem}`, 'info');
+    else push(`${done} product${done === 1 ? '' : 's'} updated`, 'success');
+  };
+
+  const bulkSummary = () => {
+    const count = `${selected.length} product${selected.length === 1 ? '' : 's'}`;
+    if (isDelete) {
+      return `Delete ${count}? Any that appear on an existing order are archived instead, so those orders keep their history. The rest, with their images, go for good.`;
+    }
+    if (isDuplicate) return `Duplicate ${count}? Each copy is created as a draft.`;
+    if (bulkAction === 'PUBLISHED') return `Publish ${count}? They become visible in the shop immediately.`;
+    if (bulkAction === 'DRAFT') return `Move ${count} to draft? They come off the shop until published again.`;
+    return `Archive ${count}? They come off the shop and out of this list.`;
+  };
+
+  const statusTabs: { value: string; label: string; count?: number }[] = [
+    { value: '', label: 'Live and draft', count: counts ? counts.PUBLISHED + counts.DRAFT : undefined },
+    { value: 'PUBLISHED', label: 'Published', count: counts?.PUBLISHED },
+    { value: 'DRAFT', label: 'Draft', count: counts?.DRAFT },
+    { value: 'ARCHIVED', label: 'Archived', count: counts?.ARCHIVED },
+  ];
 
   const categoryOptions = [
     { value: '', label: 'All categories' },
@@ -92,19 +165,36 @@ export default function AdminProducts() {
       />
 
       <AdminCard>
-        <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/*
+          Status as a row of counted links rather than a dropdown.
+
+          The count is the point: "Draft 34" tells the studio there is a
+          backlog, which a closed select never would, and archived products
+          stop being a thing nobody knows exists.
+        */}
+        <div className="mb-4 flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-stone-line pb-3 text-sm">
+          {statusTabs.map((tab, index) => (
+            <span key={tab.value || 'all'} className="flex items-center">
+              {index ? <span className="px-2 text-ink-300">|</span> : null}
+              <button
+                type="button"
+                onClick={() => { setStatus(tab.value); setPage(1); }}
+                className={clsx(
+                  'transition-colors',
+                  status === tab.value ? 'font-medium text-ink' : 'text-ink-500 hover:text-ink',
+                )}
+              >
+                {tab.label}
+                {tab.count === undefined ? null : (
+                  <span className="ml-1 text-ink-400">({tab.count})</span>
+                )}
+              </button>
+            </span>
+          ))}
+        </div>
+
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <AdminSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search by name or SKU…" />
-          <Select
-            value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            aria-label="Filter by status"
-            options={[
-              { value: '', label: 'Live and draft' },
-              { value: 'PUBLISHED', label: 'Published' },
-              { value: 'DRAFT', label: 'Draft' },
-              { value: 'ARCHIVED', label: 'Archived only' },
-            ]}
-          />
           <Select
             value={categoryId}
             onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}
@@ -116,12 +206,59 @@ export default function AdminProducts() {
           </div>
         </div>
 
+        {selected.length ? (
+          <div className="mb-4 flex flex-wrap items-center gap-3 border border-stone-line bg-paper-off px-4 py-3">
+            <span className="text-sm font-medium">{selected.length} selected</span>
+            <Select
+              value={bulkAction}
+              onChange={(e) => setBulkAction(e.target.value)}
+              aria-label="Bulk action"
+              className="w-auto min-w-[200px]"
+              options={[
+                { value: '', label: 'Bulk actions…' },
+                { value: 'PUBLISHED', label: 'Publish' },
+                { value: 'DRAFT', label: 'Move to draft' },
+                { value: 'ARCHIVED', label: 'Archive' },
+                { value: 'DUPLICATE', label: 'Duplicate' },
+                { value: 'DELETE', label: 'Delete' },
+              ]}
+            />
+            <Button
+              size="sm"
+              variant={isDelete ? 'danger' : 'primary'}
+              disabled={!bulkAction}
+              loading={applying}
+              onClick={() => setConfirming(true)}
+            >
+              Apply
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+              Clear
+            </Button>
+          </div>
+        ) : null}
+
+        <ConfirmDialog
+          open={confirming}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => void applyBulk()}
+          title={isDelete ? 'Delete products' : 'Update products'}
+          message={bulkSummary()}
+          confirmLabel={isDelete ? 'Delete' : 'Apply'}
+          tone={isDelete ? 'danger' : 'primary'}
+        />
+
         <DataTable
           rows={products}
           loading={isLoading}
           emptyTitle="No products yet"
           emptyDescription="Add your first product to start building the catalogue."
           emptyAction={<ButtonLink to="/admin/products/new" size="sm">Add product</ButtonLink>}
+          selection={{
+            selected,
+            onChange: setSelected,
+            label: (product) => product.name,
+          }}
           columns={[
             {
               key: 'product',
