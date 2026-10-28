@@ -4,14 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import type {
-  AttributeGroup, AttributeValue, Category, ContentStatus, PersonalizationField, PersonalizationType,
-  Product, ProductImage, ProductVariant,
+  AttributeGroup, AttributeValue, Category, ContentStatus, MediaAsset, PersonalizationField,
+  PersonalizationType, Product, ProductImage, ProductVariant,
 } from '../../lib/types';
 import { slugify, toNumber } from '../../lib/format';
 import { VIDEO_HELP, resolveVideo } from '../../lib/video';
 import { useToast } from '../../context/StoreProvider';
 import {
-  AdminCard, AdminPageHeader, MultiImageUpload, SortableList, StringListEditor,
+  AdminCard, AdminPageHeader, MediaPicker, MultiImageUpload, SortableList, StringListEditor,
 } from '../../components/admin/AdminKit';
 import {
   LivePreview, PLATE_FONTS, PREVIEW_SLOTS, PREVIEW_TEMPLATES, buildPreviewSlots,
@@ -892,6 +892,8 @@ function ImagesTab({
   const queryClient = useQueryClient();
   const { push } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [ordered, setOrdered] = useState(images);
 
   useEffect(() => setOrdered(images), [images]);
@@ -911,6 +913,41 @@ function ImagesTab({
       push(err instanceof ApiError ? err.message : 'Upload failed', 'error');
     } finally {
       setUploading(false);
+    }
+  };
+
+  /*
+   * Attach images that are already on the site.
+   *
+   * Photography gets reused -- the same studio shot across a size variant, a
+   * lifestyle image across a whole category -- and uploading it again would
+   * put a second copy in storage for every product that shows it.
+   *
+   * Sent one at a time on purpose. The endpoint works out each image's
+   * position from how many the product already has, so firing them off in
+   * parallel would have them all read the same count and land in an arbitrary
+   * order. In sequence, they arrive in the order they were ticked.
+   *
+   * The alt text stored against the file comes with it, so a picture
+   * described once stays described everywhere it is used.
+   */
+  const linkFromLibrary = async (assets: MediaAsset[]) => {
+    setLibraryOpen(false);
+    if (!assets.length) return;
+    setLinking(true);
+    try {
+      for (const asset of assets) {
+        await api.post(`/admin/products/${productId}/images/link`, {
+          url: asset.url,
+          alt: asset.alt ?? '',
+        });
+      }
+      await refresh();
+      push(`${assets.length} image${assets.length === 1 ? '' : 's'} added`, 'success');
+    } catch (err) {
+      push(err instanceof ApiError ? err.message : 'Could not add images', 'error');
+    } finally {
+      setLinking(false);
     }
   };
 
@@ -1027,7 +1064,25 @@ function ImagesTab({
           </div>
         ) : null}
 
-        <MultiImageUpload onUpload={(files) => void upload(files)} uploading={uploading} />
+        <div className="space-y-2.5">
+          <MultiImageUpload onUpload={(files) => void upload(files)} uploading={uploading} />
+          <Button
+            type="button"
+            variant="secondary"
+            fullWidth
+            loading={linking}
+            onClick={() => setLibraryOpen(true)}
+          >
+            Choose from media library
+          </Button>
+        </div>
+
+        <MediaPicker
+          multiple
+          open={libraryOpen}
+          onClose={() => setLibraryOpen(false)}
+          onPick={(assets) => void linkFromLibrary(assets)}
+        />
       </AdminCard>
 
       <AdminCard

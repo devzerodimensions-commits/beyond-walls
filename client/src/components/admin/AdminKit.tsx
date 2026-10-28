@@ -576,8 +576,8 @@ export function ImageField({
       <MediaPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        onPick={(url) => {
-          onChange(url);
+        onPick={(assets) => {
+          if (assets[0]) onChange(assets[0].url);
           setPickerOpen(false);
         }}
       />
@@ -586,15 +586,23 @@ export function ImageField({
 }
 
 export function MediaPicker({
-  open, onClose, onPick,
+  open, onClose, onPick, multiple = false,
 }: {
   open: boolean;
   onClose: () => void;
-  onPick: (url: string) => void;
+  /** The chosen files, in the order they were ticked. */
+  onPick: (assets: MediaAsset[]) => void;
+  /**
+   * Lets several files be ticked and added in one go, which is what a product
+   * gallery wants. Off by default: a field that holds one image should close
+   * the moment something is clicked rather than ask for a confirmation.
+   */
+  multiple?: boolean;
 }) {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [picked, setPicked] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -606,8 +614,54 @@ export function MediaPicker({
       .finally(() => setLoading(false));
   }, [open, search]);
 
+  // Start empty every time it opens. Last time's ticks are never what somebody
+  // means to add this time, and a stale selection added silently is worse than
+  // one they have to make again.
+  useEffect(() => {
+    if (!open) setPicked([]);
+  }, [open]);
+
+  const choose = (asset: MediaAsset) => {
+    if (!multiple) {
+      onPick([asset]);
+      return;
+    }
+    setPicked((current) =>
+      current.includes(asset.id)
+        ? current.filter((id) => id !== asset.id)
+        : [...current, asset.id],
+    );
+  };
+
+  const confirm = () => {
+    const byId = new Map(assets.map((asset) => [asset.id, asset]));
+    onPick(picked.map((id) => byId.get(id)).filter(Boolean) as MediaAsset[]);
+  };
+
   return (
-    <Modal open={open} onClose={onClose} title="Media library" size="lg">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Media library"
+      size="lg"
+      footer={
+        multiple ? (
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm text-ink-400">
+              {picked.length ? `${picked.length} selected` : 'Tap images to select them'}
+            </span>
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="button" size="sm" disabled={!picked.length} onClick={confirm}>
+                {picked.length > 1 ? `Add ${picked.length} images` : 'Add image'}
+              </Button>
+            </div>
+          </div>
+        ) : undefined
+      }
+    >
       <AdminSearch value={search} onChange={setSearch} placeholder="Search files…" className="mb-4" />
 
       {loading ? (
@@ -623,22 +677,36 @@ export function MediaPicker({
         </p>
       ) : (
         <div className="grid max-h-[55vh] grid-cols-3 gap-3 overflow-y-auto sm:grid-cols-5">
-          {assets.map((asset) => (
-            <button
-              key={asset.id}
-              type="button"
-              onClick={() => onPick(asset.url)}
-              className="group aspect-square overflow-hidden border border-stone-line bg-paper-warm transition-colors hover:border-ink"
-              title={asset.filename}
-            >
-              <img
-                src={assetUrl(asset.url)}
-                alt={asset.alt ?? asset.filename}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            </button>
-          ))}
+          {assets.map((asset) => {
+            const position = picked.indexOf(asset.id);
+            return (
+              <button
+                key={asset.id}
+                type="button"
+                onClick={() => choose(asset)}
+                aria-pressed={multiple ? position >= 0 : undefined}
+                className={clsx(
+                  'group relative aspect-square overflow-hidden border bg-paper-warm transition-colors',
+                  position >= 0 ? 'border-ink ring-2 ring-ink' : 'border-stone-line hover:border-ink',
+                )}
+                title={asset.filename}
+              >
+                <img
+                  src={assetUrl(asset.url)}
+                  alt={asset.alt ?? asset.filename}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+                {/* The tick order is the order they will be added, so it is
+                    worth showing rather than just marking them chosen. */}
+                {position >= 0 ? (
+                  <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center bg-ink text-2xs font-medium text-paper">
+                    {position + 1}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       )}
     </Modal>
