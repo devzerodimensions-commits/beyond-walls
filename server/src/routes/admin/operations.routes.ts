@@ -257,6 +257,44 @@ router.patch(
 );
 
 /**
+ * DELETE /admin/orders/:id — remove an order and everything hanging off it.
+ *
+ * Refused while money is still held against it. An order whose payment was
+ * captured is a financial record, and in India a tax one; deleting it would
+ * leave a charge on the customer's card with nothing on this side to account
+ * for it. Refund first — the same rule the cancel path already enforces, and
+ * the same wording, so the admin learns one rule rather than two.
+ *
+ * Reserved stock is released on the way out. `restoreStockForOrder` is guarded
+ * by `stockReleasedAt`, so an order that was already cancelled does not get
+ * its inventory handed back a second time.
+ *
+ * Items, payments and their events go with it through the cascade on their
+ * relations.
+ */
+router.delete(
+  '/orders/:id',
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw ApiError.notFound('Order not found');
+
+    const captured = await prisma.payment.findFirst({
+      where: { orderId: existing.id, status: { in: ['PAID', 'PARTIALLY_REFUNDED'] } },
+    });
+    if (captured && Number(captured.refundedAmount) < Number(captured.amount)) {
+      throw ApiError.badRequest(
+        `${existing.orderNumber} has a captured payment. Refund it first — then it can be deleted.`,
+      );
+    }
+
+    await restoreStockForOrder(existing.id);
+    await prisma.order.delete({ where: { id: existing.id } });
+
+    res.json({ success: true, data: { id: existing.id, orderNumber: existing.orderNumber } });
+  }),
+);
+
+/**
  * POST /admin/orders/:id/refund — full or partial Razorpay refund.
  *
  * Delegates to issueRefund, which sends Razorpay an idempotency key and stores

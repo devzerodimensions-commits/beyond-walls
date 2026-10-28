@@ -131,8 +131,42 @@ export interface Column<T> {
   width?: string;
 }
 
+/**
+ * A bare tick for a table row.
+ *
+ * The Checkbox in the UI kit always draws a label beside itself, which is
+ * right for a form and wrong for a column of them, so this borrows its styling
+ * and carries the description in aria-label instead.
+ */
+function RowTick({
+  checked, onChange, label, indeterminate = false,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  indeterminate?: boolean;
+}) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={label}
+      checked={checked}
+      ref={(node) => {
+        // Some rows ticked, not all: the header shows the dash rather than
+        // claiming the whole page is selected.
+        if (node) node.indeterminate = indeterminate && !checked;
+      }}
+      onChange={(e) => onChange(e.target.checked)}
+      onClick={(e) => e.stopPropagation()}
+      className="tickbox h-4 w-4 shrink-0 cursor-pointer appearance-none border border-ink-300 bg-paper
+                 transition-colors checked:border-ink checked:bg-ink indeterminate:border-ink indeterminate:bg-ink"
+    />
+  );
+}
+
 export function DataTable<T extends { id: string }>({
   columns, rows, loading, emptyTitle = 'Nothing here yet', emptyDescription, emptyAction, skeletonRows = 6,
+  selection,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -141,7 +175,44 @@ export function DataTable<T extends { id: string }>({
   emptyDescription?: string;
   emptyAction?: ReactNode;
   skeletonRows?: number;
+  /**
+   * Adds a tick column. Pass the ids currently selected and a handler; the
+   * table owns none of it, so the page above can clear the selection when the
+   * filters change and the rows underneath are no longer the same rows.
+   */
+  selection?: {
+    selected: string[];
+    onChange: (ids: string[]) => void;
+    /** Describes a row in the tick's aria-label, e.g. order number. */
+    label?: (row: T) => string;
+  };
 }) {
+  const selected = selection?.selected ?? [];
+  const allOnPage = rows.length > 0 && rows.every((row) => selected.includes(row.id));
+  const someOnPage = rows.some((row) => selected.includes(row.id));
+
+  const toggleRow = (row: T, checked: boolean) => {
+    if (!selection) return;
+    selection.onChange(
+      checked ? [...selected, row.id] : selected.filter((id) => id !== row.id),
+    );
+  };
+
+  /*
+   * Select-all covers this page only, and leaves anything ticked on another
+   * page alone. Someone who ticks a row, pages forward and ticks "all" has not
+   * asked to lose the first one.
+   */
+  const togglePage = (checked: boolean) => {
+    if (!selection) return;
+    const idsOnPage = rows.map((row) => row.id);
+    selection.onChange(
+      checked
+        ? [...selected.filter((id) => !idsOnPage.includes(id)), ...idsOnPage]
+        : selected.filter((id) => !idsOnPage.includes(id)),
+    );
+  };
+
   if (loading) {
     return (
       <div className="space-y-2 p-1">
@@ -164,6 +235,16 @@ export function DataTable<T extends { id: string }>({
         <table className="admin-table">
           <thead>
             <tr>
+              {selection ? (
+                <th style={{ width: 40 }}>
+                  <RowTick
+                    checked={allOnPage}
+                    indeterminate={someOnPage}
+                    onChange={togglePage}
+                    label="Select every row on this page"
+                  />
+                </th>
+              ) : null}
               {columns.map((column) => (
                 <th
                   key={column.key}
@@ -178,6 +259,15 @@ export function DataTable<T extends { id: string }>({
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
+                {selection ? (
+                  <td>
+                    <RowTick
+                      checked={selected.includes(row.id)}
+                      onChange={(checked) => toggleRow(row, checked)}
+                      label={`Select ${selection.label?.(row) ?? 'this row'}`}
+                    />
+                  </td>
+                ) : null}
                 {columns.map((column) => (
                   <td key={column.key} className={column.className}>
                     {column.render(row)}
@@ -206,7 +296,18 @@ export function DataTable<T extends { id: string }>({
               className="rounded-[10px] border p-4"
               style={{ borderColor: 'var(--a-line)', background: 'var(--a-surface)' }}
             >
-              <div className="mb-3">{lead.render(row)}</div>
+              <div className="mb-3 flex items-start gap-3">
+                {selection ? (
+                  <span className="pt-0.5">
+                    <RowTick
+                      checked={selected.includes(row.id)}
+                      onChange={(checked) => toggleRow(row, checked)}
+                      label={`Select ${selection.label?.(row) ?? 'this row'}`}
+                    />
+                  </span>
+                ) : null}
+                <div className="min-w-0 flex-1">{lead.render(row)}</div>
+              </div>
               <dl className="space-y-2">
                 {rest.map((column) => (
                   <div key={column.key} className="flex items-start justify-between gap-4">
