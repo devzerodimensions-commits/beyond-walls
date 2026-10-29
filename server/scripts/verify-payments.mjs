@@ -19,8 +19,15 @@ const BASE = process.env.API_URL ?? 'http://localhost:4000/api';
 const SANDBOX = process.env.RAZORPAY_SANDBOX_URL ?? 'http://127.0.0.1:4999';
 const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET ?? 'sandbox_secret';
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET ?? 'sandbox_webhook_secret';
-const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@beyondwall.in';
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
+/** The seed sets no default admin, so a missing value is a setup error. */
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be set to run this script — it matches the seeded admin.`);
+  return value;
+}
+
+const ADMIN_EMAIL = requireEnv('SEED_ADMIN_EMAIL');
+const ADMIN_PASSWORD = requireEnv('SEED_ADMIN_PASSWORD');
 
 let passed = 0;
 let failed = 0;

@@ -8,8 +8,15 @@ import { expect, test } from '@playwright/test';
  */
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:4000/api';
-const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@beyondwall.in';
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
+/** The seed sets no default admin, so a missing value is a setup error, not a login failure. */
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be set to run this suite — it matches the seeded admin.`);
+  return value;
+}
+
+const ADMIN_EMAIL = requireEnv('SEED_ADMIN_EMAIL');
+const ADMIN_PASSWORD = requireEnv('SEED_ADMIN_PASSWORD');
 
 let adminToken = '';
 const created: string[] = [];

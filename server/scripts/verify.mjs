@@ -15,8 +15,15 @@ import crypto from 'crypto';
 
 const BASE = process.argv[2] ?? process.env.API_URL ?? 'http://localhost:4000/api';
 const ROOT = BASE.replace(/\/api$/, '');
-const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@beyondwall.in';
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
+/** The seed sets no default admin, so a missing value is a setup error. */
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be set to run this script — it matches the seeded admin.`);
+  return value;
+}
+
+const ADMIN_EMAIL = requireEnv('SEED_ADMIN_EMAIL');
+const ADMIN_PASSWORD = requireEnv('SEED_ADMIN_PASSWORD');
 
 const RUN = Date.now().toString(36).slice(-5);
 const CART_SESSION = `verify_${RUN}`;

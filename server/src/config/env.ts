@@ -86,8 +86,10 @@ export const env = {
   razorpayWebhookSecret: optional('RAZORPAY_WEBHOOK_SECRET'),
   razorpayCurrency: optional('RAZORPAY_CURRENCY', 'INR'),
 
-  seedAdminEmail: optional('SEED_ADMIN_EMAIL', 'admin@beyondwall.in'),
-  seedAdminPassword: optional('SEED_ADMIN_PASSWORD', 'Admin@12345'),
+  /* No defaults: a default administrator password is a published one. The
+     seed refuses to run without both -- see server/prisma/seed.ts. */
+  seedAdminEmail: optional('SEED_ADMIN_EMAIL'),
+  seedAdminPassword: optional('SEED_ADMIN_PASSWORD'),
   seedAdminName: optional('SEED_ADMIN_NAME', 'Beyond Walls Admin'),
 
   rateLimitWindowMinutes: num('RATE_LIMIT_WINDOW_MINUTES', 15),

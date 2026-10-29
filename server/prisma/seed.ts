@@ -43,8 +43,34 @@ function log(step: string, detail = '') {
 // 1. Admin account
 // ---------------------------------------------------------------------------
 async function seedAdmin() {
-  const email = (process.env.SEED_ADMIN_EMAIL ?? 'admin@beyondwall.in').toLowerCase();
-  const password = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
+  /*
+   * No defaults, on purpose.
+   *
+   * These used to fall back to admin@beyondwall.in / Admin@12345, and that
+   * password was printed in a public README — so every install shipped with an
+   * administrator account whose credentials anyone could look up, and the only
+   * thing standing between that and the catalogue was somebody remembering to
+   * change it.
+   *
+   * Refusing to seed is the safer failure. A clear error at setup costs a
+   * minute; an unchanged default admin costs the shop.
+   */
+  const rawEmail = process.env.SEED_ADMIN_EMAIL;
+  const password = process.env.SEED_ADMIN_PASSWORD;
+
+  if (!rawEmail || !password) {
+    throw new Error(
+      'SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must both be set before seeding.\n' +
+        '  They have no defaults: a default administrator password is a published one.\n' +
+        '  Generate one with:\n' +
+        "    node -e \"console.log(require('crypto').randomBytes(18).toString('base64url'))\"",
+    );
+  }
+  if (password.length < 12) {
+    throw new Error('SEED_ADMIN_PASSWORD must be at least 12 characters.');
+  }
+
+  const email = rawEmail.toLowerCase();
   const name = process.env.SEED_ADMIN_NAME ?? 'Beyond Walls Admin';
 
   const user = await prisma.user.upsert({
@@ -1135,7 +1161,7 @@ async function main() {
   // eslint-disable-next-line no-console
   console.log('  ─────────────────────────────────────────');
   // eslint-disable-next-line no-console
-  console.log(`  Done. Sign in at /admin with ${process.env.SEED_ADMIN_EMAIL ?? 'admin@beyondwall.in'}`);
+  console.log(`  Done. Sign in at /admin with ${process.env.SEED_ADMIN_EMAIL}`);
   // eslint-disable-next-line no-console
   console.log('  NOTE: product prices are PLACEHOLDERS (priceConfirmed = false).');
   // eslint-disable-next-line no-console

@@ -495,6 +495,53 @@ router.post(
 );
 
 /**
+ * DELETE /admin/orders/:id/ship — forget a booking so the order can be sent again.
+ *
+ * Booking refuses an order that already carries a shipment, which is right:
+ * two bookings are two parcels and somebody pays for both. But a cancelled
+ * shipment leaves those ids behind, and until now nothing could remove them —
+ * so an order whose first booking was cancelled, for a pincode the courier
+ * could not serve, could never be re-booked. The advice the UI gave ("cancel
+ * it in Shiprocket first") was advice that led nowhere.
+ *
+ * This only forgets. It does not cancel anything at the courier, because it
+ * cannot know whether they already have: cancelling is done in their panel,
+ * where the freight refund is decided. Hence the deliberate wording in the
+ * admin — cancel there, then clear here.
+ */
+router.delete(
+  '/orders/:id/ship',
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw ApiError.notFound('Order not found');
+    if (!existing.courierShipmentId) {
+      throw ApiError.badRequest('This order has no courier booking to clear');
+    }
+
+    const order = await prisma.order.update({
+      where: { id: existing.id },
+      data: {
+        courierOrderId: null,
+        courierShipmentId: null,
+        courierBookedAt: null,
+        // The waybill went with the cancelled shipment. Leaving it on the order
+        // would show the customer a tracking number that resolves to nothing.
+        trackingNumber: null,
+        trackingUrl: null,
+        courierName: null,
+      },
+      include: ORDER_INCLUDE,
+    });
+
+    res.json({
+      success: true,
+      data: order,
+      message: 'Booking cleared. Make sure it is cancelled in Shiprocket too, or you will have two parcels.',
+    });
+  }),
+);
+
+/**
  * POST /admin/orders/:id/refund — full or partial Razorpay refund.
  *
  * Delegates to issueRefund, which sends Razorpay an idempotency key and stores

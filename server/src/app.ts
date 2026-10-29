@@ -22,6 +22,36 @@ export function createApp() {
 
   if (env.trustProxy) app.set('trust proxy', 1);
 
+  /*
+   * One address for one page.
+   *
+   * www and the bare domain both served every page, so search engines saw two
+   * copies of the catalogue and had to guess which to rank -- and a customer
+   * who signed in on one host arrived at the other without their session,
+   * because a cookie set for the bare domain is not sent to www.
+   *
+   * Done here rather than in the proxy so it travels with the application and
+   * cannot be lost the next time the server is rebuilt. 301, because this is
+   * permanent and worth caching. Everything after the host is preserved, query
+   * string included, so a shared product link still lands on the product.
+   *
+   * Skipped when the host is unreadable or already correct, which includes
+   * localhost and the health check a load balancer polls.
+   */
+  app.use((req, res, next) => {
+    const host = req.headers.host;
+    if (!host || !host.toLowerCase().startsWith('www.')) return next();
+
+    const bare = host.slice(4);
+
+    // www.localhost is somebody's local experiment, not a canonical-URL
+    // problem, and sending them to https would just break it.
+    if (/^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(bare)) return next();
+
+    const proto = env.trustProxy ? req.protocol : 'https';
+    return res.redirect(301, `${proto}://${bare}${req.originalUrl}`);
+  });
+
   app.use(
     helmet({
       // Uploaded images are served from this origin and embedded by the SPA.

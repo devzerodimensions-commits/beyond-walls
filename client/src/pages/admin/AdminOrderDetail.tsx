@@ -49,6 +49,7 @@ export default function AdminOrderDetail() {
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['admin-order', id],
@@ -93,6 +94,25 @@ export default function AdminOrderDetail() {
       push('Shipment booked — tracking details saved', 'success');
     },
     onError: (err) => push(err instanceof ApiError ? err.message : 'Could not book shipment', 'error'),
+  });
+
+  /*
+   * Forgets a booking so the order can be sent again. Only touches our record
+   * -- the courier is cancelled in their panel, where the freight refund is
+   * decided, which is why the confirmation insists on that order of events.
+   */
+  const clearBooking = useMutation({
+    mutationFn: () => api.delete(`/admin/orders/${id}/ship`),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-order', id] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+      setClearOpen(false);
+      push('Booking cleared — this order can be sent again', 'success');
+    },
+    onError: (err) => {
+      push(err instanceof ApiError ? err.message : 'Could not clear the booking', 'error');
+      setClearOpen(false);
+    },
   });
 
   const testCourier = useMutation({
@@ -401,11 +421,21 @@ export default function AdminOrderDetail() {
                 in Shiprocket — a second booking would be a second parcel.
               */}
               {order.courierShipmentId ? (
-                <div className="border border-stone-line bg-paper-off px-3 py-2.5 text-2xs leading-relaxed text-ink-500">
-                  Booked with the courier
-                  {order.courierBookedAt ? ` on ${formatDate(order.courierBookedAt, true)}` : ''}.
-                  <br />
-                  To book again, cancel it in Shiprocket first.
+                <div className="space-y-2 border border-stone-line bg-paper-off px-3 py-2.5">
+                  <p className="text-2xs leading-relaxed text-ink-500">
+                    Booked with the courier
+                    {order.courierBookedAt ? ` on ${formatDate(order.courierBookedAt, true)}` : ''}.
+                    <br />
+                    To send it again, cancel it in Shiprocket first, then clear the booking here.
+                  </p>
+                  <button
+                    type="button"
+                    className="a-btn a-btn-ghost text-2xs text-state-danger"
+                    disabled={clearBooking.isPending}
+                    onClick={() => setClearOpen(true)}
+                  >
+                    {clearBooking.isPending ? 'Clearing…' : 'Clear courier booking'}
+                  </button>
                 </div>
               ) : (
                 <>
@@ -530,6 +560,17 @@ export default function AdminOrderDetail() {
         loading={update.isPending}
         onCancel={() => setCancelOpen(false)}
         onConfirm={() => update.mutate({ status: 'CANCELLED' })}
+      />
+
+      <ConfirmDialog
+        open={clearOpen}
+        tone="danger"
+        title="Clear the courier booking?"
+        message="This only forgets the booking here — it does not cancel anything at the courier. Cancel the shipment in Shiprocket first, or you will end up with two parcels and pay for both. The waybill and tracking link are removed, so the order can be sent again."
+        confirmLabel="Clear booking"
+        loading={clearBooking.isPending}
+        onCancel={() => setClearOpen(false)}
+        onConfirm={() => clearBooking.mutate()}
       />
     </>
   );

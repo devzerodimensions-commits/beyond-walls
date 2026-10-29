@@ -120,8 +120,19 @@ must be running first.
 | API | http://localhost:4000/api |
 | Health check | http://localhost:4000/api/health |
 
-Sign in to the admin panel with the credentials from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
-(default `admin@beyondwall.in` / `Admin@12345`). **Change this password immediately.**
+Sign in to the admin panel with the credentials you set in `SEED_ADMIN_EMAIL` and
+`SEED_ADMIN_PASSWORD` before seeding.
+
+> **Set both before you run the seed.** They used to have defaults, and a default admin
+> password printed in a public README is a password anybody can read — so there are no
+> defaults any more. The seed fails loudly if they are missing, which is the intended
+> behaviour: better a clear error at setup than an account nobody changed.
+>
+> Generate one rather than inventing it:
+>
+> ```bash
+> node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))"
+> ```
 
 ### Useful commands
 
@@ -165,7 +176,7 @@ Sign in to the admin panel with the credentials from `SEED_ADMIN_EMAIL` / `SEED_
 
 | Variable | Notes |
 | --- | --- |
-| `VITE_API_URL` | API base URL, e.g. `https://api.beyondwall.in/api` |
+| `VITE_API_URL` | API base URL. Same origin in production, so `/api`. |
 | `VITE_ASSET_URL` | Where `/uploads` is served from |
 | `VITE_SITE_URL` | Canonical public URL, used in SEO tags |
 
@@ -568,7 +579,7 @@ npm run prisma:deploy -w server
 ```nginx
 server {
   listen 443 ssl http2;
-  server_name beyondwall.in;
+  server_name thebeyondwalls.com;
 
   client_max_body_size 12M;   # must exceed MAX_UPLOAD_MB
 
@@ -638,10 +649,9 @@ automatically and links straight to what needs attention.
 
 **Domain and SEO**
 
-- [ ] **Confirm the canonical site URL** in Settings → SEO. It currently defaults to
-      `https://beyondwall.in`, which was inferred from the business email address and has not been
-      confirmed. Canonical tags, the sitemap and every share link are built from it. Tick
-      *"This is the correct live domain"* once it is right.
+- [x] **Canonical site URL** — `https://thebeyondwalls.com`, confirmed. Canonical tags, the
+      sitemap and every share link are built from it. The application redirects `www` to the bare
+      domain with a 301, so the two cannot be indexed as separate copies.
 - [ ] Check the search-result preview on the same screen: titles under 60 characters, descriptions
       under 160
 - [ ] Set shipping rates and the free-shipping threshold
@@ -662,5 +672,5 @@ automatically and links straight to what needs attention.
 Beyond Walls
 First Floor, Shop No. 01, Prime Center Mall, Opp. Three Corner Garden, Mirzapur,
 Ahmedabad, Gujarat 380001
-+91 7600738785 · info@beyondwall.in
++91 7600738785 · info@thebeyondwalls.com
 Monday–Saturday, 10 AM – 8 PM

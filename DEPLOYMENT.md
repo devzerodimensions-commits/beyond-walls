@@ -1,284 +1,205 @@
-# Deploying Beyond Walls to Render
+# Deploying Beyond Walls
 
-Everything in this repository is ready to deploy. What follows is the whole
-process, in order, with the reasoning where a choice matters.
+The site runs on the studio's own server under Docker Compose. Two containers,
+one published port, Traefik in front terminating TLS.
+
+This file used to describe a Render deployment. That is no longer how it is
+hosted, and a deploy guide pointing at the wrong platform is worse than none —
+so it has been replaced rather than amended.
 
 ---
 
-## What gets created
+## Where it runs
 
-Two things, described by [`render.yaml`](render.yaml):
-
-| Resource | What it is |
+| | |
 | --- | --- |
-| `beyondwalls` | One Node web service: the storefront, the admin panel and the API |
-| `beyondwalls-db` | One PostgreSQL database |
+| Host | `157.66.191.36` |
+| SSH user | `t_adf81f9d` — **not** `root`. Connecting as root fails with `Permission denied (publickey)`, which does not mean the key is wrong. |
+| Key | `~/.ssh/beyondwalls_t_adf81f9d_ed25519` (not a default filename, so `-i` is required) |
+| App directory | `~/app` → `/srv/tenants/t_adf81f9d/app` |
+| Containers | `app-app-1` (site + admin + API), `app-db-1` (postgres:16-alpine) |
+| Domain | `https://thebeyondwalls.com` |
 
-### Why one service and not two
+### Why one container serves everything
 
-It would be conventional to put the site on a static host and the API on a web
-service. Don't. The refresh token is an **HttpOnly, `SameSite=Strict` cookie**,
-and a browser will not send that cookie to a different origin. Split them and
-every customer is silently signed out fifteen minutes after logging in, with no
-error to explain it.
-
-Serving both from one origin also means there is no CORS to misconfigure, and
-uploaded images come from the same host as the pages that embed them.
+It would be conventional to put the storefront on a static host and the API
+somewhere else. Don't. The refresh token is an HttpOnly, `SameSite=Strict`
+cookie, which a browser will not send across origins — so the site and the API
+have to be the same origin or nobody stays signed in. Serving both from one
+process also means no CORS configuration to get wrong.
 
 ---
 
-## Step 1 — Put the code on GitHub
+## The deploy
 
-The repository is already initialised and committed locally. Nothing secret is
-in it: `.env` files are excluded, and only the `.env.example` templates are
-tracked.
+`~/app` is **not a git checkout**, so `git pull` there does nothing. Deployment
+is a tarball of `main` unpacked over the directory.
 
-1. Go to **github.com/new**
-2. Name it `beyond-walls`
-3. Choose **Private** — this is commercial work with business details in it
-4. Do **not** tick "Add a README", "Add .gitignore" or "Choose a license"; the
-   repository already has them and an extra commit would refuse the push
-5. Create the repository, then run the two commands GitHub shows you, which
-   will look like this:
+Push first, or the tarball will not contain your change.
+
+```powershell
+cd "C:\Users\Admin\ZERO DIMENSIONS PRIVATE LIMITED\Development - Documents\Beyond Walls"; git push origin main
+```
+
+```powershell
+ssh -i $env:USERPROFILE\.ssh\beyondwalls_t_adf81f9d_ed25519 t_adf81f9d@157.66.191.36 'cd ~; tar czf app-backup-$(date +%F-%H%M).tar.gz app; curl -sL https://github.com/devzerodimensions-commits/beyond-walls/archive/refs/heads/main.tar.gz -o latest.tar.gz; tar xzf latest.tar.gz --strip-components=1 -C app; cd app; docker compose up -d --build 2>&1 | tail -10'
+```
+
+It backs up the whole app directory first, fetches the code, rebuilds and
+restarts. Wait for `Container app-app-1 Started`.
+
+`prisma migrate deploy` runs inside the build (see the server package's
+`build:deploy` script), so data migrations apply on their own.
+
+PowerShell has no `&&` and no heredocs, which is why remote work is given as a
+single-line `ssh … '<remote command>'`.
+
+---
+
+## Configuration, and the trap in it
+
+Two files, and **both** are needed for a new setting to reach the application.
+
+### `~/app/.env`
+
+Holds the secrets. **Not** in git, so a deploy never overwrites it.
+
+### `~/app/compose.yml`
+
+Also **not** in git — the repository's `docker-compose.yml` is only the
+local-development database, and Compose prefers `compose.yml` over it. That is
+why a deploy cannot clobber the real configuration.
+
+> **`.env` alone does nothing.** It only feeds `${...}` substitution inside
+> `compose.yml`; it does not become the container's environment. A variable the
+> server reads must also be listed under `services.app.environment`, normally as
+> `${NAME:?missing from .env}`. Add it to `.env` only and it is silently absent,
+> and the server falls back to its development defaults.
+
+To add a setting:
 
 ```bash
-git remote add origin https://github.com/YOUR-USERNAME/beyond-walls.git
-git push -u origin main
+# 1. the value
+cd ~/app && read -p "Value: " V && printf "\nMY_SETTING='%s'\n" "$V" >> .env && unset V
+
+# 2. make the container see it — indentation is read from the file itself,
+#    because YAML rejects a guess
+cd ~/app && cp compose.yml compose.yml.bak-$(date +%F-%H%M%S) \
+  && IND=$(sed -n 's/^\( *\)NODE_ENV.*/\1/p' compose.yml | head -1) \
+  && printf '%s\n' "${IND}MY_SETTING: \${MY_SETTING:?missing from .env}" > /tmp/add.yml \
+  && sed -i '/NODE_ENV/r /tmp/add.yml' compose.yml \
+  && docker compose config >/dev/null && echo YAML_OK && docker compose up -d
 ```
 
----
-
-## Step 2 — Create the services on Render
-
-1. Sign in at **dashboard.render.com**
-2. **New → Blueprint**
-3. Connect the GitHub repository
-4. Render reads `render.yaml` and shows you what it will create. Approve it.
-
-Render then asks for the values the blueprint deliberately leaves blank. You can
-skip any of them now and add them later under **Environment**; the site runs
-without them and tells you in the log what is missing.
-
-| Variable | Needed for | If you leave it blank |
-| --- | --- | --- |
-| `SEED_ADMIN_PASSWORD` | Your admin login | **Set this now.** See step 3. |
-| `SMTP_*` | Order and password-reset emails | Emails are written to the log, not sent |
-| `RAZORPAY_*` | Online payment | Cash on delivery only; the site makes no payment claims |
-
-The first build takes about five minutes. It installs dependencies, generates
-the Prisma client, applies the database migrations, then compiles the server and
-the site.
+Never restart without `docker compose config` passing first.
 
 ---
 
-## Step 3 — Create the admin account
+## What is configured
 
-The database starts empty. Once the first deploy is green, open
-**Render → your service → Shell** and run:
+Every variable is documented in [`server/.env.example`](server/.env.example).
+In production these are set:
 
-```bash
-npm run seed
-```
-
-That creates the admin account, the 4 categories, the attribute groups, the
-homepage sections, the pages, the FAQs, and the 2 catalogue products.
-
-It signs you in with `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` from the
-environment. **Set a real password before running this.** The one in the README
-is a public default and anyone reading this repository knows it.
-
-Seeding is safe to run again: it updates what exists rather than duplicating it,
-and it never overwrites a price you have confirmed.
-
----
-
-## Step 4 — Fix the URL
-
-Render may not give you `beyondwalls.onrender.com` — if the name is taken it
-appends a suffix. Once you know the real URL, set both of these under
-**Environment**:
-
-- `PUBLIC_SITE_URL`
-- `API_BASE_URL`
-
-Include `https://`. These are concatenated into password-reset links and order
-emails, so a bare hostname produces a link that does not work. (The server
-corrects a missing scheme and logs a warning, but set it properly.)
-
-Then set the same URL in **Admin → Settings → SEO → Canonical site URL** and
-tick *"This is the correct live domain"*. That value drives every canonical tag,
-the sitemap and every share link.
-
----
-
-## Step 5 — Your own domain
-
-1. **Render → Settings → Custom Domains → Add**
-2. Add the CNAME record Render gives you at your domain registrar
-3. Wait for the certificate — Render issues it automatically
-4. Update `PUBLIC_SITE_URL`, `API_BASE_URL` and the admin SEO setting to the new
-   domain
-
----
-
-## Images: where uploads live
-
-**Render rebuilds the filesystem on every deploy.** Anything uploaded through
-the admin panel — product photography, gallery images, customer artwork — would
-be gone the next time you push a change. This is not a bug in Render; it is how
-containerised hosting works.
-
-The seeded product images survive only because they are committed to the
-repository and listed again by each build. Nothing uploaded afterwards has that
-protection.
-
-So uploads go into the **database**, which is the one piece of storage here
-that outlives a deploy. `STORAGE_DRIVER` is already set to `database`: there is
-nothing to sign up for, nothing to pay for and no credential to fill in — which
-also means no credential to get wrong or let expire.
-
-Stored files keep ordinary `/uploads/...` URLs and are served by the same route,
-behind the same hardening headers, as files on disk. Images already in the
-repository keep being served from disk; only new uploads go to the database.
-Nothing else in the app can tell the two apart.
-
-At startup the log names the driver in use:
-
-```
-storage    database
-```
-
-If that says `local` instead, `STORAGE_DRIVER` has not been set, and uploads
-will not survive the next deploy.
-
-**Other options.** The database suits a catalogue of product photographs. For a
-much larger or more image-heavy site, object storage with a CDN in front of it
-is the better fit, and those drivers are already written — set `STORAGE_DRIVER`
-to `s3`, `r2` or `cloudinary` and supply that provider's credentials. No code
-changes either way.
-
-**Amazon S3 or Cloudflare R2** are also supported — set `STORAGE_DRIVER=s3` and
-the `S3_*` variables instead.
-
----
-
-## Email
-
-Without SMTP credentials the server does not fail; it writes emails to the log
-and carries on. That is fine for a first look and wrong for a live shop:
-
-- a customer who forgets their password gets a reset link that is never sent
-- nobody receives an order confirmation
-- custom-order enquiries — your actual sales leads — arrive only in the admin
-  panel, so someone has to go looking for them
-
-Any SMTP provider works. Fill in `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
-`SMTP_PASSWORD`, `SMTP_FROM`, and `ADMIN_NOTIFICATION_EMAIL` for the enquiries.
-
----
-
-## Razorpay
-
-1. Razorpay Dashboard → **Settings → API Keys** → generate live keys
-2. Put them in Render → Environment as `RAZORPAY_KEY_ID` and
-   `RAZORPAY_KEY_SECRET`
-3. Razorpay Dashboard → **Settings → Webhooks** → add:
-   - URL: `https://your-domain/api/webhooks/razorpay`
-   - Events: `payment.authorized`, `payment.captured`, `payment.failed`,
-     `refund.created`, `refund.processed`
-   - Copy the webhook secret into `RAZORPAY_WEBHOOK_SECRET`
-4. **Admin → Settings → Payments** → enable online payment
-
-The secret key is only ever read on the server. Only the public key id reaches
-the browser, and it is fetched from the API at checkout rather than compiled
-into the bundle, so it can be rotated without a rebuild.
-
-Test with Razorpay's own test keys first. The webhook must be reachable from the
-internet, so this is the one thing that cannot be rehearsed locally.
-
----
-
-## Before you sell from it
-
-The blueprint uses Render's **free** plans so nothing is charged without your
-say-so. Two things to understand before real customers arrive:
-
-**The free web service sleeps after 15 minutes of no traffic.** The next visitor
-waits roughly 50 seconds looking at a blank page. For a shop, that is the
-difference between a sale and a bounce.
-
-**The free database is deleted after 30 days** and cannot be backed up. Every
-order, customer and product goes with it.
-
-To fix both, in `render.yaml`:
-
-```yaml
-databases:
-  - name: beyondwalls-db
-    plan: basic-256mb        # was: free
-
-services:
-  - type: web
-    plan: starter            # was: free
-```
-
-Push the change and Render applies it. Current pricing is on Render's site; as of
-writing this is about $7/month for the service and $7/month for the database.
-
----
-
-## Deploying an update
-
-```bash
-git add -A
-git commit -m "What changed"
-git push
-```
-
-Render rebuilds and redeploys automatically. Migrations run as part of the build,
-so a schema change deploys with the code that needs it.
-
----
-
-## When something is wrong
-
-**Check the startup banner first.** Render → Logs. It states plainly what is and
-is not configured:
-
-```
-  Beyond Walls API
-  ─────────────────────────────────────────
-  env        production
-  razorpay   NOT configured (add keys to .env)
-  email      not configured (emails are logged only)
-  storage    local
-```
-
-| Symptom | Cause |
+| | |
 | --- | --- |
-| Blank page, API works | The client build is missing. Look for `[web] no client build at …` in the log. |
-| Signed out after ~15 min | `PUBLIC_SITE_URL` points at a different origin than the site is served from. |
-| Password reset link does not work | `PUBLIC_SITE_URL` is missing `https://`, or SMTP is unconfigured. |
-| Images vanish after a deploy | STORAGE_DRIVER is not set. The log says `storage    local` instead of `storage    database`. |
-| Everyone is rate limited at once | `TRUST_PROXY` is not `true`, so every customer looks like one visitor. |
-| Payment says unavailable | Razorpay keys are missing, or it is disabled in Admin → Settings → Payments. |
+| Database | `PGPASSWORD`, assembled into `DATABASE_URL` in `compose.yml` |
+| Auth | `JWT_SECRET`, `JWT_REFRESH_SECRET` |
+| Admin seed | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` — no defaults, the seed refuses without them |
+| Email | `SMTP_*` — the studio's own mail host, `srv1.zerodimensions.in` |
+| Payments | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` |
+| Courier | `SHIPROCKET_*`, including the webhook token |
+| Proxy | `TRUST_PROXY=true` — without it the server sees every request as coming from Traefik, rate limiting counts all customers as one visitor, and secure cookies are refused |
+| Uploads | `STORAGE_DRIVER=database` |
+
+### Uploads live in Postgres
+
+Product images, logos and video are rows, not files. One backup covers the
+database and the media together, with no second store that can drift out of
+step with it. `/uploads/...` URLs are served from the database by a handler in
+`server/src/app.ts`, which answers Range requests so video can be seeked.
 
 ---
 
-## Verifying a deployment
+## Webhooks
 
-The test suites run against any URL:
+Both are public, both authenticate, and neither is rate limited.
+
+| Who | URL |
+| --- | --- |
+| Razorpay | `https://thebeyondwalls.com/api/webhooks/razorpay` |
+| Shiprocket | `https://thebeyondwalls.com/api/webhooks/parcel-tracking` |
+
+Razorpay's is verified by HMAC over the raw body, which is why it is mounted
+before the JSON parser. Shiprocket's is verified by a shared secret in
+`x-api-key`.
+
+> Shiprocket refuses a callback URL containing `shiprocket`, `kartrocket`, `sr`
+> or `kr`. That is why the route is called `parcel-tracking` — the obvious name
+> is the one name it cannot have.
+
+---
+
+## Data
+
+PostgreSQL 16 in `app-db-1`, on a **named** Docker volume, not a bind mount.
+Under rootless Docker the container's postgres uid (70) maps to a subuid, while
+a bind-mounted host directory belongs to the tenant uid and arrives as uid 0
+inside — `initdb` then cannot write to its own data directory.
+
+The volume lives under the tenant home (`.local/share/docker/volumes`), which
+restic backs up.
 
 ```bash
-# API behaviour — creates and cleans up its own test data
-API_URL=https://your-domain/api node server/scripts/verify.mjs
-
-# The browser journey, desktop and mobile
-E2E_BASE_URL=https://your-domain npx playwright test
+# size of the database, media included
+ssh -i $env:USERPROFILE\.ssh\beyondwalls_t_adf81f9d_ed25519 t_adf81f9d@157.66.191.36 \
+  'cd ~/app && docker compose exec -T db psql -U beyondwalls -d beyondwalls -c "SELECT pg_size_pretty(pg_database_size(current_database()));"'
 ```
 
-Both make far more requests than a person would, so raise `RATE_LIMIT_MAX` and
-`AUTH_RATE_LIMIT_MAX` while they run, then put them back.
+**A backup nobody has restored is not a backup.** Restoring into a scratch
+database and checking the catalogue is intact is worth doing before it is ever
+needed in anger.
 
-`verify.mjs` places a real order. Orders are never hard-deleted, so it leaves one
-cancelled test order behind in the admin.
+---
+
+## Checking a deploy
+
+```bash
+# integrations, from the startup banner
+ssh -i $env:USERPROFILE\.ssh\beyondwalls_t_adf81f9d_ed25519 t_adf81f9d@157.66.191.36 \
+  'cd ~/app && docker compose logs app --tail 40 | grep -iE "razorpay|email|storage"'
+```
+
+Expect `razorpay configured` and `email SMTP configured`.
+
+From anywhere, needing no credentials:
+
+```bash
+curl -s https://thebeyondwalls.com/api/health
+curl -s https://thebeyondwalls.com/api/checkout/config
+```
+
+The courier is checked from the admin panel — open any order, Shipping, **Test
+courier connection**. It cannot be checked by opening a URL, because the admin
+API authenticates on a bearer token the app holds in memory, not a cookie.
+
+---
+
+## Rolling back
+
+Every deploy writes `~/app-backup-<date>-<time>.tar.gz` first.
+
+```bash
+ssh -i $env:USERPROFILE\.ssh\beyondwalls_t_adf81f9d_ed25519 t_adf81f9d@157.66.191.36 \
+  'cd ~ && ls -1t app-backup-*.tar.gz | head -5'
+```
+
+```bash
+# replace <file>, then rebuild
+ssh -i $env:USERPROFILE\.ssh\beyondwalls_t_adf81f9d_ed25519 t_adf81f9d@157.66.191.36 \
+  'cd ~ && tar xzf <file> && cd app && docker compose up -d --build 2>&1 | tail -5'
+```
+
+This restores code and configuration. **It does not undo a data migration** —
+migrations here are written to be idempotent and guarded on the symptom they
+repair, so re-running one is safe, but reversing a schema change means writing
+the migration that reverses it.
