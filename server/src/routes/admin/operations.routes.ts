@@ -131,6 +131,7 @@ router.get(
           siteUrl: String(await getSetting('seo.siteUrl', '')),
           razorpayConfigured,
           emailConfigured,
+          courierConfigured: shiprocketConfigured,
         },
       },
     });

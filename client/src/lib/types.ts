@@ -614,5 +614,6 @@ export interface DashboardData {
     siteUrl: string;
     razorpayConfigured: boolean;
     emailConfigured: boolean;
+    courierConfigured: boolean;
   };
 }

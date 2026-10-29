@@ -216,7 +216,10 @@ export default function AdminDashboard() {
  * number nobody has agreed to.
  */
 function LaunchChecklist({ checks }: { checks: DashboardData['launchChecks'] }) {
-  const { unconfirmedPrices, domainConfirmed, siteUrl, razorpayConfigured, emailConfigured } = checks;
+  const {
+    unconfirmedPrices, domainConfirmed, siteUrl, razorpayConfigured, emailConfigured,
+    courierConfigured,
+  } = checks;
 
   const items: { key: string; tone: 'warn' | 'info'; body: React.ReactNode }[] = [];
 
@@ -300,6 +303,22 @@ function LaunchChecklist({ checks }: { checks: DashboardData['launchChecks'] }) 
           <p className="mt-1 leading-relaxed">
             Order confirmations, password resets and enquiry alerts are written to the server log
             instead of being sent. Add SMTP details to the server environment.
+          </p>
+        </>
+      ),
+    });
+  }
+
+  if (!courierConfigured) {
+    items.push({
+      key: 'courier',
+      tone: 'info',
+      body: (
+        <>
+          <p className="font-medium text-ink">The courier is not connected</p>
+          <p className="mt-1 leading-relaxed">
+            Orders cannot be booked from here yet. Book them in Shiprocket and type the waybill into
+            the order instead — the customer still gets the same tracking email either way.
           </p>
         </>
       ),

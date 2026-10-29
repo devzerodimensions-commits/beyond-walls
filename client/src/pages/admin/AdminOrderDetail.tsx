@@ -95,6 +95,18 @@ export default function AdminOrderDetail() {
     onError: (err) => push(err instanceof ApiError ? err.message : 'Could not book shipment', 'error'),
   });
 
+  const testCourier = useMutation({
+    mutationFn: () =>
+      api.get<{ configured: boolean; ok?: boolean; mode?: string; message?: string }>(
+        '/admin/shipping/test',
+      ),
+    onSuccess: (result) => {
+      if (!result.configured) push(result.message ?? 'No courier credentials on the server', 'info');
+      else push(`Courier connected (${result.mode ?? 'live'})`, 'success');
+    },
+    onError: (err) => push(err instanceof ApiError ? err.message : 'Courier test failed', 'error'),
+  });
+
   const refund = useMutation({
     mutationFn: (amount?: number) => api.post(`/admin/orders/${id}/refund`, { amount }),
     onSuccess: async () => {
@@ -396,15 +408,33 @@ export default function AdminOrderDetail() {
                   To book again, cancel it in Shiprocket first.
                 </div>
               ) : (
-                <Button
-                  size="sm"
-                  fullWidth
-                  loading={bookCourier.isPending}
-                  disabled={order.status === 'CANCELLED' || order.status === 'REFUNDED'}
-                  onClick={() => bookCourier.mutate()}
-                >
-                  Book with courier
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    fullWidth
+                    loading={bookCourier.isPending}
+                    disabled={order.status === 'CANCELLED' || order.status === 'REFUNDED'}
+                    onClick={() => bookCourier.mutate()}
+                  >
+                    Book with courier
+                  </Button>
+                  {/*
+                    Signs in to the courier and reports back, booking nothing.
+
+                    Here rather than buried in settings because this is where
+                    somebody stands when a booking has just failed, and the
+                    first useful question is whether the credentials work at
+                    all or the parcel itself was the problem.
+                  */}
+                  <button
+                    type="button"
+                    className="a-btn a-btn-ghost w-full text-2xs"
+                    disabled={testCourier.isPending}
+                    onClick={() => testCourier.mutate()}
+                  >
+                    {testCourier.isPending ? 'Checking…' : 'Test courier connection'}
+                  </button>
+                </>
               )}
 
               <Input
