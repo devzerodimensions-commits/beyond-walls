@@ -3,8 +3,10 @@ import prisma from '../../lib/prisma';
 import { asyncHandler } from '../../utils/http';
 import { verifyWebhookSignature } from '../../services/razorpay.service';
 import { applyRefund, markPaid, recordEvent } from '../../services/payment.service';
-import { restoreStockForOrder } from '../../services/order.service';
+import { ORDER_INCLUDE, restoreStockForOrder } from '../../services/order.service';
 import { env } from '../../config/env';
+import { mapCourierStatus } from '../../services/courierStatus';
+import { sendOrderStatusUpdate } from '../../services/email.service';
 
 const router = Router();
 
@@ -192,6 +194,121 @@ router.post(
     }
 
     return res.json({ success: true, data: { processed: eventType } });
+  }),
+);
+
+/**
+ * POST /api/webhooks/parcel-tracking
+ *
+ * Where the courier reports a parcel moving.
+ *
+ * Named "parcel-tracking" deliberately. Shiprocket refuses a callback URL
+ * containing shiprocket, kartrocket, sr or kr, so the obvious name for this
+ * route is the one name it cannot have.
+ *
+ * Authenticated by a shared secret in x-api-key, which is their mechanism.
+ * Without it the route refuses everything: the URL is not a secret, and anyone
+ * who learned it could otherwise mark an order delivered and trigger the
+ * email that goes with it.
+ *
+ * Always answers 200 once the secret checks out, because their documentation
+ * asks for it and a retry storm helps nobody. An event about an order we
+ * cannot find, or one that means nothing to us, is acknowledged and dropped.
+ */
+router.post(
+  '/parcel-tracking',
+  asyncHandler(async (req, res) => {
+    if (!env.shiprocketWebhookToken) {
+      return res.status(503).json({ success: false, error: { message: 'Tracking webhook not configured' } });
+    }
+
+    const presented = req.headers['x-api-key'];
+    if (typeof presented !== 'string' || presented !== env.shiprocketWebhookToken) {
+      return res.status(401).json({ success: false, error: { message: 'Invalid token' } });
+    }
+
+    const body = (typeof req.body === 'object' && req.body ? req.body : {}) as Record<string, unknown>;
+
+    /*
+     * `order_id` is the reference we sent at booking, which is our own order
+     * number. It is the only identifier in this payload we issued ourselves,
+     * so it is the one worth trusting; the shipment id is a fallback for an
+     * order booked before this field was stored.
+     *
+     * Their sample shows order_id as "1373900_150876814" -- their channel id
+     * joined to ours -- so the tail after the last underscore is taken when
+     * the whole string does not match.
+     */
+    const reference = String(body.order_id ?? '');
+    const shipmentId = body.sr_order_id ? String(body.sr_order_id) : undefined;
+    const tail = reference.includes('_') ? reference.slice(reference.lastIndexOf('_') + 1) : reference;
+
+    const order = await prisma.order.findFirst({
+      where: {
+        OR: [
+          { orderNumber: reference },
+          { orderNumber: tail },
+          ...(shipmentId ? [{ courierOrderId: shipmentId }] : []),
+        ],
+      },
+    });
+
+    if (!order) {
+      return res.json({ success: true, data: { unmatched: reference } });
+    }
+
+    const awb = body.awb ? String(body.awb) : null;
+    const courierName = body.courier_name ? String(body.courier_name) : null;
+    const label = String(body.current_status ?? body.shipment_status ?? '');
+    const nextStatus = mapCourierStatus(label);
+
+    const data: Record<string, unknown> = {};
+
+    // The waybill can arrive here first if it was assigned in their panel
+    // rather than through the site.
+    if (awb && awb !== order.trackingNumber) {
+      data.trackingNumber = awb;
+      data.trackingUrl = `https://shiprocket.co/tracking/${awb}`;
+    }
+    if (courierName && courierName !== order.courierName) data.courierName = courierName;
+
+    /*
+     * Statuses only ever move forward.
+     *
+     * Couriers resend and reorder events, and a late "in transit" arriving
+     * after "delivered" would otherwise walk a finished order backwards and
+     * email the customer about it. Cancellations are the exception — an RTO is
+     * real news whenever it arrives.
+     */
+    const FLOW = ['PENDING', 'CONFIRMED', 'IN_PRODUCTION', 'READY_TO_SHIP', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+    const moved =
+      nextStatus &&
+      nextStatus !== order.status &&
+      (nextStatus === 'CANCELLED' || FLOW.indexOf(nextStatus) > FLOW.indexOf(order.status));
+
+    if (moved) {
+      data.status = nextStatus;
+      if (nextStatus === 'SHIPPED' && !order.shippedAt) data.shippedAt = new Date();
+      if (nextStatus === 'DELIVERED' && !order.deliveredAt) data.deliveredAt = new Date();
+    }
+
+    if (!Object.keys(data).length) {
+      return res.json({ success: true, data: { noop: label } });
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: data as never,
+      include: ORDER_INCLUDE,
+    });
+
+    // Only when the status actually moved. A waybill appearing is not news to
+    // a customer; "your order is out for delivery" is.
+    if (moved) {
+      await sendOrderStatusUpdate(updated as never, env.publicSiteUrl);
+    }
+
+    return res.json({ success: true, data: { orderNumber: order.orderNumber, status: updated.status } });
   }),
 );
 

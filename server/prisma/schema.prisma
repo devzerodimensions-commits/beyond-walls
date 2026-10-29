@@ -595,6 +595,15 @@ model Order {
   trackingUrl     String?
   courierName     String?
 
+  /// The courier account's own ids for this order, kept so a second booking
+  /// attempt can be recognised instead of creating a duplicate shipment that
+  /// someone has to notice and cancel. Null until the order is handed over.
+  courierOrderId    String?
+  courierShipmentId String?
+  /// When it was handed to the courier. Distinct from shippedAt, which is when
+  /// the parcel actually left: a booked order can sit for a day before pickup.
+  courierBookedAt   DateTime?
+
   items    OrderItem[]
   payments Payment[]
 

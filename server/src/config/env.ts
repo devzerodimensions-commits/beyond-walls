@@ -110,6 +110,31 @@ export const env = {
   /** Where enquiry notifications go. Falls back to the contact email setting. */
   adminNotificationEmail: optional('ADMIN_NOTIFICATION_EMAIL'),
 
+  // --- Courier (Shiprocket; optional, booking is disabled when unset) -------
+  /**
+   * Point this at the sandbox while testing. The sandbox has its own
+   * credentials, so the host and the login have to change together — which is
+   * why the base URL is a setting rather than a flag.
+   */
+  shiprocketBaseUrl: optional('SHIPROCKET_BASE_URL', 'https://apiv2.shiprocket.in'),
+  shiprocketEmail: optional('SHIPROCKET_EMAIL'),
+  shiprocketPassword: optional('SHIPROCKET_PASSWORD'),
+  /** The pickup location's nickname, exactly as Shiprocket spells it. */
+  shiprocketPickupLocation: optional('SHIPROCKET_PICKUP_LOCATION', 'work'),
+  /** Where parcels leave from. Used for rate and serviceability checks. */
+  shiprocketPickupPincode: optional('SHIPROCKET_PICKUP_PINCODE', '380001'),
+  /**
+   * The shared secret on tracking callbacks, sent as x-api-key. Without it the
+   * webhook is refused outright rather than trusted: anyone who learns the URL
+   * could otherwise mark an order delivered.
+   */
+  shiprocketWebhookToken: optional('SHIPROCKET_WEBHOOK_TOKEN'),
+  /** Fallbacks for a product with no weight or size recorded yet. */
+  shipmentDefaultWeightKg: num('SHIPMENT_DEFAULT_WEIGHT_KG', 0.5),
+  shipmentDefaultLengthCm: num('SHIPMENT_DEFAULT_LENGTH_CM', 25),
+  shipmentDefaultBreadthCm: num('SHIPMENT_DEFAULT_BREADTH_CM', 20),
+  shipmentDefaultHeightCm: num('SHIPMENT_DEFAULT_HEIGHT_CM', 5),
+
   // --- File storage --------------------------------------------------------
   /** local | s3 | r2 | cloudinary */
   storageDriver: optional('STORAGE_DRIVER', 'local'),

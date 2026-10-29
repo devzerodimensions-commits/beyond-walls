@@ -79,6 +79,22 @@ export default function AdminOrderDetail() {
     onError: (err) => push(err instanceof ApiError ? err.message : 'Update failed', 'error'),
   });
 
+  /*
+   * Hands the order to the courier and fills the tracking fields from what
+   * comes back. Deliberately does not advance the status: a booked parcel has
+   * not shipped, and the customer hears about shipping, not about booking.
+   */
+  const bookCourier = useMutation({
+    mutationFn: () => api.post<Order>(`/admin/orders/${id}/ship`),
+    onSuccess: async (_data, _vars, context) => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-order', id] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+      void context;
+      push('Shipment booked — tracking details saved', 'success');
+    },
+    onError: (err) => push(err instanceof ApiError ? err.message : 'Could not book shipment', 'error'),
+  });
+
   const refund = useMutation({
     mutationFn: (amount?: number) => api.post(`/admin/orders/${id}/refund`, { amount }),
     onSuccess: async () => {
@@ -365,6 +381,32 @@ export default function AdminOrderDetail() {
 
           <AdminCard title="Shipping">
             <div className="space-y-4">
+              {/*
+                Booking, above the fields it fills in.
+
+                Once an order is booked the button goes away rather than
+                greying out, because the only honest next step is cancelling
+                in Shiprocket — a second booking would be a second parcel.
+              */}
+              {order.courierShipmentId ? (
+                <div className="border border-stone-line bg-paper-off px-3 py-2.5 text-2xs leading-relaxed text-ink-500">
+                  Booked with the courier
+                  {order.courierBookedAt ? ` on ${formatDate(order.courierBookedAt, true)}` : ''}.
+                  <br />
+                  To book again, cancel it in Shiprocket first.
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  fullWidth
+                  loading={bookCourier.isPending}
+                  disabled={order.status === 'CANCELLED' || order.status === 'REFUNDED'}
+                  onClick={() => bookCourier.mutate()}
+                >
+                  Book with courier
+                </Button>
+              )}
+
               <Input
                 label="Courier" value={tracking.courierName}
                 onChange={(e) => setTracking({ ...tracking, courierName: e.target.value })}

@@ -14,6 +14,9 @@ import {
 } from '../../services/settings.service';
 import { persistUploads, resolveFolder, upload, deleteUploadedFile, UPLOAD_FOLDERS } from '../../middleware/upload';
 import { fileReferenceCount } from '../../services/media.service';
+import {
+  assignAwb, bookShipment, checkServiceability, shiprocketConfigured, testConnection,
+} from '../../services/shiprocket.service';
 import { emailConfigured, sendOrderStatusUpdate } from '../../services/email.service';
 import { razorpayConfigured } from '../../services/razorpay.service';
 import { env } from '../../config/env';
@@ -291,6 +294,202 @@ router.delete(
     await prisma.order.delete({ where: { id: existing.id } });
 
     res.json({ success: true, data: { id: existing.id, orderNumber: existing.orderNumber } });
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Courier
+// ---------------------------------------------------------------------------
+
+/** GET /admin/shipping/test — proves the courier credentials, changes nothing. */
+router.get(
+  '/shipping/test',
+  asyncHandler(async (_req, res) => {
+    if (!shiprocketConfigured) {
+      return res.json({
+        success: true,
+        data: { configured: false, message: 'No courier credentials on this server yet' },
+      });
+    }
+    const result = await testConnection();
+    return res.json({ success: true, data: { configured: true, ...result } });
+  }),
+);
+
+/**
+ * The parcel's weight and size.
+ *
+ * Taken from the products where they have been filled in, and from the
+ * server's defaults where they have not. A studio that has not measured
+ * anything yet still gets a booking rather than a refusal — but the courier
+ * bills on what is declared, so a default that is too low is an invoice
+ * correction later. The response says which products are missing figures so
+ * somebody can fix the cause.
+ *
+ * Weight adds up across the parcel. Dimensions do not: the box is roughly the
+ * largest item's footprint, with the heights stacked, which is closer to how
+ * anything is actually packed than adding three lengths together.
+ */
+function measureParcel(
+  items: { quantity: number; product: { weightGrams: number | null; widthInches: unknown; heightInches: unknown; depthMm: number | null; name: string } | null }[],
+) {
+  const unmeasured: string[] = [];
+  const inchesToCm = (value: unknown) => (value == null ? null : Number(value) * 2.54);
+
+  let weightKg = 0;
+  let maxLength = 0;
+  let maxBreadth = 0;
+  let stackedHeight = 0;
+
+  for (const item of items) {
+    const product = item.product;
+    if (!product) continue;
+
+    if (product.weightGrams == null) unmeasured.push(product.name);
+
+    const grams = product.weightGrams ?? env.shipmentDefaultWeightKg * 1000;
+    weightKg += (grams * item.quantity) / 1000;
+
+    maxLength = Math.max(maxLength, inchesToCm(product.widthInches) ?? env.shipmentDefaultLengthCm);
+    maxBreadth = Math.max(maxBreadth, inchesToCm(product.heightInches) ?? env.shipmentDefaultBreadthCm);
+    stackedHeight += ((product.depthMm ?? env.shipmentDefaultHeightCm * 10) / 10) * item.quantity;
+  }
+
+  return {
+    // Couriers bill in half-kilo steps and refuse a zero, so never below 0.5.
+    weightKg: Math.max(0.5, Math.round(weightKg * 100) / 100),
+    lengthCm: Math.max(1, Math.round(maxLength)),
+    breadthCm: Math.max(1, Math.round(maxBreadth)),
+    heightCm: Math.max(1, Math.round(stackedHeight)),
+    unmeasured: [...new Set(unmeasured)],
+  };
+}
+
+const SHIPPING_ITEM_INCLUDE = {
+  items: {
+    include: {
+      product: {
+        select: { name: true, weightGrams: true, widthInches: true, heightInches: true, depthMm: true },
+      },
+    },
+  },
+};
+
+/** GET /admin/orders/:id/shipping-quote — what the courier would charge. */
+router.get(
+  '/orders/:id/shipping-quote',
+  asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: SHIPPING_ITEM_INCLUDE,
+    });
+    if (!order) throw ApiError.notFound('Order not found');
+
+    const parcel = measureParcel(order.items as never);
+    const address = order.shippingAddress as Record<string, string>;
+
+    const quote = await checkServiceability({
+      deliveryPincode: String(address.pincode ?? ''),
+      weightKg: parcel.weightKg,
+      codAmount: order.paymentMethod === 'COD' ? Number(order.total) : 0,
+    });
+
+    res.json({ success: true, data: { parcel, ...quote } });
+  }),
+);
+
+/**
+ * POST /admin/orders/:id/ship — hand the order to the courier.
+ *
+ * Books the shipment, asks for a waybill, and stores both on the order. The
+ * customer is not told here: the status stays where it is, because a booked
+ * parcel has not shipped. Marking it Shipped is still a deliberate act, and
+ * that is what sends the email with the tracking number this call obtained.
+ *
+ * Refuses an order that already has a shipment rather than creating a second
+ * one. A duplicate parcel costs real money and somebody has to notice it.
+ */
+router.post(
+  '/orders/:id/ship',
+  asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: SHIPPING_ITEM_INCLUDE,
+    });
+    if (!order) throw ApiError.notFound('Order not found');
+
+    if (order.courierShipmentId) {
+      throw ApiError.badRequest(
+        `${order.orderNumber} is already booked with the courier (AWB ${order.trackingNumber ?? 'pending'}). Cancel it in Shiprocket before booking again.`,
+      );
+    }
+    if (order.status === 'CANCELLED' || order.status === 'REFUNDED') {
+      throw ApiError.badRequest(`${order.orderNumber} is ${order.status.toLowerCase()}`);
+    }
+
+    const parcel = measureParcel(order.items as never);
+    const address = order.shippingAddress as Record<string, string>;
+
+    const booking = await bookShipment({
+      orderNumber: order.orderNumber,
+      placedAt: order.placedAt,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
+      shippingAddress: address,
+      paymentMethod: order.paymentMethod,
+      total: Number(order.total),
+      // Only an unpaid COD order has anything to collect at the door.
+      codAmount:
+        order.paymentMethod === 'COD' && order.paymentStatus !== 'PAID' ? Number(order.total) : 0,
+      items: order.items.map((item) => ({
+        name: item.productName,
+        sku: item.sku || item.productName.slice(0, 40),
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+      })),
+      ...parcel,
+    });
+
+    /*
+     * Stored before the waybill is requested.
+     *
+     * If assigning the waybill fails — an empty wallet, an unservable pincode
+     * — the shipment still exists at the courier. Writing the ids first means
+     * a retry is recognised as "already booked" instead of quietly creating a
+     * second parcel.
+     */
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        courierOrderId: booking.courierOrderId,
+        courierShipmentId: booking.courierShipmentId,
+        courierBookedAt: new Date(),
+      },
+    });
+
+    const awb = await assignAwb({
+      shipmentId: booking.courierShipmentId,
+      courierId: req.body?.courierId ? Number(req.body.courierId) : undefined,
+    });
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        trackingNumber: awb.awb,
+        courierName: awb.courierName,
+        trackingUrl: awb.trackingUrl,
+      },
+      include: ORDER_INCLUDE,
+    });
+
+    res.json({
+      success: true,
+      data: updated,
+      message: parcel.unmeasured.length
+        ? `Booked with ${awb.courierName}. Estimated weight used for ${parcel.unmeasured.join(', ')} — add real weights to avoid a billing correction.`
+        : `Booked with ${awb.courierName}.`,
+    });
   }),
 );
 

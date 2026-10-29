@@ -342,6 +342,10 @@ export interface Order {
   gstin?: string | null;
   adminNote?: string | null;
   trackingNumber?: string | null;
+  /** Set once the order has been handed to the courier. */
+  courierOrderId?: string | null;
+  courierShipmentId?: string | null;
+  courierBookedAt?: string | null;
   trackingUrl?: string | null;
   courierName?: string | null;
   items: OrderItem[];
