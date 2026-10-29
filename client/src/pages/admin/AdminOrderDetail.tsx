@@ -409,15 +409,26 @@ export default function AdminOrderDetail() {
                 </div>
               ) : (
                 <>
-                  <Button
-                    size="sm"
-                    fullWidth
-                    loading={bookCourier.isPending}
-                    disabled={order.status === 'CANCELLED' || order.status === 'REFUNDED'}
-                    onClick={() => bookCourier.mutate()}
-                  >
-                    Book with courier
-                  </Button>
+                  {/*
+                    A cancelled or refunded order will never be posted, so the
+                    button is gone rather than greyed. A disabled control still
+                    invites a click and then explains nothing; a sentence
+                    explains itself.
+                  */}
+                  {order.status === 'CANCELLED' || order.status === 'REFUNDED' ? (
+                    <p className="text-2xs leading-relaxed text-ink-400">
+                      This order is {order.status.toLowerCase()}, so there is nothing to send.
+                    </p>
+                  ) : (
+                    <Button
+                      size="sm"
+                      fullWidth
+                      loading={bookCourier.isPending}
+                      onClick={() => bookCourier.mutate()}
+                    >
+                      Book with courier
+                    </Button>
+                  )}
                   {/*
                     Signs in to the courier and reports back, booking nothing.
 
