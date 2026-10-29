@@ -39,14 +39,24 @@ export function createApp() {
    * localhost and the health check a load balancer polls.
    */
   app.use((req, res, next) => {
-    const host = req.headers.host;
-    if (!host || !host.toLowerCase().startsWith('www.')) return next();
+    /*
+     * `req.hostname`, not `req.headers.host`.
+     *
+     * Behind the proxy the original hostname arrives in X-Forwarded-Host while
+     * Host carries the backend address, so reading Host directly saw no "www."
+     * and this redirect quietly did nothing. Express resolves the forwarded
+     * header for us once `trust proxy` is set, which it is in production, and
+     * falls back to Host elsewhere. It also strips the port, which is why the
+     * redirect is rebuilt from the hostname rather than by trimming a string.
+     */
+    const hostname = req.hostname?.toLowerCase();
+    if (!hostname || !hostname.startsWith('www.')) return next();
 
-    const bare = host.slice(4);
+    const bare = hostname.slice(4);
 
     // www.localhost is somebody's local experiment, not a canonical-URL
     // problem, and sending them to https would just break it.
-    if (/^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(bare)) return next();
+    if (bare === 'localhost' || bare === '127.0.0.1' || bare === '[::1]') return next();
 
     const proto = env.trustProxy ? req.protocol : 'https';
     return res.redirect(301, `${proto}://${bare}${req.originalUrl}`);
