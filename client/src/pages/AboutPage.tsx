@@ -11,65 +11,47 @@ import { ArrowRight } from '../components/ui';
  *
  * Every other content page is composed from the shared section blocks, which
  * is right for a shipping policy and wrong here: this page has to carry the
- * brand, and the blocks are general by design. So it is laid out directly —
- * an asymmetric hero, a timeline, a stats band, the process, the work and the
- * people — while the header, the footer, the container, the type scale, the
- * colours and the buttons all stay exactly as the rest of the site uses them.
+ * brand, and the blocks are general by design. So it is laid out directly,
+ * while the header, the footer, the container, the type scale, the colours
+ * and the buttons all stay exactly as the rest of the site uses them.
  *
  * Its SEO still comes from the CMS page row, so title and description remain
  * editable in the admin. The old section rows are left in the database
  * untouched: nothing is lost, and pointing the route back at StaticPage would
  * restore the previous page as it was.
  *
+ * ON SCALE
+ * An earlier version of this page was built big — a 64px heading over a 34rem
+ * photograph, work shown two across at 636px. Big is not the same as good: at
+ * that size the page is a slideshow you scroll past rather than a studio you
+ * read about. Everything here is deliberately smaller and tighter, and the
+ * quality is meant to come from proportion and restraint instead of scale.
+ *
  * ON THE PHOTOGRAPHS
- * Every image here is the studio's own. Four were found unused in the client's
- * handover folder, still in HEIC straight off a phone, and they are the only
- * photographs that show anybody working: the Rasik Vatika fit-out with the
- * ladder and the team, and the Jasco Energy sign going up and then finished.
- * They are why this page can have a people section and an installation image
- * at all. Nothing here is stock and nothing is generated.
+ * Every image is the studio's own, and every frame matches the shape of the
+ * picture inside it, so nothing is cropped to fit a layout. That rule exists
+ * because breaking it did real damage: the 2004 shopfront is a 4:5 portrait,
+ * it was put in a 4:3 landscape frame, and the crop removed the words PATEL
+ * CORPORATION from the top of the photograph. The name of the company, cut
+ * out of the only picture of it. Hence `aspect-[4/5]` below, and hence the
+ * matching comment on every other frame on this page.
  */
 
-/*
- * Selected work, chosen rather than read from the gallery.
- *
- * An earlier version of this page handed the section over to the gallery as
- * soon as the gallery held four categorised images. It now does, and the four
- * are catalogue cut-outs — a plate on a white background, which is the right
- * photograph for a shop listing and the wrong one here, where the question is
- * what a finished piece looks like in somebody's building. So the hand-over is
- * gone and these four are named outright.
- */
+/** Four finished pieces. All installed, all the studio's own photographs. */
 const WORK = [
-  {
-    src: '/uploads/photos/bw-photo-11.webp',
-    label: 'Residential',
-    name: 'Shridha, acrylic and brass',
-  },
-  {
-    src: '/uploads/photos/bw-photo-06.webp',
-    label: 'Commercial',
-    name: 'Company plates, brass',
-  },
-  {
-    src: '/uploads/photos/bw-photo-05.webp',
-    label: 'Apartment',
-    name: 'Door number, brass on black',
-  },
-  {
-    src: '/uploads/photos/bw-photo-03.webp',
-    label: 'Interior',
-    name: 'Door number, 405',
-  },
+  { src: '/uploads/photos/bw-photo-11.webp', label: 'Residential', name: 'Shridha, acrylic and brass' },
+  { src: '/uploads/photos/bw-photo-06.webp', label: 'Commercial', name: 'Company plates, brass' },
+  { src: '/uploads/photos/bw-photo-05.webp', label: 'Apartment', name: 'Door number, brass on black' },
+  { src: '/uploads/photos/bw-photo-03.webp', label: 'Interior', name: 'Door number, 405' },
 ];
 
 /*
- * The journey, in four moments rather than three.
+ * The journey, in four moments.
  *
  * Only two carry a date, because only two are dated anywhere the studio has
  * published: the year it started, and now. The middle two are named by what
- * changed, which is the honest way to describe a stretch of years nobody wrote
- * down at the time.
+ * changed, which is the honest way to describe a stretch of years nobody
+ * wrote down at the time.
  */
 const JOURNEY = [
   {
@@ -80,7 +62,7 @@ const JOURNEY = [
   {
     marker: 'Two decades',
     title: 'Materials and making',
-    text: 'Years of brass, acrylic and the finishes around them — and of learning how each behaves in a real space.',
+    text: 'Years of brass, acrylic and the finishes around them, and of learning how each behaves in a real space.',
   },
   {
     marker: 'Second generation',
@@ -97,41 +79,31 @@ const JOURNEY = [
 /*
  * Five steps, as the studio asked for them.
  *
- * Four are the studio's own words, lifted from the page this replaces. The
- * fifth, Install, is new writing: there was no published copy for it, but
- * there are photographs of their own people on a ladder fitting a sign, so it
- * describes what those photographs show and claims nothing beyond them.
+ * Four are the studio's own words from the page this replaces. The fifth,
+ * Install, is new writing: there was no published copy for it, but there are
+ * photographs of their own people on a ladder fitting a sign, so it describes
+ * what those photographs show and claims nothing beyond them.
  */
 const PROCESS = [
   {
     title: 'Understand',
-    text:
-      'We listen, and work out the idea behind the request — the space it is going into, and what '
-      + 'it has to do once it is there.',
+    text: 'We listen, and work out the idea behind the request — the space it is going into, and what it has to do once it is there.',
   },
   {
     title: 'Design',
-    text:
-      'Every piece begins as an idea, brought to life digitally first: the design, the proportions '
-      + 'and the details, refined before anything is made.',
+    text: 'Every piece begins as an idea, brought to life digitally first: the design, the proportions and the details.',
   },
   {
     title: 'Prototype',
-    text:
-      'Smaller versions of the design, made to understand how it looks, how it feels and how it '
-      + 'comes together in the physical world.',
+    text: 'Smaller versions of the design, made to understand how it looks, how it feels and how it comes together.',
   },
   {
     title: 'Produce',
-    text:
-      'Production begins at our in-house facility. From choosing the material to assembly and '
-      + 'finishing, each piece is made with hands-on attention.',
+    text: 'Production begins at our in-house facility. From choosing the material to assembly and finishing.',
   },
   {
     title: 'Install',
-    text:
-      'The finished piece is fitted on site by our own team, so how it sits on the wall is part of '
-      + 'the work rather than somebody else’s problem.',
+    text: 'The finished piece is fitted on site by our own team, so how it sits on the wall is part of the work.',
   },
 ];
 
@@ -179,95 +151,109 @@ export default function AboutPage() {
       />
 
       {/* ------------------------------------------------------------------ */}
-      {/* Hero. Split rather than a banner with text over it: the photograph   */}
-      {/* is the product, and laying words across it would hide the thing      */}
-      {/* being sold.                                                          */}
+      {/* Hero.                                                               */}
+      {/*                                                                     */}
+      {/* Capped at 26rem rather than left to grow with the photograph. A     */}
+      {/* hero is an opening line, not a chapter: the previous one ran to     */}
+      {/* 857px and filled the whole screen before a word had been read.      */}
       {/* ------------------------------------------------------------------ */}
       <section className="border-b border-stone-line bg-paper-warm">
-        <div className="container-site grid items-stretch gap-0 lg:grid-cols-12">
-          <div className="flex flex-col justify-center py-16 lg:col-span-5 lg:py-28 lg:pr-12">
-            <p className="eyebrow mb-6">About us</p>
-            <h1 className="text-balance text-[2.35rem] leading-[1.08] sm:text-[3rem] lg:text-[3.5rem] xl:text-[4rem]">
+        <div className="container-site grid items-stretch lg:grid-cols-12 lg:min-h-[26rem]">
+          <div className="flex flex-col justify-center py-12 lg:col-span-6 lg:py-16 lg:pr-14">
+            <p className="eyebrow mb-4">About us</p>
+            <h1 className="text-balance text-[1.9rem] leading-[1.14] sm:text-[2.3rem] lg:text-[2.6rem]">
               We design, make, and bring spaces to life.
             </h1>
-            <p className="mt-7 max-w-[42ch] text-[1.0625rem] leading-[1.75] text-ink-600 lg:text-[1.1875rem] lg:leading-[1.7]">
+            <p className="mt-5 max-w-[46ch] text-[0.975rem] leading-[1.75] text-ink-600">
               Beyond Walls creates thoughtful signage, spaces and custom pieces by bringing together
               design thinking, material knowledge and in-house making.
             </p>
             {/*
               A plain anchor, not a router Link. ScrollToTop only fires on a
               pathname change so it will not fight this, but a router Link
-              pushes a hash without the browser scrolling to it -- a
+              pushes a hash without the browser scrolling to it — a
               same-document anchor does the scrolling itself, and scroll-mt on
               the target keeps the heading clear of the fixed header.
             */}
-            <div className="mt-10">
+            <div className="mt-8">
               <a
                 href="#our-story"
-                className="inline-flex items-center gap-2 border border-ink bg-ink px-7 py-4 text-2xs uppercase tracking-architect text-paper transition-colors hover:bg-transparent hover:text-ink"
+                className="inline-flex items-center gap-2 border border-ink bg-ink px-6 py-3 text-2xs uppercase tracking-architect text-paper transition-colors hover:bg-transparent hover:text-ink"
               >
                 Our story
-                <ArrowRight size={14} />
+                <ArrowRight size={13} />
               </a>
             </div>
           </div>
 
-          <div className="lg:col-span-7">
+          {/*
+            Below lg the photograph keeps its own 4:5 shape. From lg it fills
+            the capped band instead, which is the one place on this page a
+            crop is the right answer: the lettering sits centre-frame, and a
+            hero that grows to 750px to avoid trimming its edges is the
+            problem this rewrite exists to fix.
+          */}
+          <div className="-mx-5 aspect-[4/5] sm:-mx-8 sm:aspect-[16/10] lg:relative lg:mx-0 lg:col-span-6 lg:aspect-auto">
             {/*
-              Negative margins pull the picture out to the viewport edge on wide
-              screens, where the container's gutter would otherwise leave a
-              strip of background beside a full-bleed image. Below that it sits
-              inside the container like everything else.
+              Absolute from lg, which is the only way the cap actually holds.
+              Left in flow, `h-full` resolves against an auto-height row and
+              falls back to the picture's intrinsic height — so the image sets
+              the row instead of the row setting the image, and a 26rem cap
+              silently became 734px. Out of flow it contributes no height, and
+              the row is the text plus the grid's own minimum.
             */}
-            <div className="-mx-5 aspect-[4/5] sm:-mx-8 sm:aspect-[16/10] lg:mx-0 lg:h-full lg:aspect-auto lg:min-h-[34rem]">
-              <img
-                src={assetUrl('/uploads/photos/bw-photo-02.webp')}
-                alt="Gold lettering reading Rasik Vatika, mounted on a dark textured wall"
-                width={1280}
-                height={1600}
-                {...{ fetchpriority: 'high' }}
-                className="h-full w-full object-cover"
-              />
-            </div>
+            <img
+              src={assetUrl('/uploads/photos/bw-photo-02.webp')}
+              alt="Gold lettering reading Rasik Vatika, mounted on a dark textured wall"
+              width={1280}
+              height={1600}
+              {...{ fetchpriority: 'high' }}
+              className="h-full w-full object-cover lg:absolute lg:inset-0"
+            />
           </div>
         </div>
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Our story. The 2004 photograph stays exactly where it is.            */}
+      {/* Our story.                                                          */}
+      {/*                                                                     */}
+      {/* The 2004 photograph, whole. It is 1920x2400 — a 4:5 portrait — so   */}
+      {/* the frame is 4:5. Nothing of it is trimmed, including the sign.     */}
       {/* ------------------------------------------------------------------ */}
-      <section id="our-story" className="container-site scroll-mt-24 py-16 lg:py-24">
-        <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
-          <div className="lg:col-span-6">
-            <div className="relative">
-              <div className="aspect-[4/3] overflow-hidden bg-paper-warm">
-                <img
-                  src={assetUrl('/uploads/general/about-us-04-Z1qL22gVby.webp')}
-                  alt="The original Patel Corporation shopfront in 2004, garlanded, with the team outside"
-                  loading="lazy"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              {/*
-                The year, set on the photograph's lower edge. Hidden below the
-                large breakpoint, where it would sit on top of faces rather than
-                beside them.
-              */}
-              <div className="absolute -bottom-6 right-0 hidden border border-stone-line bg-paper px-6 py-4 lg:block">
-                <p className="text-2xl leading-none">{established}</p>
-                <p className="mt-2 max-w-[14ch] text-2xs leading-relaxed text-ink-500">
-                  It started with a simple signage manufacturing business.
-                </p>
-              </div>
+      <section id="our-story" className="container-site scroll-mt-24 py-14 lg:py-20">
+        <div className="grid items-start gap-9 lg:grid-cols-12 lg:gap-14">
+          {/*
+            Capped below lg. The frame keeps the photograph's 4:5 whatever the
+            width, which is right — but a 4:5 frame at full tablet width is
+            1042px of photograph, and "do not crop it" is not the same request
+            as "make it enormous". The cap bounds the height without touching
+            the shape; from lg the column is narrow enough to do that itself.
+          */}
+          <figure className="mx-auto w-full max-w-[22rem] sm:max-w-[26rem] lg:col-span-5 lg:mx-0 lg:max-w-none">
+            <div className="aspect-[4/5] overflow-hidden bg-paper-warm">
+              <img
+                src={assetUrl('/uploads/general/about-us-04-Z1qL22gVby.webp')}
+                alt="The Patel Corporation shopfront in 2004, hung with marigold garlands, the family and staff standing beneath the sign"
+                width={1920}
+                height={2400}
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
             </div>
-          </div>
+            <figcaption className="mt-3.5 flex items-baseline gap-3 border-t border-stone-line pt-3.5">
+              <span className="text-lg leading-none text-ink">{established}</span>
+              <span className="text-xs leading-relaxed text-ink-500">
+                Patel Corporation, Ahmedabad — where it started.
+              </span>
+            </figcaption>
+          </figure>
 
-          <div className="lg:col-span-6 lg:pt-6">
-            <p className="eyebrow mb-5">Our story</p>
-            <h2 className="text-balance text-[1.75rem] leading-tight sm:text-[2.1rem] lg:text-[2.5rem]">
+          <div className="lg:col-span-7 lg:pt-1">
+            <p className="eyebrow mb-4">Our story</p>
+            <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
               From a small signage business to a design-led brand.
             </h2>
-            <div className="mt-7 space-y-5 text-[1.0625rem] leading-[1.75] text-ink-600">
+            <div className="mt-6 max-w-[58ch] space-y-4 text-[0.975rem] leading-[1.78] text-ink-600">
               <p>
                 In 2004 we started as Patel Corporation, an offline signage manufacturing business.
               </p>
@@ -281,79 +267,62 @@ export default function AboutPage() {
                 from making signs to a design-led brand for personal spaces.
               </p>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Journey. Horizontal on a laptop, vertical on a phone.                */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="border-y border-stone-line bg-paper-off py-16 lg:py-24">
-        <div className="container-site">
-          <div className="max-w-2xl">
-            <p className="eyebrow mb-5">Our journey</p>
-            <h2 className="text-balance text-[1.75rem] leading-tight sm:text-[2.1rem] lg:text-[2.4rem]">
-              Twenty years of making, in four moments.
-            </h2>
-          </div>
-
-          <ol className="relative mt-12 lg:mt-16">
             {/*
-              One rule behind the markers, in two orientations: horizontally
-              across the four on a laptop, vertically down the left below that.
-              It stops short of the last marker on a phone, where the entries
-              stack, so the line does not run past the end of the journey.
+              The journey sits inside the story rather than in a band of its
+              own. It is the same subject, and giving it a separate section
+              with its own heading was one more full screen to scroll past.
             */}
-            <span
-              aria-hidden="true"
-              className="absolute left-[7px] top-2 bottom-6 w-px bg-stone-line sm:bottom-2 lg:left-0 lg:right-0 lg:top-[7px] lg:bottom-auto lg:h-px lg:w-auto"
-            />
-            <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
-              {JOURNEY.map((entry) => (
-                <li key={entry.marker} className="relative pl-8 lg:pl-0 lg:pr-6 lg:pt-9">
-                  <span
-                    aria-hidden="true"
-                    className="absolute left-0 top-1 h-3.5 w-3.5 rounded-full border-2 border-paper-off lg:top-0"
-                    style={{ background: 'var(--brand-strong)' }}
-                  />
-                  <p className="text-xl leading-none text-ink lg:text-[1.4rem]">{entry.marker}</p>
-                  <h3 className="mt-3.5 text-xs font-semibold uppercase tracking-architect">
-                    {entry.title}
-                  </h3>
-                  <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-500">
-                    {entry.text}
-                  </p>
-                </li>
-              ))}
-            </div>
-          </ol>
+            <ol className="relative mt-10 border-t border-stone-line pt-8">
+              <span
+                aria-hidden="true"
+                className="absolute left-[5px] top-10 bottom-5 w-px bg-stone-line sm:left-0 sm:right-0 sm:top-[calc(2rem+5px)] sm:bottom-auto sm:h-px sm:w-auto"
+              />
+              <div className="grid gap-7 sm:grid-cols-2 sm:gap-x-8 lg:grid-cols-4 lg:gap-x-6">
+                {JOURNEY.map((entry) => (
+                  <li key={entry.marker} className="relative pl-6 sm:pl-0 sm:pt-6">
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 top-1 h-2.5 w-2.5 rounded-full border-2 border-paper sm:top-0"
+                      style={{ background: 'var(--brand-strong)' }}
+                    />
+                    <p className="text-[0.95rem] leading-none text-ink">{entry.marker}</p>
+                    <h3 className="mt-2.5 text-2xs font-semibold uppercase tracking-architect text-ink-500">
+                      {entry.title}
+                    </h3>
+                    <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-500">{entry.text}</p>
+                  </li>
+                ))}
+              </div>
+            </ol>
+          </div>
         </div>
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Numbers. Only what the business can actually stand behind.           */}
+      {/* Numbers. Only what the business can actually stand behind.          */}
       {/* ------------------------------------------------------------------ */}
-      <section className="bg-ink py-12 text-paper lg:py-16">
-        <div className="container-site grid gap-10 sm:grid-cols-2 lg:grid-cols-3 lg:gap-14">
+      <section className="bg-ink py-10 text-paper lg:py-12">
+        <div className="container-site grid gap-8 sm:grid-cols-3 lg:gap-12">
           <div>
             {/* Counted from 2004 rather than written down, so it stays true. */}
-            <p className="text-4xl leading-none lg:text-5xl">{years}+</p>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-architect">Years of making</p>
-            <p className="mt-2 text-sm leading-relaxed text-paper/60">
+            <p className="text-[2rem] leading-none lg:text-[2.5rem]">{years}+</p>
+            <p className="mt-3 text-2xs font-semibold uppercase tracking-architect">Years of making</p>
+            <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-paper/60">
               Signage manufacturing since 2004, now in its second generation.
             </p>
           </div>
           <div>
-            <p className="text-4xl leading-none lg:text-5xl">In-house</p>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-architect">Manufacturing</p>
-            <p className="mt-2 text-sm leading-relaxed text-paper/60">
+            <p className="text-[2rem] leading-none lg:text-[2.5rem]">In-house</p>
+            <p className="mt-3 text-2xs font-semibold uppercase tracking-architect">Manufacturing</p>
+            <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-paper/60">
               Production happens at our own facility, from material to finishing.
             </p>
           </div>
           <div>
-            <p className="text-4xl leading-none lg:text-5xl">One roof</p>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-architect">Design and production</p>
-            <p className="mt-2 text-sm leading-relaxed text-paper/60">
+            <p className="text-[2rem] leading-none lg:text-[2.5rem]">One roof</p>
+            <p className="mt-3 text-2xs font-semibold uppercase tracking-architect">Design and production</p>
+            <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-paper/60">
               The people who draw it and the people who make it work together.
             </p>
           </div>
@@ -361,33 +330,33 @@ export default function AboutPage() {
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* What makes us different                                             */}
+      {/* How we work — the difference and the five steps, in one section.    */}
       {/* ------------------------------------------------------------------ */}
-      <section className="container-site py-16 lg:py-24">
-        <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
-          <div className="lg:col-span-5">
-            <p className="eyebrow mb-5">Why Beyond Walls</p>
-            <h2 className="text-balance text-[1.75rem] leading-tight sm:text-[2.1rem] lg:text-[2.5rem]">
+      <section className="container-site py-14 lg:py-20">
+        <div className="grid gap-9 lg:grid-cols-12 lg:gap-14">
+          <div className="lg:col-span-4">
+            <p className="eyebrow mb-4">Why Beyond Walls</p>
+            <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
               Design meets making.
             </h2>
-            <p className="mt-6 max-w-[42ch] text-[1.0625rem] leading-[1.75] text-ink-600">
+            <p className="mt-5 max-w-[42ch] text-[0.975rem] leading-[1.78] text-ink-600">
               We do not stop at how something looks. We understand what happens after the design
-              leaves the screen: the materials, the making, the details, and the challenges that
-              come with turning an idea into a physical product.
+              leaves the screen: the materials, the making, and the challenges that come with
+              turning an idea into a physical product.
             </p>
           </div>
 
-          <div className="grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:col-span-7">
+          <div className="grid gap-x-8 gap-y-7 sm:grid-cols-2 lg:col-span-8">
             {DIFFERENCE.map((item, index) => (
-              <div key={item.title} className="border-t border-stone-line pt-5">
+              <div key={item.title} className="border-t border-stone-line pt-4">
                 <span
-                  className="block text-sm font-medium"
+                  className="block text-2xs font-medium"
                   style={{ color: 'var(--brand-strong)' }}
                 >
                   {String(index + 1).padStart(2, '0')}
                 </span>
-                <h3 className="mt-3 text-[1.0625rem] font-medium leading-snug">{item.title}</h3>
-                <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-500">{item.text}</p>
+                <h3 className="mt-2.5 text-[0.975rem] font-medium leading-snug">{item.title}</h3>
+                <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-ink-500">{item.text}</p>
               </div>
             ))}
           </div>
@@ -395,34 +364,28 @@ export default function AboutPage() {
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Process — five steps, understand through install.                    */}
+      {/* Process — five steps, understand through install.                   */}
       {/* ------------------------------------------------------------------ */}
-      <section className="border-y border-stone-line bg-paper-warm py-16 lg:py-24">
+      <section className="border-y border-stone-line bg-paper-warm py-14 lg:py-20">
         <div className="container-site">
-          <div className="max-w-2xl">
-            <p className="eyebrow mb-5">Our process</p>
-            <h2 className="text-balance text-[1.75rem] leading-tight sm:text-[2.1rem] lg:text-[2.5rem]">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-10 gap-y-3">
+            <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
               A clear journey from idea to your space.
             </h2>
+            <p className="eyebrow">Our process</p>
           </div>
 
-          {/*
-            Two across on a tablet and five on a desktop. Five columns leaves
-            each step around 200px at the large breakpoint, enough for a number,
-            a one-word title and three lines — and the five then read as one run
-            across the page, which is the point of naming them.
-          */}
-          <ol className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:mt-16 lg:grid-cols-5 lg:gap-x-6">
+          <ol className="mt-10 grid gap-x-6 gap-y-8 sm:grid-cols-2 lg:mt-12 lg:grid-cols-5">
             {PROCESS.map((entry, index) => (
-              <li key={entry.title} className="border-t border-ink/15 pt-6">
+              <li key={entry.title} className="border-t border-ink/15 pt-5">
                 <span
-                  className="block text-3xl font-light leading-none lg:text-[2.25rem]"
+                  className="block text-xl font-light leading-none"
                   style={{ color: 'var(--brand-strong)' }}
                 >
                   {String(index + 1).padStart(2, '0')}
                 </span>
-                <h3 className="mt-5 text-lg leading-snug">{entry.title}</h3>
-                <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-600">{entry.text}</p>
+                <h3 className="mt-3.5 text-[0.975rem] font-medium leading-snug">{entry.title}</h3>
+                <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-600">{entry.text}</p>
               </li>
             ))}
           </ol>
@@ -430,23 +393,21 @@ export default function AboutPage() {
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Selected work. Two across rather than four, so the photographs are   */}
-      {/* big enough to read as work rather than as thumbnails.                */}
+      {/* Selected work. Four across, each its own 4:5 — nothing cropped,     */}
+      {/* and small enough that the section is a row of work rather than a    */}
+      {/* second scroll through the gallery.                                  */}
       {/* ------------------------------------------------------------------ */}
-      <section className="container-site py-16 lg:py-24">
-        <div className="mb-10 flex flex-wrap items-end justify-between gap-5 lg:mb-14">
-          <div>
-            <p className="eyebrow mb-5">Selected work</p>
-            <h2 className="text-balance text-[1.75rem] leading-tight sm:text-[2.1rem] lg:text-[2.5rem]">
-              Spaces we have made.
-            </h2>
-          </div>
+      <section className="container-site py-14 lg:py-20">
+        <div className="mb-8 flex flex-wrap items-baseline justify-between gap-x-10 gap-y-3 lg:mb-10">
+          <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
+            Spaces we have made.
+          </h2>
           <Link to="/gallery" className="link-underline text-sm text-ink">
             View the full gallery →
           </Link>
         </div>
 
-        <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:gap-x-8 lg:gap-y-14">
+        <div className="grid grid-cols-2 gap-x-5 gap-y-7 lg:grid-cols-4 lg:gap-x-6">
           {WORK.map((item) => (
             <figure key={item.src} className="group">
               <div className="aspect-[4/5] overflow-hidden bg-paper-warm">
@@ -459,9 +420,9 @@ export default function AboutPage() {
                   className="h-full w-full object-cover transition-transform duration-700 ease-architect group-hover:scale-[1.03]"
                 />
               </div>
-              <figcaption className="mt-5">
-                <p className="eyebrow">{item.label}</p>
-                <p className="mt-2 text-[1.0625rem] text-ink">{item.name}</p>
+              <figcaption className="mt-3">
+                <p className="eyebrow text-ink-400">{item.label}</p>
+                <p className="mt-1 text-[0.875rem] text-ink">{item.name}</p>
               </figcaption>
             </figure>
           ))}
@@ -469,22 +430,23 @@ export default function AboutPage() {
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* The people behind the work.                                          */}
-      {/*                                                                      */}
-      {/* One job, twice: the sign being lifted onto the wall, and the same    */}
-      {/* sign finished. Both are the studio's own photographs of their own    */}
-      {/* people — the only two that exist, and the reason this section can be */}
-      {/* here at all.                                                         */}
+      {/* The people behind the work.                                         */}
+      {/*                                                                     */}
+      {/* Three photographs of the studio's own people at two jobs: the       */}
+      {/* Rasik Vatika fit-out, and a sign going up and then finished. Each   */}
+      {/* frame matches its picture — 4:5 for the portrait, 4:3 for the two   */}
+      {/* landscapes — so none of the three is trimmed to line up with the    */}
+      {/* others.                                                             */}
       {/* ------------------------------------------------------------------ */}
-      <section className="border-t border-stone-line bg-paper-off py-16 lg:py-24">
+      <section className="border-t border-stone-line bg-paper-off py-14 lg:py-20">
         <div className="container-site">
-          <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
-            <div className="lg:col-span-5">
-              <p className="eyebrow mb-5">The people behind the work</p>
-              <h2 className="text-balance text-[1.75rem] leading-tight sm:text-[2.1rem] lg:text-[2.5rem]">
+          <div className="grid gap-9 lg:grid-cols-12 lg:gap-14">
+            <div className="lg:col-span-4">
+              <p className="eyebrow mb-4">The people behind the work</p>
+              <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
                 Made by us. Fitted by us.
               </h2>
-              <div className="mt-7 max-w-[44ch] space-y-5 text-[1.0625rem] leading-[1.75] text-ink-600">
+              <div className="mt-5 max-w-[40ch] space-y-4 text-[0.975rem] leading-[1.78] text-ink-600">
                 <p>
                   A sign is not finished when it leaves the facility. It is finished when it is on
                   the wall, level, and looking like the drawing.
@@ -496,8 +458,24 @@ export default function AboutPage() {
               </div>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2 lg:col-span-7 lg:gap-7">
+            <div className="grid gap-5 sm:grid-cols-2 lg:col-span-8 lg:grid-cols-3 lg:gap-6">
               <figure>
+                <div className="aspect-[4/5] overflow-hidden bg-paper-warm">
+                  <img
+                    src={assetUrl('/uploads/photos/bw-photo-08.webp')}
+                    alt="Installation day at Rasik Vatika: a stepladder against the wall, one of the team carrying tools, the gold lettering already mounted"
+                    width={1280}
+                    height={1600}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <figcaption className="mt-3 text-[0.8125rem] text-ink-500">
+                  Rasik Vatika, on the day.
+                </figcaption>
+              </figure>
+
+              <figure className="self-start">
                 <div className="aspect-[4/3] overflow-hidden bg-paper-warm">
                   <img
                     src={assetUrl('/uploads/photos/bw-photo-09.webp')}
@@ -508,12 +486,10 @@ export default function AboutPage() {
                     className="h-full w-full object-cover"
                   />
                 </div>
-                <figcaption className="mt-4 text-sm text-ink-500">
-                  Going up — Jasco Energy, Naroda.
-                </figcaption>
+                <figcaption className="mt-3 text-[0.8125rem] text-ink-500">Going up.</figcaption>
               </figure>
 
-              <figure>
+              <figure className="self-start">
                 <div className="aspect-[4/3] overflow-hidden bg-paper-warm">
                   <img
                     src={assetUrl('/uploads/photos/bw-photo-10.webp')}
@@ -524,7 +500,7 @@ export default function AboutPage() {
                     className="h-full w-full object-cover"
                   />
                 </div>
-                <figcaption className="mt-4 text-sm text-ink-500">
+                <figcaption className="mt-3 text-[0.8125rem] text-ink-500">
                   The same sign, finished.
                 </figcaption>
               </figure>
@@ -534,62 +510,16 @@ export default function AboutPage() {
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Design and making — the asymmetric editorial block.                  */}
-      {/*                                                                      */}
-      {/* The photograph is the Rasik Vatika fit-out: the stepladder, one of   */}
-      {/* the team carrying tools, the lettering already up. It replaces a     */}
-      {/* shot of a brass plate held in somebody's hand, which said nothing    */}
-      {/* about making at the size this block prints it.                       */}
+      {/* Closing call to action                                              */}
       {/* ------------------------------------------------------------------ */}
-      <section className="border-t border-stone-line">
-        <div className="grid lg:grid-cols-12">
-          <div className="lg:col-span-6">
-            <div className="aspect-[4/5] sm:aspect-[16/10] lg:aspect-auto lg:h-full lg:min-h-[32rem]">
-              <img
-                src={assetUrl('/uploads/photos/bw-photo-08.webp')}
-                alt="Installation day at Rasik Vatika: a stepladder against the wall, one of the team carrying tools, the gold lettering already mounted"
-                width={1280}
-                height={1600}
-                loading="lazy"
-                className="h-full w-full object-cover"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center bg-paper-off lg:col-span-6">
-            <div className="px-5 py-14 sm:px-8 lg:px-14 lg:py-20 xl:px-20">
-              <p className="eyebrow mb-5">Design meets making</p>
-              <h2 className="text-balance text-[1.75rem] leading-tight sm:text-[2.1rem] lg:text-[2.5rem]">
-                Thoughtful design. Real-world making.
-              </h2>
-              <div className="mt-7 max-w-[50ch] space-y-5 text-[1.0625rem] leading-[1.75] text-ink-600">
-                <p>
-                  Our design experience helps us create with intention. Our manufacturing
-                  experience helps us make it work.
-                </p>
-                <p>
-                  But it is not only about what we make. It is about how we work with people. We do
-                  not see customers as numbers or orders. We listen, we understand the idea behind
-                  the request, and we work towards something that feels right for the person and
-                  the space.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Closing call to action                                               */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="bg-ink py-16 text-paper lg:py-20">
-        <div className="container-site flex flex-wrap items-center justify-between gap-8">
+      <section className="bg-ink py-12 text-paper lg:py-16">
+        <div className="container-site flex flex-wrap items-center justify-between gap-7">
           <div>
-            <p className="eyebrow mb-4 text-paper/50">Let us make something</p>
-            <h2 className="text-balance text-[1.75rem] leading-tight sm:text-[2.1rem] lg:text-[2.4rem]">
+            <p className="eyebrow mb-3 text-paper/50">Let us make something</p>
+            <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2rem]">
               Have a space, sign or idea in mind?
             </h2>
-            <p className="mt-4 max-w-[44ch] text-[0.9375rem] leading-relaxed text-paper/65">
+            <p className="mt-3 max-w-[46ch] text-[0.875rem] leading-relaxed text-paper/65">
               Send us the sizes, the material and the artwork, and we will come back to you with a
               quote.
             </p>
@@ -601,10 +531,10 @@ export default function AboutPage() {
           */}
           <Link
             to="/custom-order"
-            className="inline-flex shrink-0 items-center gap-2 border border-paper bg-paper px-7 py-4 text-2xs uppercase tracking-architect text-ink transition-colors hover:bg-transparent hover:text-paper"
+            className="inline-flex shrink-0 items-center gap-2 border border-paper bg-paper px-6 py-3 text-2xs uppercase tracking-architect text-ink transition-colors hover:bg-transparent hover:text-paper"
           >
             Start a custom order
-            <ArrowRight size={14} />
+            <ArrowRight size={13} />
           </Link>
         </div>
       </section>
