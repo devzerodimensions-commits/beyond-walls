@@ -162,6 +162,7 @@ export default function AdminSettings() {
                   label="Favicon"
                   value={values['brand.favicon'] as string | null}
                   folder="logo"
+                  hint="Use the square mark, not the wordmark. The site squares and re-encodes whatever you pick, so it is always a format Google accepts — but a wide logo squared down is a thin strip nobody can read at 16 pixels. Search engines redraw it only when they next crawl the site, which can take a few weeks."
                   onChange={(url) => set('brand.favicon', url)}
                 />
 

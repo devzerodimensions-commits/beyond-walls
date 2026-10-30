@@ -14,6 +14,7 @@ import routes from './routes';
 import seoRoutes from './routes/public/seo.routes';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { ensureUploadDirs } from './middleware/upload';
+import { getFavicon } from './services/favicon.service';
 
 export function createApp() {
   const app = express();
@@ -157,6 +158,30 @@ export function createApp() {
     }),
   );
 
+  /*
+   * The favicon, in the two formats a search engine accepts.
+   *
+   * Mounted here rather than left to the static directory because what is
+   * served depends on a setting, and because /favicon.ico previously fell
+   * through to the SPA catch-all and answered with HTML -- which is the
+   * fallback Google tries when the page offers it nothing usable.
+   *
+   * Cached for an hour rather than immutably: the URL never changes, so a
+   * studio that swaps its favicon has to be able to see the new one.
+   */
+  app.get(['/favicon.ico', '/favicon.png'], async (req, res, next) => {
+    try {
+      const icon = await getFavicon();
+      const ico = req.path.endsWith('.ico');
+      res.setHeader('Content-Type', ico ? 'image/x-icon' : 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.end(ico ? icon.ico : icon.png);
+    } catch {
+      // Nothing renderable. Fall through so the static handler can still
+      // answer, rather than serving a broken image.
+      return next();
+    }
+  });
   /*
    * Static uploads.
    *
