@@ -178,10 +178,31 @@ export function validatePersonalization(
     });
   }
 
-  // A personalised item always carries a WhatsApp contact for proof/design
-  // confirmation. This is a system order-reference field, not a product
-  // option, so it has no price delta and is not configured per product.
-  if (active.length && !active.some((field) => field.key === WHATSAPP_CONTACT_KEY)) {
+  /*
+   * A made-to-order item carries a WhatsApp contact for proof approval. This
+   * is a system order-reference field, not a product option, so it has no
+   * price delta and is not configured per product.
+   *
+   * "Made to order" means the customer's answers change what gets made: a
+   * field bound to a preview slot is drawn onto the plate, and an upload is
+   * artwork that has to be checked before anything is cut. A mounting choice
+   * or a note to the studio is not -- a stock sign bought with adhesive
+   * backing is made exactly as photographed, so there is nothing to approve.
+   * The studio can still reach that customer: the order carries the phone
+   * number given at checkout, which is what the order screen falls back to.
+   *
+   * Mirrored by needsProofApproval() in
+   * client/src/components/product/PersonalizationForm.tsx. Asking for more
+   * here than the form asks for rejects an answer the customer was never
+   * given the chance to type.
+   */
+  const needsProof = active.some((field) => (
+    Boolean(field.previewSlot)
+    || field.type === 'IMAGE_UPLOAD'
+    || field.type === 'FILE_UPLOAD'
+  ));
+
+  if (needsProof && !active.some((field) => field.key === WHATSAPP_CONTACT_KEY)) {
     const raw = answers[WHATSAPP_CONTACT_KEY];
     const value = raw === null || raw === undefined ? '' : String(raw).trim();
 

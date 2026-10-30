@@ -55,14 +55,43 @@ const WHATSAPP_CONTACT_FIELD: PersonalizationField = {
 };
 
 /**
- * Adds the order-reference contact automatically to products that already
- * have personalisation. It is deliberately virtual: admins do not need to
- * create it per product and it can never affect the product price or artwork.
+ * Whether an order for this product has to be approved before it is made.
+ *
+ * The WhatsApp number is not a contact detail -- checkout already collects a
+ * phone number, and the order screen falls back to it. It is the channel a
+ * proof is approved on, so it is asked for exactly when the customer's answers
+ * change what gets made:
+ *
+ *   - a field bound to a preview slot is drawn onto the plate: the name, the
+ *     house number, the typeface, the colours
+ *   - an upload is artwork the customer sent, which has to be checked before
+ *     anything is cut, whether or not it feeds the preview
+ *
+ * A mounting dropdown and a note to the studio are neither. A stock sign
+ * ordered with adhesive backing is a ready-made order -- the studio makes what
+ * the photograph already shows, so there is no proof to approve and no reason
+ * to stand between the customer and the buy button.
+ *
+ * Mirrored in server/src/services/cart.service.ts. The two have to agree: if
+ * the server asks for more than the form does, the cart rejects an answer the
+ * customer was never given the chance to type.
+ */
+export function needsProofApproval(fields: PersonalizationField[]): boolean {
+  return fields.some((field) => field.status === 'PUBLISHED' && (
+    Boolean(field.previewSlot)
+    || field.type === 'IMAGE_UPLOAD'
+    || field.type === 'FILE_UPLOAD'
+  ));
+}
+
+/**
+ * Adds the order-reference contact automatically to made-to-order products.
+ * It is deliberately virtual: admins do not need to create it per product and
+ * it can never affect the product price or artwork.
  */
 export function withWhatsAppContactField(fields: PersonalizationField[]): PersonalizationField[] {
-  const hasPersonalisation = fields.some((field) => field.status === 'PUBLISHED');
   const alreadyConfigured = fields.some((field) => field.key === WHATSAPP_CONTACT_KEY);
-  if (!hasPersonalisation || alreadyConfigured) return fields;
+  if (!needsProofApproval(fields) || alreadyConfigured) return fields;
   return [...fields, WHATSAPP_CONTACT_FIELD];
 }
 

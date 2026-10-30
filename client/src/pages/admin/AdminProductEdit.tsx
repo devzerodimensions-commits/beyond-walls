@@ -1913,7 +1913,7 @@ function PersonalizationTab({
         <div className="space-y-6 lg:col-span-2">
           <AdminCard
             title="Personalisation fields"
-            description="Every published field is required. A WhatsApp contact number is added automatically for order reference and proof approval."
+            description="Every published field is required. If any field is bound to a preview slot or takes an upload, the order is made to order, so a WhatsApp number is added automatically for proof approval — a stock product with only a mounting choice or a note does not ask for one."
             actions={
               <Button size="sm" icon={<PlusIcon size={14} />} onClick={() => setEditing({ ...EMPTY_FIELD })}>
                 Add field
