@@ -37,6 +37,44 @@ import { ArrowRight } from '../components/ui';
  * matching comment on every other frame on this page.
  */
 
+/*
+ * The three photographs of the studio at work, with their real pixel sizes.
+ *
+ * The sizes are here because the row below is laid out from them: each frame
+ * is given a flex-grow equal to its own aspect ratio, so its width comes out
+ * proportional to its shape and every image in the row ends up exactly the
+ * same height. Bottom edges line up, captions sit on one baseline, and not a
+ * pixel of any of the three is cropped to achieve it.
+ *
+ * The arrangement it replaces put a 4:5 portrait and two ~4:3 landscapes in
+ * equal columns, which cannot line up: the portrait ran half as tall again as
+ * its neighbours, and `self-start` left the two landscapes hanging at the top
+ * of a column of empty space with their captions stranded above the third.
+ */
+const PEOPLE = [
+  {
+    src: '/uploads/photos/bw-photo-08.webp',
+    width: 1280,
+    height: 1600,
+    caption: 'Rasik Vatika, on the day.',
+    alt: 'Installation day at Rasik Vatika: a stepladder against the wall, one of the team carrying tools, the gold lettering already mounted',
+  },
+  {
+    src: '/uploads/photos/bw-photo-09.webp',
+    width: 1600,
+    height: 1164,
+    caption: 'Going up.',
+    alt: 'Two of the team behind a large Jasco Energy sign, lifting it into position on a boundary wall',
+  },
+  {
+    src: '/uploads/photos/bw-photo-10.webp',
+    width: 1600,
+    height: 1217,
+    caption: 'The same sign, finished.',
+    alt: 'The finished Jasco Energy sign mounted above the boundary wall, seen from the gate',
+  },
+];
+
 /** Four finished pieces. All installed, all the studio's own photographs. */
 const WORK = [
   { src: '/uploads/photos/bw-photo-11.webp', label: 'Residential', name: 'Shridha, acrylic and brass' },
@@ -458,52 +496,41 @@ export default function AboutPage() {
               </div>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2 lg:col-span-8 lg:grid-cols-3 lg:gap-6">
-              <figure>
-                <div className="aspect-[4/5] overflow-hidden bg-paper-warm">
-                  <img
-                    src={assetUrl('/uploads/photos/bw-photo-08.webp')}
-                    alt="Installation day at Rasik Vatika: a stepladder against the wall, one of the team carrying tools, the gold lettering already mounted"
-                    width={1280}
-                    height={1600}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <figcaption className="mt-3 text-[0.8125rem] text-ink-500">
-                  Rasik Vatika, on the day.
-                </figcaption>
-              </figure>
+            {/*
+              A justified row: stacked on a phone, side by side from sm.
 
-              <figure className="self-start">
-                <div className="aspect-[4/3] overflow-hidden bg-paper-warm">
-                  <img
-                    src={assetUrl('/uploads/photos/bw-photo-09.webp')}
-                    alt="Two of the team behind a large Jasco Energy sign, lifting it into position on a boundary wall"
-                    width={1600}
-                    height={1164}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <figcaption className="mt-3 text-[0.8125rem] text-ink-500">Going up.</figcaption>
-              </figure>
-
-              <figure className="self-start">
-                <div className="aspect-[4/3] overflow-hidden bg-paper-warm">
-                  <img
-                    src={assetUrl('/uploads/photos/bw-photo-10.webp')}
-                    alt="The finished Jasco Energy sign mounted above the boundary wall, seen from the gate"
-                    width={1600}
-                    height={1217}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <figcaption className="mt-3 text-[0.8125rem] text-ink-500">
-                  The same sign, finished.
-                </figcaption>
-              </figure>
+              Each frame grows in proportion to its own aspect ratio against a
+              zero basis, so widths come out as 0.80 : 1.37 : 1.31 and all
+              three images resolve to one height. The captions then share a
+              baseline for free. `min-w-0` because a flex item will not shrink
+              below its content otherwise, and `items-start` keeps a longer
+              caption from stretching its neighbours.
+            */}
+            <div className="flex flex-col items-start gap-5 sm:flex-row lg:col-span-8 lg:gap-6">
+              {PEOPLE.map((photo) => (
+                <figure
+                  key={photo.src}
+                  className="w-full min-w-0 sm:w-auto"
+                  style={{ flexGrow: photo.width / photo.height, flexBasis: 0 }}
+                >
+                  <div
+                    className="overflow-hidden bg-paper-warm"
+                    style={{ aspectRatio: `${photo.width} / ${photo.height}` }}
+                  >
+                    <img
+                      src={assetUrl(photo.src)}
+                      alt={photo.alt}
+                      width={photo.width}
+                      height={photo.height}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <figcaption className="mt-3 text-[0.8125rem] text-ink-500">
+                    {photo.caption}
+                  </figcaption>
+                </figure>
+              ))}
             </div>
           </div>
         </div>
