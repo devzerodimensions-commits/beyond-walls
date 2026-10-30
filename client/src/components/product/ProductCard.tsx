@@ -8,6 +8,7 @@ import {
   cardAction, displayPriceRange, isFullyOutOfStock, sellableVariants,
 } from '../../lib/pricing';
 import { useCart, useSettings, useWishlist } from '../../context/StoreProvider';
+import { imageFrame, isImageFit, ratioValue } from '../../lib/productImage';
 import { Badge, CartIcon, HeartIcon, Skeleton, Spinner } from '../ui';
 
 interface Props {
@@ -28,6 +29,16 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
 
   const image = product.images?.find((i) => i.isPrimary) ?? product.images?.[0];
   const hover = product.images?.find((i) => i.url !== image?.url);
+
+  /*
+   * The frame is sized from the primary image, and the hover image is laid
+   * over it. Two photographs of one product are nearly always the same shape,
+   * and where they are not, the second is fitted to the first rather than
+   * allowed to resize the card from under the cursor.
+   */
+  const fitSetting = get<string>('catalog.imageFit', 'natural');
+  const fit = isImageFit(fitSetting) ? fitSetting : 'natural';
+  const frame = imageFrame(image, fit, get<string>('catalog.imageRatio', '1:1'));
 
   // Price comes from the pricing helper so a variant-priced product shows the
   // right figure — and a range when its variants differ.
@@ -72,7 +83,8 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
     <article className={clsx('group relative flex h-full flex-col', className)}>
       <Link
         to={`/product/${product.slug}`}
-        className="relative block aspect-square w-full shrink-0 overflow-hidden bg-paper-warm"
+        className="relative block w-full shrink-0 overflow-hidden bg-paper-warm"
+        style={frame.style}
         aria-label={product.name}
       >
         {image ? (
@@ -82,7 +94,8 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
               alt={image.alt ?? product.name}
               loading={priority ? 'eager' : 'lazy'}
               className={clsx(
-                'h-full w-full object-cover transition-all duration-700 ease-architect',
+                'h-full w-full transition-all duration-700 ease-architect',
+                frame.objectClass,
                 hover ? 'group-hover:opacity-0' : 'group-hover:scale-[1.06]',
               )}
             />
@@ -92,7 +105,12 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
                 alt=""
                 loading="lazy"
                 aria-hidden="true"
-                className="absolute inset-0 h-full w-full scale-[1.02] object-cover opacity-0 transition-all duration-700 ease-architect group-hover:scale-100 group-hover:opacity-100"
+                className={clsx(
+                  'absolute inset-0 h-full w-full scale-[1.02] opacity-0 transition-all duration-700 ease-architect group-hover:scale-100 group-hover:opacity-100',
+                  // Never crop the second photograph when the first was not
+                  // cropped either.
+                  fit === 'cover' ? 'object-cover' : 'object-contain',
+                )}
               />
             ) : null}
           </>
@@ -213,9 +231,16 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
 }
 
 export function ProductCardSkeleton() {
+  // The placeholder takes the configured frame shape, so the grid does not
+  // change height at the moment the real cards replace it. In natural mode
+  // each card ends up its own photograph's shape, and the configured shape is
+  // the closest guess available before any of them have loaded.
+  const { get } = useSettings();
+  const ratio = ratioValue(get<string>('catalog.imageRatio', '1:1'));
+
   return (
     <div className="flex h-full flex-col">
-      <Skeleton className="aspect-square w-full shrink-0" />
+      <Skeleton className="w-full shrink-0" style={{ aspectRatio: String(ratio) }} />
       <Skeleton className="mt-3.5 h-2.5 w-20" />
       <Skeleton className="mt-2.5 h-3.5 w-3/4" />
       <Skeleton className="mt-2.5 h-3.5 w-1/2" />

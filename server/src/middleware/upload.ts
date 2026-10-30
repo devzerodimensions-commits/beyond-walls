@@ -58,6 +58,9 @@ export interface PersistedUpload {
   mimeType: string;
   size: number;
   originalName: string;
+  /** Pixel size of the stored image. Undefined for video and for PDFs. */
+  width?: number;
+  height?: number;
 }
 
 /**
@@ -126,6 +129,8 @@ export async function persistUpload(
     // reports and what a quota would be counted against.
     size: buffer.length,
     originalName: file.originalname,
+    width: optimized?.width,
+    height: optimized?.height,
   };
 }
 

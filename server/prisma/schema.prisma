@@ -424,6 +424,12 @@ model ProductImage {
   alt       String?
   sortOrder Int      @default(0)
   isPrimary Boolean  @default(false)
+  /// Pixel size of the stored file, recorded when it is uploaded or linked.
+  /// The storefront sizes an image's frame from this, so the space is reserved
+  /// before the image arrives rather than after. Null for rows written before
+  /// it was captured; the shop falls back to the configured frame shape.
+  width     Int?
+  height    Int?
   createdAt DateTime @default(now())
 
   @@index([productId])

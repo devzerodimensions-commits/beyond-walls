@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
 import { env } from '../config/env';
 
 /**
@@ -57,10 +57,36 @@ export interface OptimizedImage {
   extension: string;
   /** False when the original was kept, so the caller can name the file correctly. */
   converted: boolean;
+  /**
+   * The stored image's pixel size, after rotation and any resize.
+   *
+   * Recorded because the storefront needs an image's shape before the image
+   * itself arrives: without it a frame sized to the picture can only be sized
+   * once the picture has loaded, which is the definition of layout shift. Both
+   * are undefined for a PDF, and for anything sharp could not read.
+   */
+  width?: number;
+  height?: number;
 }
 
 export function isConvertible(mimeType: string): boolean {
   return CONVERTIBLE.has(mimeType);
+}
+
+/**
+ * Width and height as the image will actually be seen.
+ *
+ * A phone writes orientation into EXIF rather than into the pixels, so a
+ * portrait photograph off an iPhone reports 4032x3024 -- landscape -- until
+ * the rotation is applied. Orientations 5 to 8 are the quarter turns, and for
+ * those the two have to be swapped or every portrait upload would be recorded
+ * as a landscape one.
+ */
+function orientedSize(meta: Metadata): { width?: number; height?: number } {
+  const turned = (meta.orientation ?? 1) >= 5;
+  const width = turned ? meta.pageHeight ?? meta.height : meta.width;
+  const height = turned ? meta.width : meta.pageHeight ?? meta.height;
+  return { width, height };
 }
 
 /**
@@ -127,15 +153,33 @@ export async function optimizeImage(
       });
     }
 
-    const out = await pipeline.webp({ quality, effort }).toBuffer();
+    /*
+     * resolveWithObject costs nothing here -- sharp has just finished the
+     * encode and knows the output size -- and it is the only reading that is
+     * true after both the rotate and the resize above.
+     */
+    const { data: out, info } = await pipeline
+      .webp({ quality, effort })
+      .toBuffer({ resolveWithObject: true });
 
     // Re-encoding an already-tight WebP, or a flat PNG at high quality, can
     // cost bytes rather than save them. Keep whichever is smaller, unless a
     // resize means the larger file is genuinely a different image.
     const resized = Boolean(maxEdge) && longest > (maxEdge ?? Infinity);
-    if (!resized && out.length >= buffer.length && mimeType === 'image/webp') return unchanged;
+    if (!resized && out.length >= buffer.length && mimeType === 'image/webp') {
+      // Keeping the original still tells the caller its shape, which is the
+      // whole point of measuring.
+      return { ...unchanged, ...orientedSize(meta) };
+    }
 
-    return { buffer: out, mimeType: 'image/webp', extension: '.webp', converted: true };
+    return {
+      buffer: out,
+      mimeType: 'image/webp',
+      extension: '.webp',
+      converted: true,
+      width: info.width,
+      height: info.height,
+    };
   } catch {
     // Corrupt frame, an exotic colour profile, a codec this build of sharp was
     // not compiled with. Store what was sent rather than refusing the upload.

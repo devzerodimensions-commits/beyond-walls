@@ -174,6 +174,23 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'seo.googleSiteVerification', group: 'seo', label: 'Google site verification token', value: '' },
   { key: 'seo.robots', group: 'seo', label: 'Robots directive', value: 'index, follow' },
 
+  // --- Product images --------------------------------------------------------
+  /*
+   * How a product photograph sits in its frame, catalogue-wide.
+   *
+   * The default is the one that never damages a picture. "contain" and "cover"
+   * are there because a catalogue shot on a white background and a photograph
+   * of a sign on a wall want different things, and which one this shop sells
+   * is not a decision code should be making on the studio's behalf.
+   */
+  { key: 'catalog.imageFit', group: 'catalog', label: 'Product image fit', value: 'natural' },
+  /*
+   * The frame shape used by "contain" and "cover" -- and the fallback in
+   * "natural" for an image whose pixel size was never recorded, which is every
+   * product image uploaded before that was captured.
+   */
+  { key: 'catalog.imageRatio', group: 'catalog', label: 'Product image shape', value: '1:1' },
+
   // --- Store behaviour -------------------------------------------------------
   { key: 'store.enableWishlist', group: 'store', label: 'Enable wishlist', value: true },
   { key: 'store.enableReviews', group: 'store', label: 'Show product reviews', value: false },
@@ -196,7 +213,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
 const PUBLIC_GROUPS = new Set([
   'brand', 'contact', 'hours', 'social', 'footer', 'announcement',
-  'payment', 'shipping', 'tax', 'seo', 'store',
+  'payment', 'shipping', 'tax', 'seo', 'store', 'catalog',
 ]);
 
 /** Keys that must never be exposed to the storefront. */

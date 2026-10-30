@@ -142,8 +142,8 @@ export function PageLoader({ label = 'Loading' }: { label?: string }) {
   );
 }
 
-export function Skeleton({ className }: { className?: string }) {
-  return <div className={clsx('skeleton', className)} />;
+export function Skeleton({ className, style }: { className?: string; style?: CSSProperties }) {
+  return <div className={clsx('skeleton', className)} style={style} />;
 }
 
 // ---------------------------------------------------------------------------

@@ -684,8 +684,10 @@ router.post(
           mimeType: item.mimeType,
           size: item.size,
           folder: 'products',
+          width: item.width,
+          height: item.height,
         },
-        update: {},
+        update: { width: item.width, height: item.height },
       });
       created.push(
         await prisma.productImage.create({
@@ -695,6 +697,8 @@ router.post(
             alt: product.name,
             sortOrder: sortOrder++,
             isPrimary: product.images.length === 0 && created.length === 0,
+            width: item.width,
+            height: item.height,
           },
         }),
       );
@@ -711,7 +715,16 @@ router.post(
     const url = String(req.body?.url ?? '');
     if (!url) throw ApiError.badRequest('url is required');
 
-    const count = await prisma.productImage.count({ where: { productId: req.params.id } });
+    /*
+     * The media library already measured this file when it was uploaded, so
+     * the shape comes from there rather than from opening the image again --
+     * and an asset old enough to predate the measurement leaves both null,
+     * which the shop handles.
+     */
+    const [count, asset] = await Promise.all([
+      prisma.productImage.count({ where: { productId: req.params.id } }),
+      prisma.mediaAsset.findUnique({ where: { url }, select: { width: true, height: true } }),
+    ]);
     const image = await prisma.productImage.create({
       data: {
         productId: req.params.id,
@@ -719,6 +732,8 @@ router.post(
         alt: String(req.body?.alt ?? ''),
         sortOrder: count,
         isPrimary: count === 0,
+        width: asset?.width ?? null,
+        height: asset?.height ?? null,
       },
     });
     res.status(201).json({ success: true, data: image });

@@ -3,6 +3,8 @@ import clsx from 'clsx';
 import { assetUrl } from '../../lib/api';
 import type { ProductImage } from '../../lib/types';
 import { resolveVideo } from '../../lib/video';
+import { imageFrame, isImageFit, objectClassIn, ratioValue } from '../../lib/productImage';
+import { useSettings } from '../../context/StoreProvider';
 import { Badge, ChevronLeft, ChevronRight, CloseIcon } from '../ui';
 
 /**
@@ -23,6 +25,18 @@ export function ProductGallery({
   const [origin, setOrigin] = useState({ x: 50, y: 50 });
   const [lightbox, setLightbox] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
+  const { get } = useSettings();
+
+  /*
+   * The frame is sized once, from the first photograph, and every other
+   * photograph is fitted into it. Sizing it from whichever image is showing
+   * would mean the page changed height each time a thumbnail was clicked,
+   * which is worse than a little space around an odd-shaped picture.
+   */
+  const fitSetting = get<string>('catalog.imageFit', 'natural');
+  const fit = isImageFit(fitSetting) ? fitSetting : 'natural';
+  const ratioKey = get<string>('catalog.imageRatio', '1:1');
+  const frame = imageFrame(images[0], fit, ratioKey);
 
   /*
    * The video, when there is one, is the slide after the last photograph. It
@@ -71,7 +85,10 @@ export function ProductGallery({
     return video ? (
       <VideoFrame video={video} title={productName} />
     ) : (
-      <div className="flex aspect-[4/3] items-center justify-center bg-paper-warm text-2xs uppercase tracking-architect text-ink-300 sm:aspect-square">
+      <div
+        className="flex items-center justify-center bg-paper-warm text-2xs uppercase tracking-architect text-ink-300"
+        style={{ aspectRatio: String(ratioValue(ratioKey)) }}
+      >
         No image
       </div>
     );
@@ -106,7 +123,14 @@ export function ProductGallery({
                   src={assetUrl(image.url)}
                   alt=""
                   loading="lazy"
-                  className="h-full w-full object-cover"
+                  className={clsx(
+                    'h-full w-full',
+                    // The rail stays square whatever the frame does, because a
+                    // ragged column of thumbnails is harder to scan — but a
+                    // thumbnail is still a product photograph, so it is only
+                    // cropped when the setting says cropping is wanted.
+                    fit === 'cover' ? 'object-cover' : 'object-contain',
+                  )}
                 />
               </button>
             ))}
@@ -143,13 +167,17 @@ export function ProductGallery({
             onMouseLeave={() => setZooming(false)}
             onMouseMove={onMove}
             onClick={() => setLightbox(true)}
-            className="group relative aspect-[4/3] cursor-zoom-in overflow-hidden bg-paper-warm sm:aspect-square"
+            className="group relative cursor-zoom-in overflow-hidden bg-paper-warm"
+            style={frame.style}
           >
             <img
               src={assetUrl(current.url)}
               alt={current.alt ?? productName}
               {...{ fetchpriority: 'high' }}
-              className="h-full w-full object-cover transition-transform duration-300 ease-out"
+              className={clsx(
+                'h-full w-full transition-transform duration-300 ease-out',
+                objectClassIn(current, frame, fit),
+              )}
               style={
                 zooming
                   ? { transform: 'scale(1.85)', transformOrigin: `${origin.x}% ${origin.y}%` }
@@ -249,7 +277,11 @@ export function ProductGallery({
                   )}
                   aria-label={`View image ${index + 1}`}
                 >
-                  <img src={assetUrl(image.url)} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={assetUrl(image.url)}
+                    alt=""
+                    className={clsx('h-full w-full', fit === 'cover' ? 'object-cover' : 'object-contain')}
+                  />
                 </button>
               ))}
             </div>

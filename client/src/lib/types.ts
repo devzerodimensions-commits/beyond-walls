@@ -58,6 +58,9 @@ export interface ProductImage {
   alt?: string | null;
   sortOrder?: number;
   isPrimary?: boolean;
+  /** Pixel size of the stored file. Null on rows written before it was captured. */
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface ProductVariant {

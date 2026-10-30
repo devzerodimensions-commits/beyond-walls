@@ -6,6 +6,9 @@ import { ApiError, api } from '../../lib/api';
 import type { BusinessHour, CheckoutConfig, SettingsMap } from '../../lib/types';
 import { useToast } from '../../context/StoreProvider';
 import { AdminCard, AdminPageHeader, ImageField, StringListEditor } from '../../components/admin/AdminKit';
+import {
+  FIT_LABELS, RATIO_LABELS, imageFrame, isImageFit, type ImageFit,
+} from '../../lib/productImage';
 import { BrandColorField } from '../../components/admin/BrandColorField';
 import {
   AlertIcon, Badge, Button, Checkbox, Input, PageLoader, Select, Textarea, TrashIcon,
@@ -13,7 +16,7 @@ import {
 
 type Group =
   | 'brand' | 'contact' | 'hours' | 'social' | 'footer'
-  | 'announcement' | 'payment' | 'shipping' | 'tax' | 'seo' | 'store';
+  | 'announcement' | 'payment' | 'shipping' | 'tax' | 'seo' | 'store' | 'catalog';
 
 const GROUPS: { id: Group; label: string; description: string }[] = [
   { id: 'brand', label: 'Brand & logo', description: 'Your logo, name and tagline.' },
@@ -24,6 +27,7 @@ const GROUPS: { id: Group; label: string; description: string }[] = [
   { id: 'payment', label: 'Payments', description: 'Razorpay and cash on delivery.' },
   { id: 'shipping', label: 'Shipping & tax', description: 'Rates, free shipping and GST handling.' },
   { id: 'store', label: 'Store behaviour', description: 'Wishlist, reviews, checkout and budget filters.' },
+  { id: 'catalog', label: 'Product images', description: 'How product photos are shaped across the shop.' },
   { id: 'footer', label: 'Footer', description: 'Footer text and copyright.' },
   { id: 'seo', label: 'SEO defaults', description: 'Titles, descriptions and the canonical site URL.' },
 ];
@@ -445,6 +449,46 @@ export default function AdminSettings() {
             </>
           ) : null}
 
+          {/* ---- Product images ---- */}
+          {group === 'catalog' ? (
+            <AdminCard
+              title="Product images"
+              description="One rule for every product photo — the shop grid, the product page, the home page and the wishlist."
+            >
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Select
+                  label="How a photo fills its frame"
+                  value={str('catalog.imageFit') || 'natural'}
+                  hint="Natural never crops and never stretches. Pick a fixed shape instead if you would rather every card were exactly the same height."
+                  options={FIT_LABELS}
+                  onChange={(e) => set('catalog.imageFit', e.target.value)}
+                />
+                <Select
+                  label="Frame shape"
+                  value={str('catalog.imageRatio') || '1:1'}
+                  hint={
+                    (str('catalog.imageFit') || 'natural') === 'natural'
+                      ? 'Only used for photos uploaded before the site began recording their size.'
+                      : 'The shape every product photo is shown in.'
+                  }
+                  options={RATIO_LABELS}
+                  onChange={(e) => set('catalog.imageRatio', e.target.value)}
+                />
+              </div>
+
+              <ImageFitPreview
+                fit={str('catalog.imageFit') || 'natural'}
+                ratio={str('catalog.imageRatio') || '1:1'}
+              />
+
+              <p className="mt-6 border-t border-[color:var(--a-line)] pt-5 text-xs leading-relaxed text-[color:var(--a-muted)]">
+                Photo sizes are recorded as you upload, so a page holds the right amount
+                of space while a picture loads instead of jumping once it arrives.
+                Pictures added before this existed fall back to the frame shape above —
+                re-uploading one is enough to fix it.
+              </p>
+            </AdminCard>
+          ) : null}
           {/* ---- Footer ---- */}
           {group === 'footer' ? (
             <AdminCard title="Footer">
@@ -590,6 +634,68 @@ export default function AdminSettings() {
  * actually truncates at. The homepage uses the default title as-is; every
  * other page goes through the template, so both are shown.
  */
+/**
+ * What the two settings actually do, drawn rather than described.
+ *
+ * The three samples are the shapes that cause the argument: a square
+ * catalogue shot, a tall nameplate, a wide signboard. They are run through
+ * `imageFrame` — the same function the shop itself uses — so this is not a
+ * drawing of what should happen, it is the real thing at small size.
+ */
+function ImageFitPreview({ fit, ratio }: { fit: string; ratio: string }) {
+  const resolved: ImageFit = isImageFit(fit) ? fit : 'natural';
+
+  const samples = [
+    { label: 'Square photo', width: 1200, height: 1200, fill: '#8a8f85' },
+    { label: 'Tall photo', width: 900, height: 1200, fill: '#6f7a86' },
+    { label: 'Wide photo', width: 1600, height: 900, fill: '#8c7f6d' },
+  ];
+
+  const swatch = (w: number, h: number, fill: string) =>
+    `data:image/svg+xml;utf8,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">`
+      + `<rect width="100%" height="100%" fill="${fill}"/>`
+      + `<circle cx="50%" cy="50%" r="${Math.min(w, h) * 0.22}" fill="rgba(255,255,255,.55)"/>`
+      + '</svg>',
+    )}`;
+
+  const note =
+    resolved === 'cover'
+      ? 'The tall and wide photos are cropped to fit the frame.'
+      : resolved === 'contain'
+        ? 'Every photo is shown whole, with space around it where the shape differs.'
+        : 'Each frame takes its own photo’s shape. Nothing is cropped or stretched.';
+
+  return (
+    <div className="mt-7">
+      <p className="mb-3 text-xs font-medium text-[color:var(--a-muted)]">
+        How three differently shaped photos would look
+      </p>
+      <div className="grid max-w-md grid-cols-3 items-start gap-4">
+        {samples.map((s) => {
+          const frame = imageFrame(s, resolved, ratio);
+          return (
+            <figure key={s.label}>
+              <div
+                className="overflow-hidden border border-[color:var(--a-line)]"
+                style={{ ...frame.style, background: 'var(--a-sunken)' }}
+              >
+                <img
+                  src={swatch(s.width, s.height, s.fill)}
+                  alt=""
+                  className={clsx('h-full w-full', frame.objectClass)}
+                />
+              </div>
+              <figcaption className="mt-2 text-2xs text-[color:var(--a-faint)]">{s.label}</figcaption>
+            </figure>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-2xs text-[color:var(--a-faint)]">{note}</p>
+    </div>
+  );
+}
+
 function SearchPreview({
   siteUrl, title, template, description,
 }: {

@@ -999,8 +999,12 @@ router.post(
             size: item.size,
             folder,
             alt: String(req.body?.alt ?? ''),
+            width: item.width,
+            height: item.height,
           },
-          update: {},
+          // A re-upload to the same URL is the same bytes, but a row written
+          // before dimensions were captured has none -- so fill them in.
+          update: { width: item.width, height: item.height },
         }),
       );
     }
