@@ -61,7 +61,12 @@ const PAGES = [
           'detail can change how a space feels.\n\n' +
           'Now the second generation is carrying that experience forward in a new direction — from ' +
           'making signs to a design-led brand for personal spaces.',
-        config: { image: '/uploads/photos/bw-photo-07.webp', imageSide: 'right' },
+        config: {
+          image: '/uploads/photos/bw-photo-07.webp',
+          imageSide: 'right',
+          variant: 'editorial',
+          ratio: 'landscape',
+        },
       },
 
       /*
@@ -157,7 +162,12 @@ const PAGES = [
           'But it is not only about what we make. It is about how we work with people. We do not see ' +
           'customers as numbers or orders. We listen, we understand the idea behind the request, and ' +
           'we work towards something that feels right for the person and the space.',
-        config: { image: '/uploads/photos/bw-photo-02.webp', imageSide: 'left' },
+        config: {
+          image: '/uploads/photos/bw-photo-02.webp',
+          imageSide: 'left',
+          variant: 'editorial',
+          ratio: 'landscape',
+        },
       },
 
       /*

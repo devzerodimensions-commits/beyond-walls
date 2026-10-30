@@ -998,8 +998,14 @@ export function SectionHeadingBlock({ section }: { section: HomeSection }) {
    */
   if (config.variant === 'statement') {
     return (
-      <section className="container-site py-20 lg:py-28">
-        <div className="mx-auto max-w-[24ch] border-y border-stone-line py-14 text-center lg:py-20">
+      /*
+       * Enough room to stand alone, not so much that the page stalls. The
+       * first attempt stacked outer and inner padding and took 746px of
+       * scrolling for one sentence; the rules carry the separation, so the
+       * outer space can be modest.
+       */
+      <section className="container-site py-14 lg:py-20">
+        <div className="mx-auto max-w-[24ch] border-y border-stone-line py-10 text-center lg:py-14">
           {section.subtitle ? (
             <p className="eyebrow mb-6 text-ink-400">{section.subtitle}</p>
           ) : null}
@@ -1028,15 +1034,70 @@ export function SectionHeadingBlock({ section }: { section: HomeSection }) {
 }
 
 /** An image beside a paragraph. The side is chosen in the editor. */
+/**
+ * An image beside a paragraph. The side is chosen in the editor.
+ *
+ * The image is given a shape rather than being left to take one.
+ *
+ * It used to be `h-full w-full object-cover` in a box with no height, so each
+ * section ended up as tall as whichever photograph it held: two blocks doing
+ * the same job on the About page measured 887px and 424px, and the page read
+ * as a series of accidents. A stated aspect ratio makes them agree, and makes
+ * a page look composed rather than assembled.
+ *
+ *   ratio    portrait | square | landscape (default) | auto
+ *            `auto` is the old behaviour, for a diagram or a screenshot where
+ *            cropping would destroy the point.
+ *   variant  editorial — an asymmetric split with the picture given the larger
+ *            share and dropped below the text's top edge, which is what stops
+ *            two columns of equal weight reading like a slide.
+ */
 export function ImageTextSection({ section }: { section: HomeSection }) {
-  const config = (section.config ?? {}) as { image?: string; imageSide?: string };
+  const config = (section.config ?? {}) as {
+    image?: string;
+    imageSide?: string;
+    ratio?: string;
+    variant?: string;
+  };
   const imageFirst = config.imageSide !== 'right';
+  const editorial = config.variant === 'editorial';
+
+  const ratio =
+    {
+      portrait: 'aspect-[4/5]',
+      square: 'aspect-square',
+      landscape: 'aspect-[4/3]',
+      auto: '',
+    }[config.ratio ?? 'landscape'] ?? 'aspect-[4/3]';
 
   return (
-    <section className="container-site py-14">
-      <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+    <section className={clsx('container-site', editorial ? 'py-16 lg:py-24' : 'py-14')}>
+      <div
+        className={clsx(
+          'grid gap-10',
+          editorial
+            ? 'lg:grid-cols-12 lg:items-center lg:gap-14'
+            : 'items-center lg:grid-cols-2 lg:gap-16',
+        )}
+      >
         {config.image ? (
-          <div className={clsx('overflow-hidden bg-paper-warm', imageFirst ? 'lg:order-1' : 'lg:order-2')}>
+          <div
+            className={clsx(
+              'overflow-hidden bg-paper-warm',
+              imageFirst ? 'lg:order-1' : 'lg:order-2',
+              // Seven columns of twelve: enough to be the subject of the
+              // section rather than an illustration beside it.
+              editorial && 'lg:col-span-7',
+              /*
+               * Dropped a little below the text on wide screens only. It is
+               * the whole difference between an editorial spread and a slide,
+               * and at narrow widths the two stack anyway, so there is nothing
+               * to offset against.
+               */
+              editorial && (imageFirst ? 'lg:mt-14' : 'lg:mb-14'),
+              ratio,
+            )}
+          >
             <img
               src={assetUrl(config.image)}
               alt={section.title ?? ''}
@@ -1046,11 +1107,25 @@ export function ImageTextSection({ section }: { section: HomeSection }) {
           </div>
         ) : null}
 
-        <div className={clsx(imageFirst ? 'lg:order-2' : 'lg:order-1')}>
+        <div
+          className={clsx(
+            imageFirst ? 'lg:order-2' : 'lg:order-1',
+            editorial && 'lg:col-span-5',
+          )}
+        >
           {section.subtitle ? <p className="eyebrow mb-4">{section.subtitle}</p> : null}
-          {section.title ? <h2 className="text-2xl lg:text-3xl">{section.title}</h2> : null}
+          {section.title ? (
+            <h2 className={clsx(editorial ? 'text-balance text-2xl leading-tight lg:text-[2.1rem]' : 'text-2xl lg:text-3xl')}>
+              {section.title}
+            </h2>
+          ) : null}
           {section.bodyText ? (
-            <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-ink-500">
+            <p
+              className={clsx(
+                'mt-4 whitespace-pre-line leading-relaxed text-ink-500',
+                editorial ? 'mt-6 text-sm lg:text-[0.95rem] lg:leading-[1.75]' : 'text-sm',
+              )}
+            >
               {section.bodyText}
             </p>
           ) : null}
