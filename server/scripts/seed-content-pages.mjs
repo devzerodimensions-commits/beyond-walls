@@ -64,39 +64,41 @@ const PAGES = [
         config: { image: '/uploads/photos/bw-photo-07.webp', imageSide: 'right' },
       },
 
+      /*
+       * The founder and co-founder profiles used to sit here. The studio asked
+       * for them to come off the page in October 2026, so they are gone from
+       * the seed as well -- otherwise a fresh environment would recreate what
+       * production has had removed.
+       *
+       * What took their place is below: a strip of three facts the page already
+       * states in the company's voice, and the gallery. The facts that lived
+       * only in the profiles -- the 500 projects, the twenty years, the named
+       * materials -- are not restated anywhere, because attributing one
+       * person's record to the company is the studio's claim to make.
+       */
       {
-        type: 'IMAGE_TEXT',
-        subtitle: 'Founder — Patel Mohmed Ammar',
-        title: 'From digital design to physical expression',
-        bodyText:
-          'With a Bachelor’s degree in Fine Arts and two years of experience as a visual designer, I ' +
-          'have spent much of my career working with ideas through a screen: building identities, ' +
-          'creating visuals, and finding ways to communicate through design.\n\n' +
-          'But I wanted to take that thinking beyond the digital world.\n\n' +
-          'Growing up around our family’s signage manufacturing business gave me an early connection ' +
-          'to materials, making and physical spaces. Today I am bringing that together with my ' +
-          'background in visual design to build Beyond Walls.\n\n' +
-          'The goal is simple: to explore what happens when design leaves the screen and becomes ' +
-          'something you can see, touch and live with.',
-        config: { image: '/uploads/photos/bw-photo-04.webp', imageSide: 'left' },
-      },
-
-      {
-        type: 'IMAGE_TEXT',
-        subtitle: 'Co-founder — Patel Mohmed Ishaq',
-        title: 'Twenty years of making things real',
-        bodyText:
-          'With 20 years of experience in signage manufacturing, Mohmed Ishaq brings hands-on ' +
-          'knowledge of materials, fabrication and execution to Beyond Walls.\n\n' +
-          'Over the years he has completed more than 500 signage and elevation projects, working ' +
-          'closely with interior designers, architects and businesses to turn designs into finished ' +
-          'physical products.\n\n' +
-          'From acrylic, MDF and ACP to fabrication, finishing and installation, his experience goes ' +
-          'beyond knowing materials. It comes from understanding how they behave, how they work ' +
-          'together, and how they perform in the real world.\n\n' +
-          'At Beyond Walls that experience is the foundation of our approach: pieces that are not ' +
-          'only designed well, but made to work well.',
-        config: { image: '/uploads/photos/bw-photo-01.webp', imageSide: 'right' },
+        type: 'USP_STRIP',
+        subtitle: 'Beyond Walls',
+        title: 'Two decades of making, now making for homes',
+        config: {
+          items: [
+            {
+              title: 'Since 2004',
+              text: 'Started as Patel Corporation, an offline signage manufacturing business.',
+            },
+            {
+              title: 'Made in-house',
+              text:
+                'Production happens at our own facility, from choosing the material to finishing.',
+            },
+            {
+              title: 'Design and making',
+              text:
+                'Our design experience creates with intention. Our manufacturing experience makes ' +
+                'it work.',
+            },
+          ],
+        },
       },
 
       {
@@ -132,6 +134,13 @@ const PAGES = [
             },
           ],
         },
+      },
+
+      {
+        type: 'GALLERY',
+        subtitle: 'Our work',
+        title: 'Pieces we have made',
+        config: { limit: 8 },
       },
 
       {
