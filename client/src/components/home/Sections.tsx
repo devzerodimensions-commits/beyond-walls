@@ -149,8 +149,72 @@ export function HeroSection({ section }: { section: HomeSection }) {
 // ---------------------------------------------------------------------------
 
 export function UspStrip({ section }: { section: HomeSection }) {
-  const items = ((section.config?.items ?? []) as { title: string; text: string }[]) ?? [];
+  const config = (section.config ?? {}) as {
+    items?: { title: string; text: string }[];
+    variant?: string;
+  };
+  const items = config.items ?? [];
   if (!items.length) return null;
+
+  /*
+   * Two treatments, because the strip does two different jobs.
+   *
+   * Under the homepage hero it is a reassurance line: deliberately quiet, read
+   * on the way past to something else. On a content page it carries the
+   * argument itself, and at that size it read as fine print -- small caps and
+   * 12px body between hairline rules, directly after a full-bleed photograph.
+   * It lost every time.
+   *
+   * `feature` gives the same content room: a tinted band, no dividers, numerals
+   * large enough to set the rhythm, and type at a size somebody actually
+   * reads. The default is byte-for-byte what it was, so the homepage does not
+   * move.
+   */
+  const feature = config.variant === 'feature';
+
+  if (feature) {
+    return (
+      <section className="bg-paper-warm py-16 lg:py-24">
+        <div className="container-site">
+          {section.subtitle ? (
+            <p className="eyebrow mb-3 text-ink-400">{section.subtitle}</p>
+          ) : null}
+          {section.title ? (
+            <h2 className="max-w-[20ch] text-balance text-2xl leading-tight lg:text-4xl">
+              {section.title}
+            </h2>
+          ) : null}
+
+          <div
+            className={clsx(
+              'grid gap-x-10 gap-y-10 sm:grid-cols-3 lg:gap-x-16',
+              (section.title || section.subtitle) && 'mt-12 lg:mt-16',
+            )}
+          >
+            {items.map((item, index) => (
+              <div key={item.title}>
+                {/* The numeral is the structure: large, light, and in the brand
+                    colour so the three read as a sequence rather than three
+                    unrelated paragraphs. Through the custom property, as the
+                    process steps do, so it follows the colour the admin sets
+                    rather than hard-coding one. */}
+                <span
+                  className="block text-3xl font-light leading-none lg:text-4xl"
+                  style={{ color: 'var(--brand-strong)' }}
+                >
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <h3 className="mt-5 text-sm font-semibold uppercase tracking-architect">
+                  {item.title}
+                </h3>
+                <p className="mt-2.5 text-sm leading-relaxed text-ink-600">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="border-b border-stone-line bg-paper">
@@ -919,7 +983,35 @@ export function StepsSection({ section }: { section: HomeSection }) {
   * prose below it rather than sitting centred above left-aligned text.
   */
 export function SectionHeadingBlock({ section }: { section: HomeSection }) {
-  const centred = (section.config as { align?: string } | null)?.align === 'center';
+  const config = (section.config ?? {}) as { align?: string; variant?: string };
+  const centred = config.align === 'center';
+
+  /*
+   * A statement, for the one sentence a page is actually making.
+   *
+   * Every page here ends up as paragraphs of similar weight, so the line worth
+   * remembering sits in the middle of a block at the same size as everything
+   * around it. This sets it large, alone, between rules, with nothing else
+   * competing — the only treatment on the site that says "stop and read this".
+   *
+   * Opt-in, so no existing heading changes.
+   */
+  if (config.variant === 'statement') {
+    return (
+      <section className="container-site py-20 lg:py-28">
+        <div className="mx-auto max-w-[24ch] border-y border-stone-line py-14 text-center lg:py-20">
+          {section.subtitle ? (
+            <p className="eyebrow mb-6 text-ink-400">{section.subtitle}</p>
+          ) : null}
+          {section.title ? (
+            <p className="text-balance text-2xl leading-[1.3] sm:text-3xl lg:text-[2.6rem]">
+              {section.title}
+            </p>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="container-site pb-2 pt-14">

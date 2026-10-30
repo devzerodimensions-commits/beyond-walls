@@ -81,6 +81,7 @@ const PAGES = [
         subtitle: 'Beyond Walls',
         title: 'Two decades of making, now making for homes',
         config: {
+          variant: 'feature',
           items: [
             {
               title: 'Since 2004',
@@ -155,9 +156,20 @@ const PAGES = [
           'us make it work.\n\n' +
           'But it is not only about what we make. It is about how we work with people. We do not see ' +
           'customers as numbers or orders. We listen, we understand the idea behind the request, and ' +
-          'we work towards something that feels right for the person and the space.\n\n' +
-          'Good design starts with an idea. Good making brings it to life. We understand both.',
+          'we work towards something that feels right for the person and the space.',
         config: { image: '/uploads/photos/bw-photo-02.webp', imageSide: 'left' },
+      },
+
+      /*
+       * The one sentence the page is making, set on its own rather than left at
+       * the end of a paragraph where it reads like every other line. Immediately
+       * before the call to action, so the page makes its point and then asks.
+       */
+      {
+        type: 'SECTION_HEADING',
+        title:
+          'Good design starts with an idea. Good making brings it to life. We understand both.',
+        config: { variant: 'statement' },
       },
 
       {
