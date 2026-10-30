@@ -36,6 +36,7 @@ const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'));
 const AdminProductEdit = lazy(() => import('./pages/admin/AdminProductEdit'));
+const AdminProductNew = lazy(() => import('./pages/admin/AdminProductNew'));
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'));
 const AdminAttributes = lazy(() => import('./pages/admin/AdminAttributes'));
 const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'));
@@ -164,7 +165,8 @@ export default function App() {
         >
           <Route index element={<AdminDashboard />} />
           <Route path="products" element={<AdminProducts />} />
-          <Route path="products/new" element={<AdminProductEdit />} />
+          {/* Creating is a guided flow; editing is the full tabbed editor. */}
+          <Route path="products/new" element={<AdminProductNew />} />
           <Route path="products/:id" element={<AdminProductEdit />} />
           <Route path="categories" element={<AdminCategories />} />
           <Route path="attributes" element={<AdminAttributes />} />
