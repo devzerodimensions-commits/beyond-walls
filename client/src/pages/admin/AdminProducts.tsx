@@ -11,8 +11,9 @@ import {
   AdminCard, AdminPageHeader, AdminSearch, DataTable, StatusToggle,
 } from '../../components/admin/AdminKit';
 import {
-  Badge, Button, ButtonLink, CheckIcon, CloseIcon, ConfirmDialog, CopyIcon, DownloadIcon,
-  EditIcon, EyeIcon, Input, Modal, Pagination, Select, StarIcon, TrashIcon, UploadIcon,
+  ArchiveIcon, Badge, Button, ButtonLink, CheckIcon, CloseIcon, ConfirmDialog, CopyIcon,
+  DownloadIcon, EditIcon, EyeIcon, Input, Modal, Pagination, RefreshIcon, Select, StarIcon,
+  TrashIcon, UploadIcon,
 } from '../../components/ui';
 
 /** How the import reads a spreadsheet's headings. */
@@ -41,6 +42,7 @@ export default function AdminProducts() {
   const [status, setStatus] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [deleting, setDeleting] = useState<Product | null>(null);
+  const [archiving, setArchiving] = useState<Product | null>(null);
 
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkAction, setBulkAction] = useState('');
@@ -633,6 +635,14 @@ export default function AdminProducts() {
                       { value: 'ARCHIVED', label: 'Archived' },
                     ]}
                   />
+                ) : product.status === 'ARCHIVED' ? (
+                  /*
+                   * A label, not the toggle. The toggle only knows Draft and
+                   * Live, so on an archived row it renders with neither half
+                   * lit -- a control that looks broken. The way back is the
+                   * restore button in the actions column.
+                   */
+                  <Badge>Archived</Badge>
                 ) : (
                   <StatusToggle
                     status={product.status}
@@ -712,6 +722,35 @@ export default function AdminProducts() {
                   >
                     <CopyIcon size={15} />
                   </button>
+                  {/*
+                    Archive and restore are the same slot, because a product is
+                    only ever in one of the two states. Archiving asks first --
+                    it is reversible, but it takes the product off the shop and
+                    out of the default list, so without a prompt it reads as
+                    the row having vanished. Restoring comes back as a draft,
+                    never straight to live: deciding it should be on the shop
+                    again is a separate decision from deciding it still exists.
+                  */}
+                  {product.status === 'ARCHIVED' ? (
+                    <button
+                      type="button"
+                      onClick={() => setStatusMutation.mutate({ id: product.id, next: 'DRAFT' })}
+                      disabled={setStatusMutation.isPending}
+                      className="p-1.5 text-ink-400 transition-colors hover:text-ink disabled:opacity-40"
+                      title="Restore as a draft"
+                    >
+                      <RefreshIcon size={15} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setArchiving(product)}
+                      className="p-1.5 text-ink-400 transition-colors hover:text-ink"
+                      title="Archive"
+                    >
+                      <ArchiveIcon size={15} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setDeleting(product)}
@@ -728,6 +767,20 @@ export default function AdminProducts() {
 
         <Pagination page={page} totalPages={data?.meta?.totalPages ?? 1} onChange={setPage} />
       </AdminCard>
+
+      <ConfirmDialog
+        open={Boolean(archiving)}
+        title={`Archive "${archiving?.name}"?`}
+        message="The product comes off the shop and out of this list. Nothing is lost — it moves to the Archived tab, where it can be restored at any time."
+        confirmLabel="Archive product"
+        loading={setStatusMutation.isPending}
+        onCancel={() => setArchiving(null)}
+        onConfirm={() => {
+          if (!archiving) return;
+          setStatusMutation.mutate({ id: archiving.id, next: 'ARCHIVED' });
+          setArchiving(null);
+        }}
+      />
 
       <ConfirmDialog
         open={Boolean(deleting)}

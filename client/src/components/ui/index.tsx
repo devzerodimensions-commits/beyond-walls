@@ -688,6 +688,7 @@ export const ShareIcon = icon(<><circle cx="18" cy="5" r="2.5" /><circle cx="6" 
 export const EyeIcon = icon(<><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" /><circle cx="12" cy="12" r="2.6" /></>);
 export const AlertIcon = icon(<><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5" /><path d="M12 16.2v.1" /></>);
 export const RefreshIcon = icon(<><path d="M20 12a8 8 0 1 1-2.5-5.8" /><path d="M20 4v5h-5" /></>);
+export const ArchiveIcon = icon(<><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12.5h4" /></>);
 
 /** Sticky element that keeps focus inside a panel while it is open. */
 export function useFocusTrap<T extends HTMLElement>(active: boolean) {
