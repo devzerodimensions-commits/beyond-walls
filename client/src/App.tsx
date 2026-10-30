@@ -37,6 +37,7 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'));
 const AdminProductEdit = lazy(() => import('./pages/admin/AdminProductEdit'));
 const AdminProductNew = lazy(() => import('./pages/admin/AdminProductNew'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'));
 const AdminAttributes = lazy(() => import('./pages/admin/AdminAttributes'));
 const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'));
@@ -129,7 +130,15 @@ export default function App() {
             <Route path="profile" element={<AccountProfile />} />
           </Route>
 
-          {/* Dynamic CMS pages: /about, /privacy-policy, … */}
+          {/*
+            About is laid out directly rather than composed from section
+            blocks: it carries the brand, and the blocks are general by
+            design. Its SEO still comes from the CMS row, and the old section
+            rows are untouched -- pointing this back at StaticPage would
+            restore the previous page exactly.
+          */}
+          <Route path="about" element={<AboutPage />} />
+          {/* Dynamic CMS pages: /privacy-policy, /shipping-policy, … */}
           <Route path=":slug" element={<StaticPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

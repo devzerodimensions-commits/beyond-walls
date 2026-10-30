@@ -1,0 +1,520 @@
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { api, assetUrl } from '../lib/api';
+import type { GalleryItem, Page } from '../lib/types';
+import { useSettings } from '../context/StoreProvider';
+import { Seo } from '../lib/seo';
+import { ArrowRight } from '../components/ui';
+
+/**
+ * About, built rather than assembled.
+ *
+ * Every other content page is composed from the shared section blocks, which
+ * is right for a shipping policy and wrong here: this page has to carry the
+ * brand, and the blocks are general by design. So it is laid out directly —
+ * an asymmetric hero, a timeline, a stats band, a process, the work — while
+ * the header, the footer, the container, the type scale, the colours and the
+ * buttons all stay exactly as the rest of the site uses them.
+ *
+ * Its SEO still comes from the CMS page row, so title and description remain
+ * editable in the admin. The old section rows are left in the database
+ * untouched: nothing is lost, and pointing the route back at StaticPage would
+ * restore the previous page as it was.
+ *
+ * ON THE PHOTOGRAPHS
+ * The studio has seven photographs of finished signage and one of the original
+ * Patel Corporation shopfront. It has no workshop, process or team
+ * photography. So this page does not pretend otherwise: the process is set
+ * typographically rather than illustrated with stock images of other people's
+ * workshops, and there is no team section. Both are worth adding the day real
+ * photographs exist.
+ */
+
+/** The studio's own photographs of finished work. */
+const WORK = [
+  { src: '/uploads/photos/bw-photo-02.webp', label: 'Residential', name: 'Rasik Vatika' },
+  { src: '/uploads/photos/bw-photo-05.webp', label: 'Apartment', name: 'Door number, brass on black' },
+  { src: '/uploads/photos/bw-photo-06.webp', label: 'Commercial', name: 'Company plates, brass' },
+  { src: '/uploads/photos/bw-photo-03.webp', label: 'Interior', name: 'Door number, 405' },
+];
+
+/*
+ * The process, in the studio's own words from the existing page.
+ *
+ * Three steps, not five. The page it replaces named three and described
+ * three; the brief suggested five, and inventing two more would be us writing
+ * the studio's process for them.
+ */
+const PROCESS = [
+  {
+    title: 'It starts on a screen',
+    text:
+      'Every Beyond Walls piece begins as an idea. We bring it to life digitally first, refining '
+      + 'the design, the proportions and the details before anything is made.',
+  },
+  {
+    title: 'Then we make a prototype',
+    text:
+      'Before moving into production we make smaller versions of the design to understand how it '
+      + 'looks, how it feels and how it comes together in the physical world.',
+  },
+  {
+    title: 'Then we make it real',
+    text:
+      'Once the prototype is refined and approved, production begins at our in-house facility. '
+      + 'From choosing the material to assembly and finishing, each piece is made with hands-on '
+      + 'attention to detail.',
+  },
+];
+
+const DIFFERENCE = [
+  {
+    title: 'Design-led thinking',
+    text: 'We approach a piece with a design mindset — the space, the material, the purpose.',
+  },
+  {
+    title: 'Materials and finishes',
+    text: 'Two decades of working out how materials behave, and how they perform in a real space.',
+  },
+  {
+    title: 'Made in-house',
+    text: 'Production happens at our own facility, so quality, finish and timing stay with us.',
+  },
+  {
+    title: 'Design and making together',
+    text: 'Our design experience creates with intention. Our manufacturing experience makes it work.',
+  },
+];
+
+export default function AboutPage() {
+  /* Only for the SEO fields, which stay editable in the admin. */
+  const { data: page } = useQuery({
+    queryKey: ['page', 'about'],
+    queryFn: () => api.get<Page>('/pages/about'),
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: gallery } = useQuery({
+    queryKey: ['gallery', 'about'],
+    queryFn: () => api.get<GalleryItem[]>('/gallery'),
+    staleTime: 5 * 60_000,
+  });
+
+  const settings = useSettings();
+  const established = 2004;
+  const years = new Date().getFullYear() - established;
+
+  /*
+   * Installed work, not catalogue shots.
+   *
+   * The gallery currently holds product photographs -- a plate on a white
+   * background -- which is the right thing for a shop page and the wrong
+   * thing here, where the question is what a finished piece looks like in
+   * somebody's building. The four below are the studio's own photographs of
+   * signs that have been installed.
+   *
+   * The gallery takes over as soon as it holds four images the studio has
+   * categorised, because at that point it is both the better source and the
+   * one they control. Until then it is the fallback rather than the
+   * preference.
+   */
+  const curated = (gallery ?? []).filter((item) => item.tag);
+  const work = curated.length >= 4
+    ? curated.slice(0, 4).map((item) => ({
+      src: item.image,
+      label: item.tag ?? 'Beyond Walls',
+      name: item.title ?? '',
+    }))
+    : WORK;
+
+  return (
+    <>
+      <Seo
+        settings={settings.settings}
+        title={page?.seoTitle || page?.title || 'About'}
+        description={
+          page?.seoDescription
+          || 'Beyond Walls began in 2004 as Patel Corporation. Two decades of signage manufacturing, now a design-led brand for personal spaces.'
+        }
+        canonical="/about"
+      />
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Hero. Split rather than a banner with text over it: the photograph   */}
+      {/* is the product, and laying words across it would hide the thing      */}
+      {/* being sold.                                                          */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="border-b border-stone-line bg-paper-warm">
+        <div className="container-site grid items-stretch gap-0 lg:grid-cols-12">
+          <div className="flex flex-col justify-center py-14 lg:col-span-5 lg:py-24 lg:pr-12">
+            <p className="eyebrow mb-5">About us</p>
+            <h1 className="text-balance text-[2rem] leading-[1.12] sm:text-[2.6rem] lg:text-[3.1rem]">
+              We design, make, and bring spaces to life.
+            </h1>
+            <p className="mt-6 max-w-[46ch] text-[0.95rem] leading-[1.8] text-ink-600">
+              Beyond Walls creates thoughtful signage, spaces and custom pieces by bringing together
+              design thinking, material knowledge and in-house making.
+            </p>
+            {/*
+              A plain anchor, not a router Link. ScrollToTop only fires on a
+              pathname change so it will not fight this, but a router Link
+              pushes a hash without the browser scrolling to it -- a
+              same-document anchor does the scrolling itself, and scroll-mt on
+              the target keeps the heading clear of the fixed header.
+            */}
+            <div className="mt-9">
+              <a
+                href="#our-story"
+                className="inline-flex items-center gap-2 border border-ink bg-ink px-7 py-3.5 text-2xs uppercase tracking-architect text-paper transition-colors hover:bg-transparent hover:text-ink"
+              >
+                Our story
+                <ArrowRight size={14} />
+              </a>
+            </div>
+          </div>
+
+          <div className="lg:col-span-7">
+            {/*
+              Negative margins pull the picture out to the viewport edge on wide
+              screens, where the container's gutter would otherwise leave a
+              strip of background beside a full-bleed image. Below that it sits
+              inside the container like everything else.
+            */}
+            <div className="-mx-5 aspect-[4/5] sm:-mx-8 sm:aspect-[16/10] lg:mx-0 lg:h-full lg:aspect-auto lg:min-h-[32rem]">
+              <img
+                src={assetUrl('/uploads/photos/bw-photo-02.webp')}
+                alt="Gold lettering reading Rasik Vatika, mounted on a dark textured wall"
+                width={1280}
+                height={1600}
+                {...{ fetchpriority: 'high' }}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Our story                                                           */}
+      {/* ------------------------------------------------------------------ */}
+      <section id="our-story" className="container-site scroll-mt-24 py-16 lg:py-24">
+        <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
+          <div className="lg:col-span-6">
+            <div className="relative">
+              <div className="aspect-[4/3] overflow-hidden bg-paper-warm">
+                <img
+                  src={assetUrl('/uploads/general/about-us-04-Z1qL22gVby.webp')}
+                  alt="The original Patel Corporation shopfront in 2004, garlanded, with the team outside"
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              {/*
+                The year, set on the photograph's lower edge. Hidden below the
+                large breakpoint, where it would sit on top of faces rather than
+                beside them.
+              */}
+              <div className="absolute -bottom-6 right-0 hidden border border-stone-line bg-paper px-6 py-4 lg:block">
+                <p className="text-2xl leading-none">{established}</p>
+                <p className="mt-2 max-w-[14ch] text-2xs leading-relaxed text-ink-500">
+                  It started with a simple signage manufacturing business.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-6 lg:pt-6">
+            <p className="eyebrow mb-5">Our story</p>
+            <h2 className="text-balance text-2xl leading-tight sm:text-3xl lg:text-[2.3rem]">
+              From a small signage business to a design-led brand.
+            </h2>
+            <div className="mt-7 space-y-5 text-[0.95rem] leading-[1.8] text-ink-600">
+              <p>
+                In 2004 we started as Patel Corporation, an offline signage manufacturing business.
+              </p>
+              <p>
+                For more than two decades we have worked with materials, finishes, spaces and
+                businesses to turn ideas into physical signs. That experience taught us something
+                simple: the right detail can change how a space feels.
+              </p>
+              <p>
+                Now the second generation is carrying that experience forward in a new direction —
+                from making signs to a design-led brand for personal spaces.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Journey. Horizontal on a laptop, vertical on a phone.                */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="border-y border-stone-line bg-paper-off py-16 lg:py-24">
+        <div className="container-site">
+          <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
+            <div className="lg:col-span-4">
+              <p className="eyebrow mb-5">Our journey</p>
+              <h2 className="text-balance text-2xl leading-tight sm:text-3xl lg:text-[2.1rem]">
+                From signage to design-led spaces.
+              </h2>
+            </div>
+
+            <ol className="relative lg:col-span-8 lg:pt-3">
+              {/*
+                The rule runs behind the markers: horizontally across the three
+                on a laptop, vertically down the left on a phone. One element,
+                two orientations, rather than two elements and a hidden one.
+              */}
+              <span
+                aria-hidden="true"
+                className="absolute left-[7px] top-2 bottom-2 w-px bg-stone-line lg:left-0 lg:right-0 lg:top-[7px] lg:bottom-auto lg:h-px lg:w-auto"
+              />
+              <div className="grid gap-9 lg:grid-cols-3 lg:gap-10">
+                {[
+                  {
+                    marker: '2004',
+                    title: 'Started with signage',
+                    text: 'Began as Patel Corporation, making signs for businesses.',
+                  },
+                  {
+                    marker: 'Two decades',
+                    title: 'Materials and making',
+                    text: 'Years of working with materials, finishes, spaces and businesses.',
+                  },
+                  {
+                    marker: 'Today',
+                    title: 'Beyond Walls',
+                    text: 'A design-led brand for personal spaces, made in our own facility.',
+                  },
+                ].map((entry) => (
+                  <li key={entry.marker} className="relative pl-7 lg:pl-0 lg:pt-8">
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 top-1.5 h-3.5 w-3.5 rounded-full border-2 border-paper-off lg:top-0"
+                      style={{ background: 'var(--brand-strong)' }}
+                    />
+                    <p className="text-lg leading-none text-ink lg:text-xl">{entry.marker}</p>
+                    <h3 className="mt-3 text-xs font-semibold uppercase tracking-architect">
+                      {entry.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-ink-500">{entry.text}</p>
+                  </li>
+                ))}
+              </div>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Numbers. Only what the business can actually stand behind.           */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="bg-ink py-12 text-paper lg:py-16">
+        <div className="container-site grid gap-10 sm:grid-cols-2 lg:grid-cols-3 lg:gap-14">
+          <div>
+            {/* Counted from 2004 rather than written down, so it stays true. */}
+            <p className="text-4xl leading-none lg:text-5xl">{years}+</p>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-architect">Years of making</p>
+            <p className="mt-2 text-sm leading-relaxed text-paper/60">
+              Signage manufacturing since 2004, now in its second generation.
+            </p>
+          </div>
+          <div>
+            <p className="text-4xl leading-none lg:text-5xl">In-house</p>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-architect">Manufacturing</p>
+            <p className="mt-2 text-sm leading-relaxed text-paper/60">
+              Production happens at our own facility, from material to finishing.
+            </p>
+          </div>
+          <div>
+            <p className="text-4xl leading-none lg:text-5xl">One roof</p>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-architect">Design and production</p>
+            <p className="mt-2 text-sm leading-relaxed text-paper/60">
+              The people who draw it and the people who make it work together.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* What makes us different                                             */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="container-site py-16 lg:py-24">
+        <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
+          <div className="lg:col-span-5">
+            <p className="eyebrow mb-5">Why Beyond Walls</p>
+            <h2 className="text-balance text-2xl leading-tight sm:text-3xl lg:text-[2.3rem]">
+              Design meets making.
+            </h2>
+            <p className="mt-6 max-w-[44ch] text-[0.95rem] leading-[1.8] text-ink-600">
+              We do not stop at how something looks. We understand what happens after the design
+              leaves the screen: the materials, the making, the details, and the challenges that
+              come with turning an idea into a physical product.
+            </p>
+          </div>
+
+          <div className="grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:col-span-7">
+            {DIFFERENCE.map((item, index) => (
+              <div key={item.title} className="border-t border-stone-line pt-5">
+                <span
+                  className="block text-sm font-medium"
+                  style={{ color: 'var(--brand-strong)' }}
+                >
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <h3 className="mt-3 text-base font-medium leading-snug">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-500">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Process. Typographic, because there is no process photography.       */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="border-y border-stone-line bg-paper-warm py-16 lg:py-24">
+        <div className="container-site">
+          <div className="max-w-2xl">
+            <p className="eyebrow mb-5">Our process</p>
+            <h2 className="text-balance text-2xl leading-tight sm:text-3xl lg:text-[2.3rem]">
+              A clear journey from idea to your space.
+            </h2>
+          </div>
+
+          <ol className="mt-12 grid gap-10 lg:mt-16 lg:grid-cols-3 lg:gap-12">
+            {PROCESS.map((entry, index) => (
+              <li key={entry.title} className="border-t border-ink/15 pt-6">
+                <span
+                  className="block text-3xl font-light leading-none lg:text-4xl"
+                  style={{ color: 'var(--brand-strong)' }}
+                >
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <h3 className="mt-5 text-lg leading-snug">{entry.title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-ink-600">{entry.text}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Selected work                                                        */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="container-site py-16 lg:py-24">
+        <div className="mb-10 flex flex-wrap items-end justify-between gap-5 lg:mb-14">
+          <div>
+            <p className="eyebrow mb-5">Selected work</p>
+            <h2 className="text-balance text-2xl leading-tight sm:text-3xl lg:text-[2.3rem]">
+              Spaces we have made.
+            </h2>
+          </div>
+          <Link to="/gallery" className="link-underline text-sm text-ink">
+            View the full gallery →
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-5 gap-y-9 lg:grid-cols-4 lg:gap-x-6">
+          {work.map((item) => (
+            <figure key={item.src} className="group">
+              <div className="aspect-[4/5] overflow-hidden bg-paper-warm">
+                <img
+                  src={assetUrl(item.src)}
+                  alt={item.name || 'Beyond Walls signage'}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-700 ease-architect group-hover:scale-[1.03]"
+                />
+              </div>
+              <figcaption className="mt-4">
+                <p className="eyebrow">{item.label}</p>
+                <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink">
+                  {item.name}
+                </p>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Design and making — the asymmetric editorial block                   */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="border-t border-stone-line">
+        <div className="grid lg:grid-cols-12">
+          <div className="lg:col-span-6">
+            <div className="aspect-[4/5] sm:aspect-[16/10] lg:h-full lg:aspect-auto lg:min-h-[30rem]">
+              <img
+                src={assetUrl('/uploads/photos/bw-photo-01.webp')}
+                alt="A finished brass company plate held in hand before installation"
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center bg-paper-off lg:col-span-6">
+            <div className="px-5 py-14 sm:px-8 lg:px-14 lg:py-20 xl:px-20">
+              <p className="eyebrow mb-5">Design meets making</p>
+              <h2 className="text-balance text-2xl leading-tight sm:text-3xl lg:text-[2.3rem]">
+                Thoughtful design. Real-world making.
+              </h2>
+              <div className="mt-7 max-w-[52ch] space-y-5 text-[0.95rem] leading-[1.8] text-ink-600">
+                <p>
+                  Our design experience helps us create with intention. Our manufacturing
+                  experience helps us make it work.
+                </p>
+                <p>
+                  But it is not only about what we make. It is about how we work with people. We do
+                  not see customers as numbers or orders. We listen, we understand the idea behind
+                  the request, and we work towards something that feels right for the person and
+                  the space.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* The statement                                                        */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="container-site py-16 lg:py-24">
+        <p className="mx-auto max-w-[24ch] border-y border-stone-line py-10 text-balance text-center text-2xl leading-[1.3] sm:text-3xl lg:py-14 lg:text-[2.6rem]">
+          Good design starts with an idea. Good making brings it to life. We understand both.
+        </p>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Closing call to action                                               */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="bg-ink py-16 text-paper lg:py-20">
+        <div className="container-site flex flex-wrap items-center justify-between gap-8">
+          <div>
+            <p className="eyebrow mb-4 text-paper/50">Let us make something</p>
+            <h2 className="text-balance text-2xl leading-tight sm:text-3xl lg:text-[2.1rem]">
+              Have a space, sign or idea in mind?
+            </h2>
+            <p className="mt-4 max-w-[44ch] text-sm leading-relaxed text-paper/65">
+              Send us the sizes, the material and the artwork, and we will come back to you with a
+              quote.
+            </p>
+          </div>
+          {/*
+            A light button on a dark band, matching the CTA block the rest of
+            the site uses. The kit's `secondary` is ink-on-transparent, which
+            would be all but invisible here.
+          */}
+          <Link
+            to="/custom-order"
+            className="inline-flex shrink-0 items-center gap-2 border border-paper bg-paper px-7 py-3.5 text-2xs uppercase tracking-architect text-ink transition-colors hover:bg-transparent hover:text-paper"
+          >
+            Start a custom order
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+      </section>
+
+    </>
+  );
+}
