@@ -900,6 +900,7 @@ export function MultiImageUpload({
   onUpload, uploading, label = 'Upload images',
   accept = '.jpg,.jpeg,.png,.webp,.gif,.avif',
   hint = 'JPG, PNG, WEBP, GIF or AVIF — up to 12 at a time',
+  progress,
 }: {
   onUpload: (files: FileList) => void;
   uploading: boolean;
@@ -907,6 +908,8 @@ export function MultiImageUpload({
   /** File picker filter. Widened where video is also allowed. */
   accept?: string;
   hint?: string;
+  /** "3 of 12", while a batch is going up one file at a time. */
+  progress?: string;
 }) {
   return (
     <label
@@ -917,8 +920,12 @@ export function MultiImageUpload({
       )}
     >
       {uploading ? <Spinner size={20} /> : <UploadIcon size={20} className="text-ink-300" />}
-      <span className="text-xs text-ink-600">{uploading ? 'Uploading…' : label}</span>
-      <span className="text-2xs text-ink-300">{hint}</span>
+      <span className="text-xs text-ink-600">
+        {uploading ? (progress ? `Uploading ${progress}…` : 'Uploading…') : label}
+      </span>
+      {/* While a batch is going up, the count is the only thing worth saying —
+          the file types matter before it starts, not during. */}
+      <span className="text-2xs text-ink-300">{uploading && progress ? 'Each image is sent on its own' : hint}</span>
       <input
         type="file"
         multiple

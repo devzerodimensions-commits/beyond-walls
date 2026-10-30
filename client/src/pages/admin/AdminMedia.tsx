@@ -32,6 +32,7 @@ export default function AdminMedia() {
   const [folder, setFolder] = useState('');
   const [uploadFolder, setUploadFolder] = useState('general');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [viewing, setViewing] = useState<MediaAsset | null>(null);
   /** Which shelf is on screen: the library, or what has been thrown away. */
   const [view, setView] = useState<'library' | 'trash'>('library');
@@ -61,38 +62,51 @@ export default function AdminMedia() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-media'] });
 
+  /*
+   * One request per file.
+   *
+   * Each image is re-encoded to WebP on the server -- about a second for a
+   * photograph off a camera -- so a dozen in one POST held the connection open
+   * long enough for the proxy to answer 502. One at a time, each request is
+   * short, the count moves, and a file that fails costs that file rather than
+   * the whole drop.
+   *
+   * It also settles the other problem here for free: pictures and footage are
+   * validated against different allowlists, and the endpoint checks one batch
+   * against one of them. Sending each file on its own with its own kind means
+   * a mixed drop needs no splitting.
+   */
   const upload = async (files: FileList) => {
+    const chosen = Array.from(files);
     setUploading(true);
+    let done = 0;
+    const failed: string[] = [];
+
     try {
-      /*
-       * Pictures and footage are checked against different allowlists, and the
-       * endpoint validates one batch against one of them. Rather than refuse a
-       * mixed drop, split it and send each kind on its own -- whoever is
-       * uploading should not have to know the server works that way.
-       */
-      const all = Array.from(files);
-      const isVideoFile = (file: File) => /\.(mp4|webm)$/i.test(file.name);
-      const batches: { kind: string; items: File[] }[] = [
-        { kind: 'video', items: all.filter(isVideoFile) },
-        { kind: 'image', items: all.filter((file) => !isVideoFile(file)) },
-      ];
-
-      for (const batch of batches) {
-        if (!batch.items.length) continue;
-        const form = new FormData();
-        batch.items.forEach((file) => form.append('files', file));
-        form.append('folder', uploadFolder);
-        form.append('kind', batch.kind);
-        await api.upload('/admin/media', form);
+      for (const file of chosen) {
+        setUploadProgress(`${done + 1} of ${chosen.length}`);
+        try {
+          const form = new FormData();
+          form.append('files', file);
+          form.append('folder', uploadFolder);
+          form.append('kind', /\.(mp4|webm)$/i.test(file.name) ? 'video' : 'image');
+          await api.upload('/admin/media', form);
+          done += 1;
+          await invalidate();
+        } catch (err) {
+          failed.push(file.name);
+          if (failed.length === 1) {
+            push(err instanceof ApiError ? err.message : `${file.name} could not be uploaded`, 'error');
+          }
+        }
       }
-
-      await invalidate();
-      push(`${files.length} file${files.length === 1 ? '' : 's'} uploaded`, 'success');
-    } catch (err) {
-      push(err instanceof ApiError ? err.message : 'Upload failed', 'error');
     } finally {
       setUploading(false);
+      setUploadProgress('');
     }
+
+    if (done && failed.length) push(`${done} uploaded, ${failed.length} failed`, 'info');
+    else if (done) push(`${done} file${done === 1 ? '' : 's'} uploaded`, 'success');
   };
 
   const updateAsset = useMutation({
@@ -174,6 +188,7 @@ export default function AdminMedia() {
               <MultiImageUpload
                 onUpload={(files) => void upload(files)}
                 uploading={uploading}
+                progress={uploadProgress}
                 label="Upload files"
                 accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.mp4,.webm"
                 hint="Images, or MP4 and WEBM video — up to 12 at a time"

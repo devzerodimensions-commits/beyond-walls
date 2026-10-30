@@ -52,6 +52,7 @@ export default function AdminProductNew() {
   const [productId, setProductId] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
 
   const [form, setForm] = useState({
     name: '',
@@ -187,20 +188,53 @@ export default function AdminProductNew() {
     if (next) setStep(next.id);
   };
 
+  /*
+   * One request per image, not one request for the batch.
+   *
+   * Every upload is re-encoded to WebP on the server, which measured about a
+   * second for a photograph straight off a camera. Twelve of those in a single
+   * POST is half a minute with nothing on screen, and the proxy in front of the
+   * application gives up and answers 502 — which is exactly what was happening.
+   *
+   * Sent one at a time, each request is short enough that nothing times out,
+   * the count moves so the wait is legible, and a file that fails costs that
+   * file rather than the whole batch. Sequentially rather than at once,
+   * because the server re-encodes them on the same small machine and twelve
+   * concurrent encodes would be slower than twelve consecutive ones.
+   */
   const uploadImages = async (files: FileList) => {
     if (!productId) return;
+    const chosen = Array.from(files);
     setUploading(true);
+    let done = 0;
+    const failed: string[] = [];
+
     try {
-      const body = new FormData();
-      Array.from(files).forEach((file) => body.append('images', file));
-      body.append('folder', 'products');
-      await api.upload(`/admin/products/${productId}/images`, body);
-      await refresh();
-    } catch (err) {
-      push(err instanceof ApiError ? err.message : 'Upload failed', 'error');
+      for (const file of chosen) {
+        setUploadProgress(`${done + 1} of ${chosen.length}`);
+        try {
+          const body = new FormData();
+          body.append('images', file);
+          body.append('folder', 'products');
+          await api.upload(`/admin/products/${productId}/images`, body);
+          done += 1;
+          // Shown as they arrive rather than all at the end, so something is
+          // visibly happening.
+          await refresh();
+        } catch (err) {
+          failed.push(file.name);
+          if (failed.length === 1) {
+            push(err instanceof ApiError ? err.message : `${file.name} could not be uploaded`, 'error');
+          }
+        }
+      }
     } finally {
       setUploading(false);
+      setUploadProgress('');
     }
+
+    if (done && failed.length) push(`${done} uploaded, ${failed.length} failed`, 'info');
+    else if (done > 1) push(`${done} images uploaded`, 'success');
   };
 
   const linkImages = async (assets: MediaAsset[]) => {
@@ -378,7 +412,11 @@ export default function AdminProductNew() {
               ) : null}
 
               <div className="space-y-2.5">
-                <MultiImageUpload onUpload={(files) => void uploadImages(files)} uploading={uploading} />
+                <MultiImageUpload
+                  onUpload={(files) => void uploadImages(files)}
+                  uploading={uploading}
+                  progress={uploadProgress}
+                />
                 <Button type="button" variant="secondary" fullWidth onClick={() => setLibraryOpen(true)}>
                   Choose from media library
                 </Button>

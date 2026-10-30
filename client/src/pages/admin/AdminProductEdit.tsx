@@ -892,6 +892,7 @@ function ImagesTab({
   const queryClient = useQueryClient();
   const { push } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [linking, setLinking] = useState(false);
   const [ordered, setOrdered] = useState(images);
@@ -900,20 +901,47 @@ function ImagesTab({
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin-product', productId] });
 
+  /*
+   * One request per image, not one request for the batch.
+   *
+   * Each upload is re-encoded to WebP on the server -- roughly a second for a
+   * photograph off a camera -- so twelve in a single POST held the connection
+   * open for half a minute and the proxy answered 502 instead. One at a time,
+   * each request is short, the count moves, and a file that fails costs that
+   * file rather than the batch. Sequential rather than concurrent: the server
+   * re-encodes on one small machine, so twelve at once would be slower than
+   * twelve in a row.
+   */
   const upload = async (files: FileList) => {
+    const chosen = Array.from(files);
     setUploading(true);
+    let done = 0;
+    const failed: string[] = [];
+
     try {
-      const form = new FormData();
-      Array.from(files).forEach((file) => form.append('images', file));
-      form.append('folder', 'products');
-      await api.upload(`/admin/products/${productId}/images`, form);
-      await refresh();
-      push(`${files.length} image${files.length === 1 ? '' : 's'} uploaded`, 'success');
-    } catch (err) {
-      push(err instanceof ApiError ? err.message : 'Upload failed', 'error');
+      for (const file of chosen) {
+        setUploadProgress(`${done + 1} of ${chosen.length}`);
+        try {
+          const form = new FormData();
+          form.append('images', file);
+          form.append('folder', 'products');
+          await api.upload(`/admin/products/${productId}/images`, form);
+          done += 1;
+          await refresh();
+        } catch (err) {
+          failed.push(file.name);
+          if (failed.length === 1) {
+            push(err instanceof ApiError ? err.message : `${file.name} could not be uploaded`, 'error');
+          }
+        }
+      }
     } finally {
       setUploading(false);
+      setUploadProgress('');
     }
+
+    if (done && failed.length) push(`${done} uploaded, ${failed.length} failed`, 'info');
+    else if (done) push(`${done} image${done === 1 ? '' : 's'} uploaded`, 'success');
   };
 
   /*
@@ -1065,7 +1093,11 @@ function ImagesTab({
         ) : null}
 
         <div className="space-y-2.5">
-          <MultiImageUpload onUpload={(files) => void upload(files)} uploading={uploading} />
+          <MultiImageUpload
+            onUpload={(files) => void upload(files)}
+            uploading={uploading}
+            progress={uploadProgress}
+          />
           <Button
             type="button"
             variant="secondary"
