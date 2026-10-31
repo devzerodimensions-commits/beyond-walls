@@ -136,34 +136,18 @@ export function Footer() {
   return (
     <footer className="bg-ink text-paper">
       {/*
-        ---- The custom-order strip ----
+        There was a full-width "Start a custom order" strip here, at the top
+        of the footer on every page. It is gone at the studio's request.
 
-        This used to be a bordered box floating at the right-hand end of a
-        flex row, with a quarter of the screen empty beside it. Given the full
-        width it stops being a box that has to be placed and becomes the first
-        thing the footer says — which is right, because somebody who has read
-        to the bottom of a page without buying is exactly who should be asked
-        whether they want something made.
+        It read well in isolation and badly in place: pages that close with
+        their own call to action — About, and the custom-order page itself,
+        which it invited you to visit while you were standing on it — ended
+        with the same invitation twice in a row, one immediately under the
+        other. Asking twice is not asking harder.
+
+        The custom-order link is still in the header on every page and in the
+        footer's own navigation below, so nothing is actually unreachable.
       */}
-      <Link
-        to="/custom-order"
-        className="group/cta block border-b border-white/10 transition-colors duration-300 hover:bg-white/[0.04]"
-      >
-        <div className="container-site flex items-center justify-between gap-6 py-9 lg:py-11">
-          <span>
-            <span className="eyebrow block text-paper/40">Something of your own</span>
-            <span className="mt-2 block text-2xl font-medium leading-tight text-paper sm:text-3xl">
-              Start a custom order
-            </span>
-          </span>
-          <span
-            aria-hidden="true"
-            className="shrink-0 text-2xl text-paper/70 transition-all duration-300 group-hover/cta:translate-x-1 group-hover/cta:text-paper sm:text-3xl"
-          >
-            →
-          </span>
-        </div>
-      </Link>
 
       {/*
         ---- One row, five columns ----
