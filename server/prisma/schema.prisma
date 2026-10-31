@@ -946,6 +946,12 @@ model MediaAsset {
   alt       String?
   width     Int?
   height    Int?
+  /// Where the bytes from before the first edit are kept, so a crop can always
+  /// be undone. Null means the file has never been edited and what is stored
+  /// under its own key is still the original.
+  originalKey String?
+  /// When the stored file was last changed by the image editor.
+  editedAt    DateTime?
   createdAt DateTime @default(now())
   /// Set when the file is put in the trash. The row and the file both stay
   /// until it is emptied, so a wrong click costs nothing.
@@ -985,6 +991,11 @@ model MediaBlob {
   mimeType  String
   bytes     Bytes
   size      Int
+  /// Bumped whenever the bytes under this key are replaced in place, which
+  /// only the image editor does. Uploads are content-addressed and therefore
+  /// cacheable forever; an edited key is not, and the number is what lets the
+  /// upload handler tell the two apart.
+  version   Int      @default(0)
   createdAt DateTime @default(now())
 
   @@index([createdAt])

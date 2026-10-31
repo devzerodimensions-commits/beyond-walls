@@ -3,13 +3,14 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import clsx from 'clsx';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import type { MediaAsset } from '../../lib/types';
+import { ImageEditor, type ImageEditPayload } from '../../components/admin/ImageEditor';
 import { formatDate } from '../../lib/format';
 import { useToast } from '../../context/StoreProvider';
 import {
   AdminCard, AdminPageHeader, AdminSearch, MultiImageUpload,
 } from '../../components/admin/AdminKit';
 import {
-  Button, ConfirmDialog, CopyIcon, Input, Modal, Pagination, RefreshIcon, Select, Skeleton,
+  Button, ConfirmDialog, CopyIcon, EditIcon, Input, Modal, Pagination, RefreshIcon, Select, Skeleton,
   TrashIcon,
 } from '../../components/ui';
 
@@ -38,6 +39,16 @@ export default function AdminMedia() {
   const [view, setView] = useState<'library' | 'trash'>('library');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [emptying, setEmptying] = useState(false);
+  /** Whether the detail modal is showing the editor rather than the details. */
+  const [editing, setEditing] = useState(false);
+  /*
+   * Bumped after an edit. An edited file keeps its URL, which is the whole
+   * point, but that means the browser has no reason to fetch it again — so
+   * the preview in here asks for it with a changing query string. Only the
+   * admin preview needs this; the public site is handled by the upload
+   * handler, which stops serving a rewritten file as immutable.
+   */
+  const [previewStamp, setPreviewStamp] = useState(0);
 
   const trashed = view === 'trash';
 
@@ -116,6 +127,40 @@ export default function AdminMedia() {
       await invalidate();
       push('Saved', 'success');
     },
+  });
+
+
+  /*
+   * Editing and undoing.
+   *
+   * Both write over the file under its existing URL, so every product and page
+   * already pointing at it shows the change. The editor is closed on success
+   * and the preview is given a cache-busting stamp, because the URL has not
+   * changed and the browser would otherwise keep showing what it already has.
+   */
+  const editImage = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: ImageEditPayload }) =>
+      api.post<MediaAsset>(`/admin/media/${id}/edit`, payload),
+    onSuccess: async (asset) => {
+      await invalidate();
+      setViewing(asset);
+      setEditing(false);
+      setPreviewStamp(Date.now());
+      push('Image updated', 'success');
+    },
+    onError: (err) => push(err instanceof ApiError ? err.message : 'Could not edit that image', 'error'),
+  });
+
+  const restoreImage = useMutation({
+    mutationFn: (id: string) => api.post<MediaAsset>(`/admin/media/${id}/restore`),
+    onSuccess: async (asset) => {
+      await invalidate();
+      setViewing(asset);
+      setEditing(false);
+      setPreviewStamp(Date.now());
+      push('Original restored', 'success');
+    },
+    onError: (err) => push(err instanceof ApiError ? err.message : 'Could not restore that image', 'error'),
   });
 
   /*
@@ -421,12 +466,24 @@ export default function AdminMedia() {
       </AdminCard>
 
       {/* Detail */}
-      <Modal open={Boolean(viewing)} onClose={() => setViewing(null)} title={viewing?.filename} size="lg">
-        {viewing ? (
+      <Modal
+        open={Boolean(viewing)}
+        onClose={() => { setViewing(null); setEditing(false); }}
+        title={viewing?.filename}
+        size="lg"
+      >
+        {viewing && editing && isImage(viewing.mimeType) ? (
+          <ImageEditor
+            asset={viewing}
+            busy={editImage.isPending}
+            onCancel={() => setEditing(false)}
+            onApply={(payload) => editImage.mutate({ id: viewing.id, payload })}
+          />
+        ) : viewing ? (
           <div className="space-y-5">
             {isImage(viewing.mimeType) ? (
               <img
-                src={assetUrl(viewing.url)}
+                src={assetUrl(viewing.url) + (previewStamp ? `?v=${previewStamp}` : '')}
                 alt={viewing.alt ?? ''}
                 className="max-h-[50vh] w-full bg-paper-warm object-contain"
               />
@@ -482,7 +539,29 @@ export default function AdminMedia() {
               </div>
             </dl>
 
-            <div className="flex justify-end border-t border-stone-line pt-4">
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-stone-line pt-4">
+              {/*
+                Editing is offered only for still images in the library — not
+                for a video, a PDF, or anything already in the trash.
+              */}
+              {!trashed && isImage(viewing.mimeType) ? (
+                <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+                  <EditIcon size={14} />
+                  Edit image
+                </Button>
+              ) : null}
+              {!trashed && viewing.editedAt ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  loading={restoreImage.isPending}
+                  onClick={() => restoreImage.mutate(viewing.id)}
+                >
+                  <RefreshIcon size={14} />
+                  Restore original
+                </Button>
+              ) : null}
+              <span className="flex-1" />
               {trashed ? (
                 <Button
                   variant="secondary"

@@ -547,6 +547,10 @@ export interface MediaAsset {
   folder: string;
   alt: string | null;
   createdAt: string;
+  width?: number | null;
+  height?: number | null;
+  /** Set once the image editor has changed the file; null means untouched. */
+  editedAt?: string | null;
 }
 
 export interface AttributeGroup {

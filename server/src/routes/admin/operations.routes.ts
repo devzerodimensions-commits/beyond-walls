@@ -13,6 +13,7 @@ import {
   setSettings,
 } from '../../services/settings.service';
 import { persistUploads, resolveFolder, upload, deleteUploadedFile, UPLOAD_FOLDERS } from '../../middleware/upload';
+import { applyImageEdit, restoreOriginalImage, type ImageEdit } from '../../services/imageEdit.service';
 import { fileReferenceCount } from '../../services/media.service';
 import {
   assignAwb, bookShipment, checkServiceability, shiprocketConfigured, testConnection,
@@ -1013,6 +1014,43 @@ router.post(
   }),
 );
 
+
+/*
+ * Editing an image already in the library.
+ *
+ * The result is written back over the same file, so every product, page and
+ * setting that points at this URL shows the edit without anything being
+ * rewritten. The bytes from before the first edit are kept, which is what
+ * makes the restore below possible however many times it is cropped after.
+ */
+router.post(
+  '/media/:id/edit',
+  asyncHandler(async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const crop = body.crop as ImageEdit['crop'] | undefined;
+
+    const asset = await applyImageEdit(req.params.id, {
+      crop: crop && typeof crop === 'object' ? crop : undefined,
+      rotate: Number(body.rotate ?? 0),
+      flipHorizontal: Boolean(body.flipHorizontal),
+      flipVertical: Boolean(body.flipVertical),
+      brightness: body.brightness === undefined ? 1 : Number(body.brightness),
+      saturation: body.saturation === undefined ? 1 : Number(body.saturation),
+      contrast: body.contrast === undefined ? 1 : Number(body.contrast),
+    });
+
+    res.json({ success: true, data: asset });
+  }),
+);
+
+/** Puts back the picture as it was uploaded. */
+router.post(
+  '/media/:id/restore',
+  asyncHandler(async (req, res) => {
+    const asset = await restoreOriginalImage(req.params.id);
+    res.json({ success: true, data: asset });
+  }),
+);
 router.patch(
   '/media/:id',
   asyncHandler(async (req, res) => {
@@ -1097,6 +1135,10 @@ router.post(
       }
       await prisma.mediaAsset.delete({ where: { id: asset.id } });
       deleteUploadedFile(asset.url);
+      // An edited file has a second copy holding its original. Nothing else
+      // ever points at that copy, so deleting the asset is the only chance to
+      // take it with us.
+      if (asset.originalKey) deleteUploadedFile(asset.originalKey);
       destroyed += 1;
     }
 
@@ -1120,6 +1162,7 @@ router.delete(
 
     await prisma.mediaAsset.delete({ where: { id: asset.id } });
     deleteUploadedFile(asset.url);
+    if (asset.originalKey) deleteUploadedFile(asset.originalKey);
     res.json({ success: true, data: { id: asset.id } });
   }),
 );

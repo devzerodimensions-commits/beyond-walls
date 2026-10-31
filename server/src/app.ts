@@ -256,9 +256,31 @@ export function createApp() {
       if (!blob) return next();
 
       res.setHeader('Content-Type', blob.mimeType);
-      // Filenames carry a content hash, so a stored file never changes under
-      // its key and can be cached as long as the ones served from disk.
-      res.setHeader('Cache-Control', env.isProduction ? 'public, max-age=2592000, immutable' : 'no-store');
+      /*
+       * An upload's filename carries a content hash, so the bytes under a key
+       * never change and may be cached forever. The image editor is the one
+       * exception: it rewrites a file in place so that the product rows and
+       * page sections pointing at the URL keep working, and `immutable` on
+       * such a key would leave the old picture in every browser that had
+       * already seen it for the next thirty days.
+       *
+       * `version` counts those rewrites. Zero means the key is still exactly
+       * what was uploaded; anything else means it has to be revalidated, which
+       * the ETag below then answers with a 304 for as long as it stays put.
+       */
+      const rewritten = blob.version > 0;
+      res.setHeader('ETag', `"${key}-${blob.version}-${blob.size}"`);
+      res.setHeader(
+        'Cache-Control',
+        !env.isProduction
+          ? 'no-store'
+          : rewritten
+            ? 'public, max-age=0, must-revalidate'
+            : 'public, max-age=2592000, immutable',
+      );
+      if (rewritten && req.headers['if-none-match'] === res.getHeader('ETag')) {
+        return res.status(304).end();
+      }
       res.setHeader('Accept-Ranges', 'bytes');
 
       /*
