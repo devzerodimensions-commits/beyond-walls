@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api';
+import { ROLE_LABELS } from '../../lib/types';
 import type { AdminCustomer, UserRole } from '../../lib/types';
 import { formatDate, formatPrice, relativeTime, statusMeta } from '../../lib/format';
 import { useAuth, useToast } from '../../context/StoreProvider';
@@ -14,6 +15,14 @@ import {
 } from '../../components/ui';
 
 type DirectoryRole = UserRole;
+
+/** What each role can do, at the point the choice is made. */
+const ROLE_HINTS: Record<UserRole, string> = {
+  CUSTOMER: 'Can place orders and see their own order history. No access to this panel.',
+  ADMIN: 'Full access: products, orders, customers, website content and settings.',
+  PARCEL_MANAGER:
+    'The packing desk. Sees the order list, opens an order, and prints its invoice or receipt. Cannot change anything, and cannot see products, customers or settings.',
+};
 
 export default function AdminCustomers() {
   return <Navigate to="/admin/users" replace />;
@@ -93,6 +102,7 @@ export function AdminUserDirectory() {
           <p className="flex items-center gap-2 text-sm font-medium hover:underline">
             {account.name}
             {account.role === 'ADMIN' ? <Badge tone="dark">Administrator</Badge> : null}
+            {account.role === 'PARCEL_MANAGER' ? <Badge>Parcel manager</Badge> : null}
             {!account.isActive ? <Badge tone="danger">Disabled</Badge> : null}
           </p>
           <p className="text-2xs text-ink-400">{account.email}</p>
@@ -103,7 +113,7 @@ export function AdminUserDirectory() {
     {
       key: 'role',
       header: 'Role',
-      render: (account) => account.role === 'ADMIN' ? 'Administrator' : 'Customer',
+      render: (account) => ROLE_LABELS[account.role] ?? account.role,
     },
     {
       key: 'orders',
@@ -180,6 +190,7 @@ export function AdminUserDirectory() {
               { value: '', label: 'All roles' },
               { value: 'CUSTOMER', label: 'Customers' },
               { value: 'ADMIN', label: 'Administrators' },
+              { value: 'PARCEL_MANAGER', label: 'Parcel managers' },
             ]}
           />
         </div>
@@ -207,10 +218,10 @@ export function AdminUserDirectory() {
               rows={[
                 { label: 'Email', value: detail.email },
                 { label: 'Phone', value: detail.phone ?? '—' },
-                { label: 'Role', value: detail.role === 'ADMIN' ? 'Administrator' : 'Customer' },
+                { label: 'Role', value: ROLE_LABELS[detail.role] ?? detail.role },
                 { label: 'Status', value: detail.isActive ? 'Active' : 'Disabled' },
                 { label: 'Joined', value: formatDate(detail.createdAt) },
-                ...(detail.role === 'ADMIN'
+                ...(detail.role !== 'CUSTOMER'
                   ? [{ label: 'Last sign-in', value: detail.lastLoginAt ? relativeTime(detail.lastLoginAt) : 'Never' }]
                   : [
                     { label: 'Paid orders', value: String(detail.paidOrders ?? 0) },
@@ -354,11 +365,12 @@ function AccountForm({ account, lockActive, errors, saving, onSubmit, onCancel }
         disabled={lockActive}
         hint={lockActive
           ? 'Use another administrator account to change your own access.'
-          : 'Administrators can sign in to and manage this panel.'}
+          : ROLE_HINTS[form.role]}
         onChange={(event) => setForm({ ...form, role: event.target.value as DirectoryRole })}
         options={[
           { value: 'CUSTOMER', label: 'Customer' },
           { value: 'ADMIN', label: 'Administrator' },
+          { value: 'PARCEL_MANAGER', label: 'Parcel manager' },
         ]}
       />
       <Input

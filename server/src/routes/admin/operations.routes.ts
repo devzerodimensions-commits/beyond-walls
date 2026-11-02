@@ -25,6 +25,16 @@ import { env } from '../../config/env';
 
 const router = Router();
 
+/**
+ * Roles an administrator may hand out from the panel.
+ *
+ * Kept as one list rather than repeated in the create and update schemas,
+ * because the two drifting apart is exactly what happened: the parcel manager
+ * role reached the admin's dropdown while the server still refused it, so
+ * creating one failed validation with the option sitting right there.
+ */
+const ASSIGNABLE_ROLES = ['CUSTOMER', 'ADMIN', 'PARCEL_MANAGER'] as const;
+
 // ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
@@ -737,21 +747,30 @@ router.patch(
     const schema = z.object({
       name: z.string().min(2).max(80).optional(),
       phone: z.string().max(20).nullable().optional(),
-      role: z.enum(['CUSTOMER', 'ADMIN']).optional(),
+      role: z.enum(ASSIGNABLE_ROLES).optional(),
       isActive: z.boolean().optional(),
       password: z.string().min(8).max(100).optional(),
     });
     const body = schema.parse(req.body);
 
-    if (
-      req.params.id === req.user?.sub
-      && (body.role === 'CUSTOMER' || body.isActive === false)
-    ) {
+    /*
+     * Any role that is not ADMIN is a demotion.
+     *
+     * These two guards used to ask whether the new role was CUSTOMER, which
+     * was the same question while CUSTOMER was the only other role. It is not
+     * any more: moving an administrator to the packing desk takes their
+     * administrator access away just as completely, and the check has to
+     * notice that or the last admin could demote themselves and lock everyone
+     * out of the panel.
+     */
+    const losesAdmin = body.role !== undefined && body.role !== 'ADMIN';
+
+    if (req.params.id === req.user?.sub && (losesAdmin || body.isActive === false)) {
       throw ApiError.badRequest('You cannot remove your own administrator access');
     }
 
     // Never allow the last active admin to be demoted or disabled.
-    if (body.role === 'CUSTOMER' || body.isActive === false) {
+    if (losesAdmin || body.isActive === false) {
       const target = await prisma.user.findUnique({ where: { id: req.params.id } });
       if (target?.role === 'ADMIN') {
         const admins = await prisma.user.count({ where: { role: 'ADMIN', isActive: true } });
@@ -780,7 +799,7 @@ router.post(
       email: z.string().email().toLowerCase(),
       password: z.string().min(8).max(100),
       phone: z.string().max(20).nullable().optional(),
-      role: z.enum(['CUSTOMER', 'ADMIN']).default('CUSTOMER'),
+      role: z.enum(ASSIGNABLE_ROLES).default('CUSTOMER'),
       isActive: z.boolean().default(true),
     });
     const body = schema.parse(req.body);
