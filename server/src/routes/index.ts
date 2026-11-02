@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAdmin } from '../middleware/auth';
+import { enforceRoleScope } from '../middleware/roleScope';
 import { invalidatePublicCache } from '../lib/publicCache';
 
 import authRoutes from './public/auth.routes';
@@ -28,7 +29,11 @@ router.use('/', orderRoutes); // /orders, /checkout/*, /payments/*
 
 // --- Admin API (every route below requires an ADMIN token) -----------------
 const admin = Router();
+// Who you are, then what you may touch. The second is an allowlist whose
+// default is refusal, so a new admin endpoint is closed to the restricted
+// roles until someone opens it on purpose.
 admin.use(requireAdmin);
+admin.use(enforceRoleScope);
 admin.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.once('finish', () => {

@@ -14,6 +14,7 @@ import {
 } from '../../services/settings.service';
 import { persistUploads, resolveFolder, upload, deleteUploadedFile, UPLOAD_FOLDERS } from '../../middleware/upload';
 import { applyImageEdit, restoreOriginalImage, type ImageEdit } from '../../services/imageEdit.service';
+import { renderOrderDocument, type DocumentKind } from '../../services/orderDocument.service';
 import { fileReferenceCount } from '../../services/media.service';
 import {
   assignAwb, bookShipment, checkServiceability, shiprocketConfigured, testConnection,
@@ -198,6 +199,29 @@ router.get(
   }),
 );
 
+
+/*
+ * The paperwork for one order.
+ *
+ * Served as a printable page rather than a generated PDF: the browser
+ * already has a layout engine and a "save as PDF", and putting a second one
+ * in the container to produce the same sheet would be a lot of machinery for
+ * a page of text. Opened in a tab, it offers to print itself.
+ *
+ * This is the one part of the admin a parcel manager can reach besides the
+ * order list, which is the whole of that role.
+ */
+router.get(
+  '/orders/:id/:document(invoice|receipt)',
+  asyncHandler(async (req, res) => {
+    const kind = req.params.document as DocumentKind;
+    const html = await renderOrderDocument(req.params.id, kind);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    // Never cached: an order's status and payment reference change under it.
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(html);
+  }),
+);
 router.patch(
   '/orders/:id',
   asyncHandler(async (req, res) => {

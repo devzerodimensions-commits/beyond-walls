@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api';
-import type { AdminCustomer } from '../../lib/types';
+import type { AdminCustomer, UserRole } from '../../lib/types';
 import { formatDate, formatPrice, relativeTime, statusMeta } from '../../lib/format';
 import { useAuth, useToast } from '../../context/StoreProvider';
 import {
@@ -13,7 +13,7 @@ import {
   PlusIcon, Select, TrashIcon,
 } from '../../components/ui';
 
-type DirectoryRole = 'CUSTOMER' | 'ADMIN';
+type DirectoryRole = UserRole;
 
 export default function AdminCustomers() {
   return <Navigate to="/admin/users" replace />;

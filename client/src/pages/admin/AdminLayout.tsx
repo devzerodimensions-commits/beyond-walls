@@ -88,6 +88,24 @@ const NAV: { group: string; items: NavItem[] }[] = [
   },
 ];
 
+/**
+ * The menu a parcel manager gets, by path.
+ *
+ * Deliberately a list of what is allowed rather than of what is hidden, and
+ * deliberately the same shape as the server's allowlist — if the two ever
+ * disagree, the server is the one that decides and this menu is simply wrong
+ * about what it is offering. Profile is here because signing out and changing
+ * your own password should not require an administrator.
+ */
+const PARCEL_MANAGER_PATHS = new Set(['/admin/orders', '/admin/profile']);
+
+function navFor(role: string | undefined): typeof NAV {
+  if (role !== 'PARCEL_MANAGER') return NAV;
+  return NAV
+    .map((group) => ({ ...group, items: group.items.filter((i) => PARCEL_MANAGER_PATHS.has(i.to)) }))
+    .filter((group) => group.items.length > 0);
+}
+
 /** Flattened once, for the search and the page title. */
 const ALL_ITEMS = NAV.flatMap((group) => group.items);
 
@@ -96,6 +114,7 @@ const COLLAPSE_KEY = 'bw.admin.rail';
 export default function AdminLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const visibleNav = navFor(user?.role);
   const { settings } = useSettings();
   const { theme, setTheme, themes } = useAdminTheme();
 
@@ -121,11 +140,19 @@ export default function AdminLayout() {
     });
   };
 
-  // Counts drive the navigation badges.
+  /*
+   * Counts drive the navigation badges.
+   *
+   * Not fetched for a parcel manager: the dashboard carries revenue, which
+   * the packing desk has no business seeing, so the server refuses it for
+   * that role. Asking anyway would mean a 403 on every page load — and the
+   * only badged item they can see is Orders, which they are looking at.
+   */
   const { data: dashboard } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: () => api.get<DashboardData>('/admin/dashboard'),
     staleTime: 60_000,
+    enabled: user?.role === 'ADMIN',
   });
 
   const badgeCount = (badge: NavItem['badge']) => {
@@ -155,9 +182,9 @@ export default function AdminLayout() {
 
   const trimmed = query.trim().toLowerCase();
   const filtered = trimmed
-    ? NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(trimmed)) }))
+    ? visibleNav.map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(trimmed)) }))
         .filter((g) => g.items.length)
-    : NAV;
+    : visibleNav;
 
   // The rail collapses only on desktop; inside the drawer it is always full.
   const sidebar = (full: boolean) => (

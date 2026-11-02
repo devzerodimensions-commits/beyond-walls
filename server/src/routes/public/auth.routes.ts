@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Role } from '@prisma/client';
 import { z } from 'zod';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
@@ -49,7 +50,9 @@ const PUBLIC_USER = {
  */
 async function issueSession(
   res: import('express').Response,
-  user: { id: string; email: string; role: 'ADMIN' | 'CUSTOMER' },
+  // Prisma's Role rather than a hand-written union, so a role added to the
+  // schema cannot be forgotten here and silently fail to get a session.
+  user: { id: string; email: string; role: Role },
 ) {
   const payload = { sub: user.id, email: user.email, role: user.role };
   const accessToken = signAccessToken(payload);

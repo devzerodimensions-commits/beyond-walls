@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ApiError, api, assetUrl } from '../../lib/api';
+import { API_URL, ApiError, api, assetUrl, tokenStore } from '../../lib/api';
 import type { Order, OrderItem, OrderStatus } from '../../lib/types';
 import { formatDate, formatPrice, statusMeta } from '../../lib/format';
 import { useToast } from '../../context/StoreProvider';
@@ -36,6 +36,32 @@ function productReviewWhatsAppUrl(order: Order, item: OrderItem): string {
   ].join(' ');
 
   return `https://wa.me/${whatsappNumber(itemWhatsAppContact(order, item))}?text=${encodeURIComponent(message)}`;
+}
+
+/**
+ * Opens an order's invoice or receipt in a new tab.
+ *
+ * Fetched rather than linked because the admin API authenticates with a
+ * bearer token held in memory — a plain link would arrive without it and be
+ * refused. The HTML comes back, becomes a blob URL, and opens in a tab that
+ * offers to print or save itself as a PDF.
+ */
+async function openDocument(orderId: string, kind: 'invoice' | 'receipt'): Promise<string | null> {
+  const response = await fetch(`${API_URL}/admin/orders/${orderId}/${kind}`, {
+    headers: { Authorization: `Bearer ${tokenStore.access ?? ''}` },
+  });
+  if (!response.ok) return `Could not open the ${kind}`;
+
+  const html = await response.text();
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  const tab = window.open(url, '_blank');
+  if (!tab) {
+    URL.revokeObjectURL(url);
+    return 'Your browser blocked the new tab — allow pop-ups for this site and try again.';
+  }
+  // Freed once the tab has had time to load it; revoking sooner leaves a blank page.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return null;
 }
 
 export default function AdminOrderDetail() {
@@ -154,6 +180,26 @@ export default function AdminOrderDetail() {
         description={`Placed ${formatDate(order.placedAt, true)}`}
         actions={
           <>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                const problem = await openDocument(order.id, 'invoice');
+                if (problem) push(problem, 'error');
+              }}
+            >
+              Invoice
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                const problem = await openDocument(order.id, 'receipt');
+                if (problem) push(problem, 'error');
+              }}
+            >
+              Receipt
+            </Button>
             {canRefund ? (
               <Button size="sm" variant="secondary" onClick={() => setRefundOpen(true)}>
                 Refund

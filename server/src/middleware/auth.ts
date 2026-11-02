@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ApiError } from '../utils/http';
 import { verifyAccessToken, type TokenPayload } from '../utils/auth';
 import prisma from '../lib/prisma';
+import { isStaffRole } from './roleScope';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -46,7 +47,9 @@ async function hasActiveAdminAccess(userId: string): Promise<boolean> {
     where: { id: userId },
     select: { role: true, isActive: true },
   }).then((user) => {
-    const valid = Boolean(user?.isActive && user.role === 'ADMIN');
+    // Any staff role keeps the panel open; which parts of it they may use
+    // is a separate question, answered by enforceRoleScope.
+    const valid = Boolean(user?.isActive && isStaffRole(user.role));
     adminAccessChecks.set(userId, { valid, expiresAt: Date.now() + ADMIN_ACCESS_TTL_MS });
     return valid;
   }).catch((error) => {
@@ -84,15 +87,21 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   }
 }
 
-/** Requires an authenticated ADMIN, periodically re-checked against the database. */
+/**
+ * Requires an authenticated staff account, re-checked against the database.
+ *
+ * Staff is ADMIN or PARCEL_MANAGER. Getting through here only means the
+ * admin API will talk to you at all; enforceRoleScope, mounted directly
+ * after, decides which endpoints answer.
+ */
 export async function requireAdmin(req: Request, _res: Response, next: NextFunction) {
   const token = extractToken(req);
   if (!token) return next(ApiError.unauthorized());
   try {
     const payload = verifyAccessToken(token);
-    if (payload.role !== 'ADMIN') return next(ApiError.forbidden('Admin access required'));
+    if (!isStaffRole(payload.role)) return next(ApiError.forbidden('Admin access required'));
 
-    // Re-verify against the DB so a demoted/disabled admin loses access within
+    // Re-verify against the DB so a demoted/disabled account loses access within
     // the short cache window rather than for the lifetime of the access token.
     if (!(await hasActiveAdminAccess(payload.sub))) {
       return next(ApiError.forbidden('Admin access required'));

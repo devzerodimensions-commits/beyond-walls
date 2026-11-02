@@ -5,8 +5,8 @@ import { AdminCard, AdminPageHeader } from '../../components/admin/AdminKit';
 import { Button, ButtonLink, Checkbox, Input, Select } from '../../components/ui';
 import { useToast } from '../../context/StoreProvider';
 import { ApiError, api } from '../../lib/api';
+import type { UserRole } from '../../lib/types';
 
-type UserRole = 'CUSTOMER' | 'ADMIN';
 
 function generatePassword() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
@@ -15,6 +15,20 @@ function generatePassword() {
   const random = Array.from(values, (value) => alphabet[value % alphabet.length]).join('');
   return `Bw!9${random}`;
 }
+
+/**
+ * What each role can do, said plainly at the point the choice is made.
+ *
+ * The parcel manager line is a promise the server keeps: an allowlist refuses
+ * everything else, so this is a description of the rule rather than a
+ * description of which menu items are hidden.
+ */
+const ROLE_HINTS: Record<UserRole, string> = {
+  CUSTOMER: 'Can place orders and see their own order history. No access to this panel.',
+  ADMIN: 'Full access: products, orders, customers, website content and settings.',
+  PARCEL_MANAGER:
+    'The packing desk. Sees the order list, opens an order, and prints its invoice or receipt. Cannot change anything, and cannot see products, customers or settings.',
+};
 
 export default function AdminUserNew() {
   const navigate = useNavigate();
@@ -127,11 +141,12 @@ export default function AdminUserNew() {
             required
             value={form.role}
             error={errors.role}
-            hint="Administrators can manage products, orders, customers and website content."
+            hint={ROLE_HINTS[form.role]}
             onChange={(event) => setForm({ ...form, role: event.target.value as UserRole })}
             options={[
               { value: 'CUSTOMER', label: 'Customer' },
               { value: 'ADMIN', label: 'Administrator' },
+              { value: 'PARCEL_MANAGER', label: 'Parcel manager' },
             ]}
           />
 

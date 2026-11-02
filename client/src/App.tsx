@@ -74,12 +74,27 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Where each staff role is allowed to land.
+ *
+ * The server refuses the rest regardless, so this is not the security
+ * boundary — it is there so a parcel manager who types /admin/products gets
+ * sent somewhere useful instead of a page that renders its furniture and then
+ * fills with permission errors.
+ */
+const PARCEL_MANAGER_ROUTES = [/^\/admin\/orders(\/|$)/, /^\/admin\/profile(\/|$)/];
+
 function RequireAdmin({ children }: { children: React.ReactNode }) {
-  const { isAdmin, isLoading, isAuthenticated } = useAuth();
+  const { user, isStaff, isLoading, isAuthenticated } = useAuth();
+  const { pathname } = useLocation();
 
   if (isLoading) return <PageLoader label="Checking access" />;
-  // Admins sign in through a dedicated screen, so non-admins never see the panel.
-  if (!isAuthenticated || !isAdmin) return <Navigate to="/admin/login" replace />;
+  // Staff sign in through a dedicated screen, so nobody else sees the panel.
+  if (!isAuthenticated || !isStaff) return <Navigate to="/admin/login" replace />;
+
+  if (user?.role === 'PARCEL_MANAGER' && !PARCEL_MANAGER_ROUTES.some((r) => r.test(pathname))) {
+    return <Navigate to="/admin/orders" replace />;
+  }
   return <>{children}</>;
 }
 

@@ -17,6 +17,10 @@ datasource db {
 enum Role {
   CUSTOMER
   ADMIN
+  /// Packing desk: sees the order list and can print an invoice or a receipt,
+  /// and nothing else. Enforced server-side by an allowlist, not by hiding
+  /// menu items.
+  PARCEL_MANAGER
 }
 
 /// Draft / Published / Archived drives visibility on the public site.

@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { api, ApiError, clearCartSession, tokenStore } from '../lib/api';
 import type { Cart, SiteSettings, User } from '../lib/types';
+import { STAFF_ROLES } from '../lib/types';
 import {
   DEFAULT_BRAND_COLOR, applyBrandPalette, buildBrandPalette, isHexColor,
 } from '../lib/brandColor';
@@ -53,6 +54,8 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  /** Any role that may open the admin panel: ADMIN or PARCEL_MANAGER. */
+  isStaff: boolean;
   login: (email: string, password: string) => Promise<User>;
   register: (input: { name: string; email: string; password: string; phone?: string }) => Promise<User>;
   logout: () => Promise<void>;
@@ -264,6 +267,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       isLoading: authLoading,
       isAuthenticated: Boolean(user),
       isAdmin: user?.role === 'ADMIN',
+      isStaff: user ? STAFF_ROLES.includes(user.role) : false,
       login,
       register,
       logout,

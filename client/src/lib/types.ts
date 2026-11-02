@@ -1,3 +1,22 @@
+/**
+ * Account roles, matching the server Role enum.
+ *
+ * PARCEL_MANAGER is the packing desk: the order list and the printable
+ * invoice and receipt, and nothing else. What that role can actually reach is
+ * decided by an allowlist on the server — the admin menu only agrees with
+ * that decision, it does not make it.
+ */
+export type UserRole = 'CUSTOMER' | 'ADMIN' | 'PARCEL_MANAGER';
+
+/** Roles that may open the admin panel at all. */
+export const STAFF_ROLES: UserRole[] = ['ADMIN', 'PARCEL_MANAGER'];
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  CUSTOMER: 'Customer',
+  ADMIN: 'Administrator',
+  PARCEL_MANAGER: 'Parcel manager',
+};
+
 export type ContentStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
 export type PersonalizationType =
@@ -27,7 +46,7 @@ export interface User {
   name: string;
   email: string;
   phone: string | null;
-  role: 'CUSTOMER' | 'ADMIN';
+  role: UserRole;
   createdAt?: string;
 }
 
@@ -585,7 +604,7 @@ export interface AdminCustomer {
   name: string;
   email: string;
   phone: string | null;
-  role: 'CUSTOMER' | 'ADMIN';
+  role: UserRole;
   isActive: boolean;
   createdAt: string;
   lastLoginAt: string | null;
