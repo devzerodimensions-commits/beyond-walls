@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { ApiError } from '../utils/http';
 import { getAllSettings, boolSetting, type SettingsMap } from './settings.service';
+import { readBundledAsset, readStored } from './mediaFile.service';
 
 /**
  * The two pieces of paper an order needs: an invoice and a receipt.
@@ -74,6 +75,34 @@ function addressLines(raw: Prisma.JsonValue | null): string[] {
   return parts.map((p) => String(p ?? '').trim()).filter(Boolean);
 }
 
+/**
+ * The studio's logo, inlined as a data URI.
+ *
+ * Inlined rather than linked because of where this document ends up. The
+ * admin fetches it with its bearer token and opens the result as a blob URL,
+ * and a blob document has no base to resolve "/uploads/logo.webp" against —
+ * a linked logo would simply be a broken image. Embedding also means the
+ * sheet is self-contained: saved as a PDF, printed, or mailed on, the logo
+ * travels with it.
+ *
+ * The uploaded brand logo wins. Failing that, the wordmark that ships in the
+ * client build is used, which is the same artwork and is always present. If
+ * neither can be read the caller falls back to setting the name in type,
+ * which is what this document did before it had a logo at all.
+ */
+async function logoDataUri(settings: SettingsMap): Promise<string | null> {
+  const configured = str(settings, 'brand.logoImage');
+  const source = (configured ? await readStored(configured) : null)
+    ?? readBundledAsset(['brand/logo.svg', 'brand/logo-mark.svg']);
+
+  if (!source || !source.buffer.length) return null;
+  // A megabyte of base64 in a header is somebody having uploaded a photograph
+  // into the logo slot. Fall back to type rather than to a 2MB invoice.
+  if (source.buffer.length > 512 * 1024) return null;
+
+  return `data:${source.mimeType};base64,${source.buffer.toString('base64')}`;
+}
+
 export async function renderOrderDocument(orderId: string, kind: DocumentKind): Promise<string> {
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: ORDER_INCLUDE });
   if (!order) throw ApiError.notFound('Order not found');
@@ -88,7 +117,7 @@ export async function renderOrderDocument(orderId: string, kind: DocumentKind): 
   };
   const pricesIncludeTax = boolSetting(settings, 'tax.pricesIncludeTax', true);
 
-  return page(order, kind, studio, pricesIncludeTax);
+  return page(order, kind, studio, pricesIncludeTax, await logoDataUri(settings));
 }
 
 function page(
@@ -96,6 +125,7 @@ function page(
   kind: DocumentKind,
   studio: { name: string; email: string; phone: string; address: string; gstin: string },
   pricesIncludeTax: boolean,
+  logo: string | null,
 ): string {
   const isReceipt = kind === 'receipt';
   const payment = order.payments[0];
@@ -166,6 +196,11 @@ function page(
   header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start;
            border-bottom: 2px solid #111; padding-bottom: 18px; }
   h1 { margin: 0 0 2px; font-size: 22px; letter-spacing: .02em; }
+  /* Capped by height so a wide wordmark and a square mark both sit right.
+     print-color-adjust keeps it from being dropped when a browser prints
+     "without background graphics". */
+  .logo { display: block; height: 44px; width: auto; max-width: 260px; margin-bottom: 6px;
+          -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   h2 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: #666; }
   .doc { text-align: right; }
   .doc .kind { font-size: 19px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
@@ -204,7 +239,9 @@ function page(
   <div class="sheet">
     <header>
       <div>
-        <h1>${esc(studio.name)}</h1>
+        ${logo
+    ? `<img class="logo" src="${logo}" alt="${esc(studio.name)}">`
+    : `<h1>${esc(studio.name)}</h1>`}
         ${studio.address ? `<div class="muted">${esc(studio.address)}</div>` : ''}
         ${studio.phone ? `<div class="muted">${esc(studio.phone)}</div>` : ''}
         ${studio.email ? `<div class="muted">${esc(studio.email)}</div>` : ''}

@@ -105,6 +105,33 @@ export async function backupStored(urlOrKey: string, filename: string): Promise<
   return stored.key;
 }
 
+/**
+ * Reads a file that ships with the client build.
+ *
+ * The brand artwork lives in the client's public folder, which Vite copies
+ * into the build, so it is on disk beside the server in every deployment and
+ * needs no database row. The second root is for running the server from its
+ * own directory in development, where the build may not exist yet.
+ *
+ * Candidates are tried in order, so a caller can name a preferred file and a
+ * fallback.
+ */
+export function readBundledAsset(names: string[]): StoredBytes | null {
+  const roots = [env.clientDist, path.resolve(process.cwd(), '../client/public')].filter(Boolean);
+  for (const root of roots) {
+    for (const name of names) {
+      const file = path.join(root, name);
+      if (!fs.existsSync(file)) continue;
+      try {
+        return { buffer: fs.readFileSync(file), mimeType: mimeFromKey(name) };
+      } catch {
+        /* try the next candidate */
+      }
+    }
+  }
+  return null;
+}
+
 function mimeFromKey(key: string): string {
   const ext = path.extname(key).toLowerCase();
   const map: Record<string, string> = {
