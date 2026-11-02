@@ -5,6 +5,7 @@ import prisma from '../../lib/prisma';
 import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../utils/http';
 import { toBool, uniqueSlug } from '../../utils/helpers';
 import { persistUploads, upload } from '../../middleware/upload';
+import { suggestPreviewFromImage } from '../../services/previewSuggest.service';
 import { deleteFileIfUnreferenced } from '../../services/media.service';
 import { isSellable } from '../../services/pricing.service';
 
@@ -657,6 +658,43 @@ router.delete(
 // Images
 // ---------------------------------------------------------------------------
 
+
+/*
+ * What the live preview should look like, worked out from a photograph.
+ *
+ * A suggestion only: it is rendered for the studio to look at and accept,
+ * never applied on its own. The service reports how confident it is and
+ * why, because a photograph of a sign already on a wall cannot be measured
+ * and saying so is more useful than a tidy wrong answer.
+ */
+router.get(
+  '/:id/preview-suggestion',
+  asyncHandler(async (req, res) => {
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      include: { images: { orderBy: { sortOrder: 'asc' } } },
+    });
+    if (!product) throw ApiError.notFound('Product not found');
+
+    // The primary image is the one the customer sees first, so it is the one
+    // the preview should agree with.
+    const image = product.images.find((i) => i.isPrimary) ?? product.images[0];
+    if (!image) {
+      return res.json({
+        success: true,
+        data: {
+          confidence: 'uncertain',
+          reason: 'Add a photograph first and this can measure it.',
+          template: null, aspect: null, plateColor: null, textColor: null,
+          measured: { imageWidth: 0, imageHeight: 0, plateWidth: null, plateHeight: null, coverage: 1, contrast: 0 },
+        },
+      });
+    }
+
+    const suggestion = await suggestPreviewFromImage(image.url);
+    return res.json({ success: true, data: suggestion });
+  }),
+);
 router.post(
   '/:id/images',
   upload.array('images', 12),

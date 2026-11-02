@@ -8,6 +8,7 @@ import type {
   PersonalizationType, Product, ProductImage, ProductVariant,
 } from '../../lib/types';
 import { slugify, toNumber } from '../../lib/format';
+import { PRESETS } from '../../lib/productPresets';
 import { VIDEO_HELP, resolveVideo } from '../../lib/video';
 import { useToast } from '../../context/StoreProvider';
 import {
@@ -1758,45 +1759,6 @@ const FIELD_TYPES: { value: PersonalizationType; label: string }[] = [
   { value: 'PHONE', label: 'Phone' },
   { value: 'EMAIL', label: 'Email' },
   { value: 'DATE', label: 'Date' },
-];
-
-/** Ready-made field sets for the common Beyond Walls products. */
-const PRESETS: { label: string; fields: Partial<PersonalizationField>[] }[] = [
-  {
-    label: 'Home nameplate',
-    fields: [
-      { key: 'houseNumber', label: 'House / flat number', type: 'TEXT', maxLength: 10, previewSlot: 'number' },
-      { key: 'name', label: 'Name', type: 'TEXT', required: true, maxLength: 28, previewSlot: 'line1' },
-      { key: 'familyName', label: 'Family name', type: 'TEXT', maxLength: 20, previewSlot: 'line2' },
-      { key: 'instructions', label: 'Instructions for us', type: 'TEXTAREA', maxLength: 500 },
-    ],
-  },
-  {
-    label: 'Office / desk plate',
-    fields: [
-      { key: 'officeName', label: 'Office or company name', type: 'TEXT', required: true, maxLength: 40, previewSlot: 'line1' },
-      { key: 'personName', label: 'Name', type: 'TEXT', maxLength: 30, previewSlot: 'line2' },
-      { key: 'degree', label: 'Degree / qualification', type: 'TEXT', maxLength: 40, previewSlot: 'line3' },
-      { key: 'logoUpload', label: 'Logo', type: 'IMAGE_UPLOAD', previewSlot: 'logo' },
-      { key: 'instructions', label: 'Instructions for us', type: 'TEXTAREA', maxLength: 500 },
-    ],
-  },
-  {
-    label: 'GST plate',
-    fields: [
-      { key: 'officeName', label: 'Business name', type: 'TEXT', required: true, maxLength: 60, previewSlot: 'line1' },
-      { key: 'gstin', label: 'GSTIN', type: 'GSTIN', required: true, previewSlot: 'line2' },
-      { key: 'instructions', label: 'Instructions for us', type: 'TEXTAREA', maxLength: 500 },
-    ],
-  },
-  {
-    label: 'QR stand',
-    fields: [
-      { key: 'qrUrl', label: 'Link the QR should open', type: 'URL', required: true },
-      { key: 'message', label: 'Text on the stand', type: 'TEXT', maxLength: 40, previewSlot: 'line1' },
-      { key: 'logoUpload', label: 'Logo', type: 'IMAGE_UPLOAD', previewSlot: 'logo' },
-    ],
-  },
 ];
 
 interface FieldDraft {

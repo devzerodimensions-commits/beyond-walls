@@ -8,6 +8,7 @@ import { slugify } from '../../lib/format';
 import { useToast } from '../../context/StoreProvider';
 import { AdminCard, AdminPageHeader, MediaPicker, MultiImageUpload } from '../../components/admin/AdminKit';
 import { ProductCard } from '../../components/product/ProductCard';
+import { PreviewSetup } from '../../components/admin/PreviewSetup';
 import {
   Badge, Button, Checkbox, CheckIcon, CloseIcon, Input, Select, Textarea, TrashIcon,
 } from '../../components/ui';
@@ -22,7 +23,7 @@ import type { MediaAsset, ProductImage } from '../../lib/types';
  * or whether you are finished — and the answer to all three is different for a
  * first product than for a twentieth.
  *
- * So this exists alongside it rather than replacing it. Five steps, each asking
+ * So this exists alongside it rather than replacing it. Six steps, each asking
  * for one kind of thing, with the card the customer will see built up beside
  * them. The full editor is one click away at every step and is where anyone
  * ends up afterwards.
@@ -33,11 +34,17 @@ import type { MediaAsset, ProductImage } from '../../lib/types';
  * waiting, not nothing.
  */
 
-type StepId = 'basics' | 'images' | 'price' | 'shipping' | 'review';
+type StepId = 'basics' | 'images' | 'preview' | 'price' | 'shipping' | 'review';
 
 const STEPS: { id: StepId; label: string; hint: string }[] = [
   { id: 'basics', label: 'Name and description', hint: 'What it is called and what it is' },
   { id: 'images', label: 'Photographs', hint: 'What the customer sees first' },
+  /*
+   * After the photographs, because it is measured from them. Before price,
+   * because whether a piece is made to order is the kind of thing that
+   * changes what it costs.
+   */
+  { id: 'preview', label: 'Live preview', hint: 'Let the customer see their own text on it' },
   { id: 'price', label: 'Price and stock', hint: 'What it costs and how many there are' },
   { id: 'shipping', label: 'Size and weight', hint: 'What the courier charges on' },
   { id: 'review', label: 'Review and publish', hint: 'Check it, then put it live' },
@@ -295,7 +302,7 @@ export default function AdminProductNew() {
     <>
       <AdminPageHeader
         title="Add a product"
-        description="Five steps. Everything is saved as you go, so you can stop and come back."
+        description="Six steps. Everything is saved as you go, so you can stop and come back."
         actions={
           productId ? (
             <Link to={`/admin/products/${productId}`} className="a-btn a-btn-secondary text-xs">
@@ -428,6 +435,23 @@ export default function AdminProductNew() {
                 onClose={() => setLibraryOpen(false)}
                 onPick={(assets) => void linkImages(assets)}
               />
+            </AdminCard>
+          ) : null}
+
+          {step === 'preview' ? (
+            <AdminCard
+              title="Live preview"
+              description="For a made-to-order piece, the customer can type their text and see it on the plate before buying."
+            >
+              {productId ? (
+                <PreviewSetup
+                  productId={productId}
+                  hasImage={images.length > 0}
+                  onApplied={() => void refresh()}
+                />
+              ) : (
+                <p className="text-sm text-ink-500">Save the first step before setting this up.</p>
+              )}
             </AdminCard>
           ) : null}
 
