@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!--
+    The same four positions as the drilling step, so the two read as one
+    sequence: the dashed outline is where the plate goes back, and the holes
+    sit under its corners.
+  -->
+  <rect x="140" y="128" width="236" height="140" fill="none" stroke="#CFCBC3" stroke-width="2" stroke-dasharray="10 8"/>
+  <g fill="#2E2E2E">
+    <ellipse cx="165" cy="153" rx="16" ry="13"/>
+    <ellipse cx="165" cy="243" rx="16" ry="13"/>
+    <ellipse cx="351" cy="243" rx="16" ry="13"/>
+  </g>
+  <!-- one already tapped in, flush with the surface -->
+  <circle cx="351" cy="153" r="16" fill="#FFFFFF" stroke="#111111" stroke-width="2.2"/>
+  <circle cx="351" cy="153" r="5.5" fill="#E4E1DB" stroke="#8F8F8F" stroke-width="1.4"/>
+  <!-- the next one, on its way into the open hole below the first -->
+  <path d="M44 34 H82 L77 102 H49 Z" fill="#0E7A57" fill-opacity="0.16" stroke="#0E7A57" stroke-width="2.4" stroke-linejoin="round"/>
+  <g stroke="#0E7A57" stroke-width="1.8" stroke-linecap="round">
+    <path d="M46 52 H80 M47 70 H79 M48 88 H78"/>
+    <path d="M63 34 V102"/>
+  </g>
+  <g stroke="#0E7A57" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M94 110 L142 146"/>
+    <path d="M128 148 L142 146 L140 132"/>
+  </g>
+</svg>

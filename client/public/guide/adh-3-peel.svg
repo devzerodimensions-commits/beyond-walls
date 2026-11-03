@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- The liner coming off the pads. -->
+  <rect x="70" y="104" width="226" height="152" fill="#FFFFFF" stroke="#111111" stroke-width="2.5"/>
+  <g fill="#E4E1DB" stroke="#8F8F8F" stroke-width="1.5">
+    <rect x="94" y="128" width="42" height="42"/>
+    <rect x="230" y="128" width="42" height="42"/>
+    <rect x="94" y="190" width="42" height="42"/>
+    <rect x="230" y="190" width="42" height="42"/>
+  </g>
+  <!-- the liner, pulled clear -->
+  <path d="M330 118 c26 22 24 72 2 124 l62 12 c22 -56 24 -106 0 -148 Z" fill="#0E7A57" fill-opacity="0.16" stroke="#0E7A57" stroke-width="2.5" stroke-linejoin="round"/>
+  <g stroke="#0E7A57" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M292 80 H344"/>
+    <path d="M334 72 L344 80 L334 88"/>
+  </g>
+</svg>

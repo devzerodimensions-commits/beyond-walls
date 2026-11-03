@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- Where it goes: beside the door, at the height of the person reading it. -->
+  <path d="M0 318 H480" stroke="#CFCBC3" stroke-width="2.5"/>
+  <!-- door -->
+  <rect x="268" y="52" width="164" height="266" fill="#EDE9E0" stroke="#111111" stroke-width="2.5"/>
+  <rect x="284" y="68" width="132" height="250" fill="#F5F3EE" stroke="#8F8F8F" stroke-width="1.8"/>
+  <circle cx="300" cy="196" r="6" fill="#8F8F8F"/>
+  <!-- the plate -->
+  <rect x="140" y="160" width="104" height="66" fill="#1F1F1F" stroke="#111111" stroke-width="2"/>
+  <g stroke="#EDE9E0" stroke-width="6" stroke-linecap="round">
+    <path d="M154 186 H222"/>
+  </g>
+  <g stroke="#8F8F8F" stroke-width="4" stroke-linecap="round">
+    <path d="M154 204 H200"/>
+  </g>
+  <!-- eye level -->
+  <path d="M60 193 H268" stroke="#0E7A57" stroke-width="2" stroke-dasharray="9 7"/>
+  <!-- dimension from the floor -->
+  <g stroke="#0E7A57" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M78 193 V318"/>
+    <path d="M71 200 L78 193 L85 200"/>
+    <path d="M71 311 L78 318 L85 311"/>
+  </g>
+  <text x="96" y="268" font-family="'Space Grotesk', Inter, system-ui, sans-serif" font-size="21" fill="#111111">1.5 m</text>
+  <text x="96" y="294" font-family="'Space Grotesk', Inter, system-ui, sans-serif" font-size="16" fill="#6B6B6B">about eye level</text>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- One screw in loosely, levelled, before the other three go in. -->
+  <rect x="124" y="134" width="232" height="132" fill="#FFFFFF" stroke="#111111" stroke-width="2.5"/>
+  <g stroke="#CFCBC3" stroke-width="9" stroke-linecap="round">
+    <path d="M160 196 H302"/>
+  </g>
+  <g fill="#F5F3EE" stroke="#111111" stroke-width="1.8">
+    <circle cx="332" cy="158" r="7.5"/>
+    <circle cx="148" cy="242" r="7.5"/>
+    <circle cx="332" cy="242" r="7.5"/>
+  </g>
+  <circle cx="148" cy="158" r="10.5" fill="#FFFFFF" stroke="#0E7A57" stroke-width="2.4"/>
+  <path d="M141 158 H155" stroke="#0E7A57" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- screwdriver: shaft and handle on one axis -->
+  <path d="M135.8 154.2 L144.2 145.8 L78.2 79.8 L69.8 88.2 Z" fill="#FFFFFF" stroke="#111111" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M60.7 93.3 L83.3 70.7 L41.3 28.7 L18.7 51.3 Z" fill="#0E7A57" fill-opacity="0.16" stroke="#0E7A57" stroke-width="2.4" stroke-linejoin="round"/>
+  <!-- level, still on -->
+  <rect x="100" y="96" width="280" height="26" fill="#FFFFFF" stroke="#111111" stroke-width="2.4"/>
+  <rect x="216" y="101" width="48" height="16" rx="8" fill="#E4F3EC" stroke="#0E7A57" stroke-width="1.8"/>
+  <circle cx="240" cy="109" r="5.5" fill="#0E7A57"/>
+  <g stroke="#0E7A57" stroke-width="1.5">
+    <path d="M230 101 V117 M250 101 V117"/>
+  </g>
+</svg>

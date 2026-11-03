@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- The back of a plate: foam pads already applied, one liner lifting. -->
+  <rect x="92" y="96" width="296" height="176" fill="#FFFFFF" stroke="#111111" stroke-width="2.5"/>
+  <g fill="#E4E1DB" stroke="#8F8F8F" stroke-width="1.5">
+    <rect x="118" y="122" width="46" height="46"/>
+    <rect x="316" y="122" width="46" height="46"/>
+    <rect x="118" y="200" width="46" height="46"/>
+    <rect x="316" y="200" width="46" height="46"/>
+  </g>
+  <path d="M316 122 L362 122 L392 86 L346 86 Z" fill="#0E7A57" fill-opacity="0.16"/>
+  <path d="M316 122 L362 122 L392 86 L346 86 Z" fill="none" stroke="#0E7A57" stroke-width="2"/>
+  <path d="M392 86 L418 66" stroke="#0E7A57" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M408 66 L418 66 L418 76" fill="none" stroke="#0E7A57" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

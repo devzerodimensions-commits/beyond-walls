@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- Held against the wall with a level on top. Nothing drilled yet. -->
+  <rect x="124" y="140" width="232" height="132" fill="#FFFFFF" stroke="#111111" stroke-width="2.5"/>
+  <g stroke="#CFCBC3" stroke-width="9" stroke-linecap="round">
+    <path d="M154 196 H302"/>
+  </g>
+  <g stroke="#CFCBC3" stroke-width="6" stroke-linecap="round">
+    <path d="M154 226 H256"/>
+  </g>
+  <g fill="#F5F3EE" stroke="#111111" stroke-width="1.8">
+    <circle cx="148" cy="164" r="7.5"/>
+    <circle cx="332" cy="164" r="7.5"/>
+    <circle cx="148" cy="248" r="7.5"/>
+    <circle cx="332" cy="248" r="7.5"/>
+  </g>
+  <rect x="100" y="102" width="280" height="26" fill="#FFFFFF" stroke="#111111" stroke-width="2.4"/>
+  <rect x="216" y="107" width="48" height="16" rx="8" fill="#E4F3EC" stroke="#0E7A57" stroke-width="1.8"/>
+  <circle cx="240" cy="115" r="5.5" fill="#0E7A57"/>
+  <g stroke="#0E7A57" stroke-width="1.5">
+    <path d="M230 107 V123 M250 107 V123"/>
+  </g>
+</svg>

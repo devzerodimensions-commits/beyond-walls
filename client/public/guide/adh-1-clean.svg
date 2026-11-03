@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- Where the plate will go, wiped down first. -->
+  <rect x="108" y="98" width="264" height="152" fill="none" stroke="#CFCBC3" stroke-width="2.5" stroke-dasharray="11 9"/>
+  <g stroke="#0E7A57" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.5">
+    <path d="M146 78 q30 -20 64 -13"/>
+    <path d="M160 58 q34 -22 72 -14"/>
+  </g>
+  <!-- cloth, with a folded corner -->
+  <path d="M164 130 q74 -20 140 -8 q16 56 4 94 q-74 18 -140 4 q-14 -48 -4 -90 Z" fill="#0E7A57" fill-opacity="0.16" stroke="#0E7A57" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M304 122 q-30 10 -28 36 q26 4 32 -28 Z" fill="#0E7A57" fill-opacity="0.3" stroke="#0E7A57" stroke-width="2"/>
+  <g stroke="#0E7A57" stroke-width="2" stroke-linecap="round" opacity="0.55">
+    <path d="M186 164 q54 -12 92 -6"/>
+    <path d="M184 192 q54 -12 94 -6"/>
+  </g>
+</svg>

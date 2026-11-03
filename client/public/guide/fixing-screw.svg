@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- A plate drilled at the corners, and the screw that goes through one. -->
+  <rect x="66" y="98" width="256" height="164" fill="#FFFFFF" stroke="#111111" stroke-width="2.5"/>
+  <g stroke="#CFCBC3" stroke-width="9" stroke-linecap="round">
+    <path d="M114 166 H258"/>
+    <path d="M114 200 H208"/>
+  </g>
+  <g fill="#F5F3EE" stroke="#111111" stroke-width="1.8">
+    <circle cx="92" cy="124" r="8"/>
+    <circle cx="296" cy="124" r="8"/>
+    <circle cx="92" cy="236" r="8"/>
+    <circle cx="296" cy="236" r="8"/>
+  </g>
+  <!-- the screw, larger, beside it -->
+  <g fill="#0E7A57" fill-opacity="0.16" stroke="#0E7A57" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M362 96 H438 V114 H362 Z"/>
+    <path d="M388 114 H412 V228 L400 252 L388 228 Z"/>
+  </g>
+  <g stroke="#0E7A57" stroke-width="2" stroke-linecap="round">
+    <path d="M388 136 H412 M388 158 H412 M388 180 H412 M388 202 H412"/>
+    <path d="M392 105 H408"/>
+  </g>
+</svg>

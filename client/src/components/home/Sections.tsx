@@ -922,10 +922,16 @@ export function PageHero({ section }: { section: HomeSection }) {
  * each step so the eye follows them down the page on a phone and across it on a
  * laptop. A connecting rule runs between them on the wide layout, which is what
  * makes it read as one process rather than four unrelated cards.
+ *
+ * A step may also carry a picture, which is what turns this from a summary of
+ * a process into instructions somebody can follow. That changes the layout
+ * rather than squeezing an image into the existing one — see
+ * IllustratedStepsSection below. Steps without pictures are untouched.
  */
 export function StepsSection({ section }: { section: HomeSection }) {
-  const items = ((section.config?.items ?? []) as { title?: string; text?: string }[]) ?? [];
+  const items = ((section.config?.items ?? []) as StepItem[]) ?? [];
   if (!items.length) return null;
+  if (items.some((item) => item.image)) return <IllustratedStepsSection section={section} items={items} />;
 
   return (
     <section className="border-y border-stone-line bg-paper-off py-14 lg:py-20">
@@ -968,6 +974,100 @@ export function StepsSection({ section }: { section: HomeSection }) {
               {item.text ? (
                 <p className="mt-2 text-sm leading-relaxed text-ink-500">{item.text}</p>
               ) : null}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+interface StepItem {
+  title?: string;
+  text?: string;
+  /** Optional picture for this step: a diagram, or a photograph of it being done. */
+  image?: string;
+  /** Describes the picture for a screen reader. Falls back to the step's own title. */
+  alt?: string;
+}
+
+/**
+ * The same sequence, with a picture on each step.
+ *
+ * Three across rather than four, because a step here is a thing to look at and
+ * then read, not a label — and because a guide tends to run to five or six
+ * steps, which lands as 3+2 or 3+3 instead of four and an orphan.
+ *
+ * The connecting rule from the plain layout is dropped: it is drawn across the
+ * top of each step, which is where the picture now is.
+ *
+ * Pictures are contained rather than cropped. These are drawings sized to the
+ * tile, so it makes no difference to them — it matters for what comes later,
+ * when the studio swaps one for a photograph of their own and the photograph
+ * is some other shape. Cropping to fit a layout is exactly how the About page
+ * lost the words PATEL CORPORATION off the top of the only photograph of the
+ * shopfront, so nothing here is cropped to fit either.
+ */
+function IllustratedStepsSection({ section, items }: { section: HomeSection; items: StepItem[] }) {
+  return (
+    <section className="border-y border-stone-line bg-paper-off py-14 lg:py-20">
+      <div className="container-site">
+        {section.subtitle || section.title || section.bodyText ? (
+          <div className="mb-10 max-w-2xl lg:mb-14">
+            {section.subtitle ? <p className="eyebrow mb-4">{section.subtitle}</p> : null}
+            {section.title ? (
+              <h2 className="text-2xl leading-tight sm:text-3xl lg:text-[2.25rem]">
+                {section.title}
+              </h2>
+            ) : null}
+            {section.bodyText ? (
+              <p className="mt-4 text-sm leading-relaxed text-ink-500">{section.bodyText}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/*
+          Three across for a sequence, two for a pair. A two-item block in a
+          three-column grid sits in two thirds of the width with a hole beside
+          it, which reads as a missing third option rather than a choice
+          between two -- and "which of these two do you have" is exactly the
+          case this block is used for here.
+        */}
+        <ol
+          className={clsx(
+            'grid gap-x-8 gap-y-10 sm:grid-cols-2',
+            items.length > 2 && 'lg:grid-cols-3',
+          )}
+        >
+          {items.map((item, index) => (
+            <li key={item.title ?? index}>
+              {item.image ? (
+                <div className="aspect-[4/3] overflow-hidden border border-stone-line bg-paper-warm">
+                  <img
+                    src={assetUrl(item.image)}
+                    alt={item.alt ?? item.title ?? ''}
+                    className="h-full w-full object-contain"
+                    loading="lazy"
+                  />
+                </div>
+              ) : null}
+
+              <div className="mt-5 flex gap-4">
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+                  style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+                >
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <div className="min-w-0">
+                  {item.title ? (
+                    <h3 className="text-base font-medium leading-snug text-ink">{item.title}</h3>
+                  ) : null}
+                  {item.text ? (
+                    <p className="mt-2 text-sm leading-relaxed text-ink-500">{item.text}</p>
+                  ) : null}
+                </div>
+              </div>
             </li>
           ))}
         </ol>

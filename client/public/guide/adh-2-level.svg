@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- The plate held up, a level across its top, the top corners marked. -->
+  <rect x="130" y="136" width="220" height="124" fill="#1F1F1F" stroke="#111111" stroke-width="2"/>
+  <g stroke="#EDE9E0" stroke-width="9" stroke-linecap="round">
+    <path d="M158 186 H300"/>
+  </g>
+  <g stroke="#8F8F8F" stroke-width="6" stroke-linecap="round">
+    <path d="M158 216 H256"/>
+  </g>
+  <rect x="106" y="100" width="268" height="26" fill="#FFFFFF" stroke="#111111" stroke-width="2.4"/>
+  <rect x="216" y="105" width="48" height="16" rx="8" fill="#E4F3EC" stroke="#0E7A57" stroke-width="1.8"/>
+  <circle cx="240" cy="113" r="5.5" fill="#0E7A57"/>
+  <g stroke="#0E7A57" stroke-width="1.5">
+    <path d="M230 105 V121 M250 105 V121"/>
+  </g>
+  <!-- pencil marks, just outside each top corner -->
+  <g stroke="#0E7A57" stroke-width="2.8" stroke-linecap="round">
+    <path d="M100 148 L114 162 M114 148 L100 162"/>
+    <path d="M366 148 L380 162 M380 148 L366 162"/>
+  </g>
+</svg>

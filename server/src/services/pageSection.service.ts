@@ -198,6 +198,14 @@ export const WIDGETS: WidgetDefinition[] = [
         itemFields: [
           { key: 'title', label: 'Step', type: 'text' },
           { key: 'text', label: 'What happens', type: 'textarea' },
+          /*
+           * Optional. Give any step a picture and the whole block switches to
+           * the illustrated layout -- three across, picture above each step --
+           * which is what a guide somebody follows needs rather than a summary
+           * of a process. Leave them all empty and the block is unchanged.
+           */
+          { key: 'image', label: 'Picture (optional)', type: 'image' },
+          { key: 'alt', label: 'Describe the picture', type: 'text' },
         ],
       },
     ],

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- The plate is off the wall now; only the marks are left. -->
+  <rect x="104" y="106" width="236" height="140" fill="none" stroke="#CFCBC3" stroke-width="2" stroke-dasharray="10 8"/>
+  <g stroke="#0E7A57" stroke-width="2.6" stroke-linecap="round">
+    <path d="M122 124 L136 138 M136 124 L122 138"/>
+    <path d="M308 124 L322 138 M322 124 L308 138"/>
+    <path d="M122 214 L136 228 M136 214 L122 228"/>
+  </g>
+  <!-- the fourth mark, now a hole -->
+  <ellipse cx="315" cy="221" rx="17" ry="14" fill="#2E2E2E"/>
+  <!-- masonry bit, entering it -->
+  <g fill="#FFFFFF" stroke="#111111" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M330 206 L356 209 L356 233 L330 236 Z"/>
+    <rect x="356" y="208" width="68" height="26"/>
+    <rect x="424" y="198" width="34" height="46" rx="5" fill="#0E7A57" fill-opacity="0.16" stroke="#0E7A57"/>
+  </g>
+  <g stroke="#111111" stroke-width="1.6">
+    <path d="M364 208 L376 234 M382 208 L394 234 M400 208 L412 234"/>
+  </g>
+  <g fill="#8F8F8F">
+    <circle cx="296" cy="250" r="3.2"/>
+    <circle cx="282" cy="266" r="2.6"/>
+    <circle cx="306" cy="268" r="2.2"/>
+    <circle cx="268" cy="252" r="2.2"/>
+  </g>
+</svg>

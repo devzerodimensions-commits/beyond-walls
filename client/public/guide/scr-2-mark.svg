@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#F5F3EE"/>
+  <!-- A pencil through the hole, so the mark is the hole. -->
+  <rect x="120" y="122" width="236" height="140" fill="#FFFFFF" stroke="#111111" stroke-width="2.5"/>
+  <g stroke="#CFCBC3" stroke-width="8" stroke-linecap="round">
+    <path d="M152 184 H296"/>
+  </g>
+  <g fill="#F5F3EE" stroke="#111111" stroke-width="1.8">
+    <circle cx="144" cy="146" r="8"/>
+    <circle cx="332" cy="146" r="8"/>
+    <circle cx="144" cy="238" r="8"/>
+    <circle cx="332" cy="238" r="8"/>
+  </g>
+  <!-- marks already left through three of them -->
+  <g stroke="#0E7A57" stroke-width="2.6" stroke-linecap="round">
+    <path d="M326 140 L338 152 M338 140 L326 152"/>
+    <path d="M138 232 L150 244 M150 232 L138 244"/>
+    <path d="M326 232 L338 244 M338 232 L326 244"/>
+  </g>
+  <!-- the pencil, going into the fourth -->
+  <g fill="#0E7A57" fill-opacity="0.16" stroke="#0E7A57" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M44 54 L58 40 L130 112 L116 126 Z"/>
+  </g>
+  <path d="M116 126 L130 112 L148 150 Z" fill="#0E7A57"/>
+  <g stroke="#0E7A57" stroke-width="1.8">
+    <path d="M56 66 L70 52"/>
+  </g>
+</svg>
