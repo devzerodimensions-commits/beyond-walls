@@ -15,8 +15,8 @@ import {
   AdminCard, AdminPageHeader, MediaPicker, MultiImageUpload, SortableList, StringListEditor,
 } from '../../components/admin/AdminKit';
 import {
-  LivePreview, PLATE_FONTS, PREVIEW_SLOTS, PREVIEW_TEMPLATES, buildPreviewSlots,
-  resolvePreviewConfig, type PreviewConfig,
+  LivePreview, PLATE_FONTS, PREVIEW_SLOTS, buildPreviewSlots, resolvePreviewConfig,
+  usePreviewTemplates, type PreviewConfig,
 } from '../../components/product/LivePreview';
 import {
   Badge, Button, Checkbox, CloseIcon, ConfirmDialog, Input, Modal, PageLoader,
@@ -151,6 +151,7 @@ export default function AdminProductEdit() {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { push } = useToast();
+  const previewTemplates = usePreviewTemplates();
 
   const isNew = !id || id === 'new';
   const requestedTab = searchParams.get('tab') as Tab | null;
@@ -455,7 +456,7 @@ export default function AdminProductEdit() {
                     label="Preview template"
                     value={form.livePreviewTemplate}
                     onChange={(e) => set('livePreviewTemplate', e.target.value)}
-                    options={PREVIEW_TEMPLATES}
+                    options={previewTemplates}
                     hint="The template is the starting point. Everything below overrides it for this product only. Bind each personalisation field to a preview slot on the Personalisation tab."
                   />
 

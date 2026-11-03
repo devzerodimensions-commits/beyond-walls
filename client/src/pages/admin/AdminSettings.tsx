@@ -10,13 +10,15 @@ import {
   FIT_LABELS, RATIO_LABELS, imageFrame, isImageFit, type ImageFit,
 } from '../../lib/productImage';
 import { BrandColorField } from '../../components/admin/BrandColorField';
+import { LivePreview, PREVIEW_TEMPLATES } from '../../components/product/LivePreview';
 import {
   AlertIcon, Badge, Button, Checkbox, Input, PageLoader, Select, Textarea, TrashIcon,
 } from '../../components/ui';
 
 type Group =
   | 'brand' | 'contact' | 'hours' | 'social' | 'footer'
-  | 'announcement' | 'payment' | 'shipping' | 'tax' | 'seo' | 'store' | 'catalog';
+  | 'announcement' | 'payment' | 'shipping' | 'tax' | 'seo' | 'store' | 'catalog'
+  | 'preview';
 
 const GROUPS: { id: Group; label: string; description: string }[] = [
   { id: 'brand', label: 'Brand & logo', description: 'Your logo, name and tagline.' },
@@ -28,6 +30,7 @@ const GROUPS: { id: Group; label: string; description: string }[] = [
   { id: 'shipping', label: 'Shipping & tax', description: 'Rates, free shipping and GST handling.' },
   { id: 'store', label: 'Store behaviour', description: 'Wishlist, reviews, checkout and budget filters.' },
   { id: 'catalog', label: 'Product images', description: 'How product photos are shaped across the shop.' },
+  { id: 'preview', label: 'Live preview designs', description: 'What each plate design is called.' },
   { id: 'footer', label: 'Footer', description: 'Footer text and copyright.' },
   { id: 'seo', label: 'SEO defaults', description: 'Titles, descriptions and the canonical site URL.' },
 ];
@@ -85,6 +88,21 @@ export default function AdminSettings() {
   };
 
   const str = (key: string) => String(values[key] ?? '');
+
+  /*
+   * The design names live in one object, so renaming one has to merge rather
+   * than replace. A blank box is a deletion, not an empty name: leaving the key
+   * behind with "" would pin the design to a nameless label instead of letting
+   * the supplied one come back.
+   */
+  const templateNames = (values['preview.templateNames'] ?? {}) as Record<string, string>;
+  const templateName = (id: string) => templateNames[id] ?? '';
+  const setTemplateName = (id: string, name: string) => {
+    const next = { ...templateNames };
+    if (name.trim()) next[id] = name;
+    else delete next[id];
+    set('preview.templateNames', next);
+  };
   const bool = (key: string) => Boolean(values[key]);
   const num = (key: string) => (values[key] === null || values[key] === undefined ? '' : String(values[key]));
 
@@ -597,6 +615,48 @@ export default function AdminSettings() {
                   categories, products and pages. Product, breadcrumb, FAQ and LocalBusiness schema are
                   emitted on the matching pages.
                 </p>
+              </div>
+            </AdminCard>
+          ) : null}
+
+          {/* ---- Live preview designs ---- */}
+          {group === 'preview' ? (
+            <AdminCard
+              title="Live preview designs"
+              description="The shapes a product's preview can be drawn in. Rename any of them to whatever you call it in the workshop."
+            >
+              <div className="space-y-6">
+                {PREVIEW_TEMPLATES.filter((design) => design.value).map((design) => (
+                  <div
+                    key={design.value}
+                    className="grid items-center gap-5 border border-stone-line p-4 sm:grid-cols-[200px_minmax(0,1fr)]"
+                  >
+                    {/*
+                      Named from the drawing, not from a list of ids. Which
+                      design "cube band" means is obvious once you can see it,
+                      and guessing from the name is how the wrong one gets
+                      renamed.
+                    */}
+                    <LivePreview
+                      template={design.value}
+                      slots={{}}
+                      hideLabel
+                      hideCaption
+                      className="!bg-paper-off !p-2"
+                    />
+                    <Input
+                      label="Name"
+                      value={templateName(design.value)}
+                      placeholder={design.label}
+                      hint={
+                        templateName(design.value)
+                          ? `Supplied name: ${design.label}`
+                          : 'Leave blank to keep the supplied name.'
+                      }
+                      onChange={(e) => setTemplateName(design.value, e.target.value)}
+                    />
+                  </div>
+                ))}
               </div>
             </AdminCard>
           ) : null}

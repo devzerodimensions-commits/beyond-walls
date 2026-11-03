@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api';
 import { PRESETS, PRESET_FOR_TEMPLATE, presetByLabel } from '../../lib/productPresets';
 import { useToast } from '../../context/StoreProvider';
-import { LivePreview, PREVIEW_TEMPLATES } from '../product/LivePreview';
+import { LivePreview, usePreviewTemplates } from '../product/LivePreview';
 import { Badge, Button, Select } from '../ui';
 
 /**
@@ -49,6 +49,7 @@ export function PreviewSetup({
   onApplied: () => void;
 }) {
   const { push } = useToast();
+  const previewTemplates = usePreviewTemplates();
   const [wanted, setWanted] = useState<boolean | null>(null);
   const [template, setTemplate] = useState('');
   const [presetLabel, setPresetLabel] = useState('');
@@ -200,7 +201,7 @@ export function PreviewSetup({
               label="Plate shape"
               value={chosenTemplate}
               onChange={(e) => setTemplate(e.target.value)}
-              options={[{ value: '', label: 'Choose a shape…' }, ...PREVIEW_TEMPLATES]}
+              options={[{ value: '', label: 'Choose a shape…' }, ...previewTemplates.slice(1)]}
               hint={detected ? 'Worked out from the photo. Change it if it looks wrong.' : undefined}
             />
             <Select

@@ -61,6 +61,16 @@ export const PRESET_FOR_TEMPLATE: Record<string, string> = {
   'nameplate-classic': 'Home nameplate',
   'desk-plate': 'Office / desk plate',
   'sign-square': 'Home nameplate',
+  /*
+   * The three decorated designs ask for the same three things as a plain
+   * nameplate -- a number and two lines of name -- so they take the same
+   * preset. Without an entry here the wizard offers no fields at all and the
+   * studio has to build them by hand, which is the step the wizard exists to
+   * remove. The wording on each field is still theirs to change per product.
+   */
+  'plate-botanical': 'Home nameplate',
+  'plate-vine': 'Home nameplate',
+  'plate-cubes': 'Home nameplate',
 };
 
 export function presetByLabel(label: string | null | undefined) {

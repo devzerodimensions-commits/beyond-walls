@@ -2,6 +2,8 @@ import { useEffect, useId, useMemo } from 'react';
 import clsx from 'clsx';
 import type { PersonalizationField } from '../../lib/types';
 import { assetUrl } from '../../lib/api';
+import { useSettings } from '../../context/StoreProvider';
+import { CubeBand, LeafFrame, VINE_PALETTE, VineBand } from './plateOrnaments';
 
 /**
  * Live nameplate preview.
@@ -80,6 +82,36 @@ export const PLATE_FONTS: PlateFont[] = [
     stack: '"Great Vibes", "Segoe Script", cursive',
     note: 'Flowing and decorative, like the Rasik Vatika sign.',
   },
+  /*
+   * The three faces below came with the botanical, vine and cube designs.
+   *
+   * Two of them are named twice on purpose. The studio supplied Avenir and
+   * Canto, which are licensed fonts: a webfont licence is sold separately from
+   * a desktop one, and serving the file from the site is the part a desktop
+   * licence does not cover. So each stack asks for the real face first -- a
+   * visitor who has it installed, which on a Mac means Avenir, sees exactly the
+   * artwork -- and falls back to the closest face we may legitimately serve.
+   * Drop a licensed woff2 into styles/ and add one @font-face to switch
+   * everyone over; nothing here needs to change.
+   */
+  {
+    id: 'geometric',
+    label: 'Geometric',
+    stack: '"Avenir Next", "Avenir", "Jost", "Montserrat", system-ui, sans-serif',
+    note: 'Light, wide, geometric. The lettering on the botanical frame.',
+  },
+  {
+    id: 'devanagari',
+    label: 'Devanagari',
+    stack: '"Yatra One", "Tiro Devanagari Marathi", "Noto Serif Devanagari", Georgia, serif',
+    note: 'Draws Marathi and Hindi names. Also covers Latin and numerals.',
+  },
+  {
+    id: 'formal-script',
+    label: 'Formal script',
+    stack: '"Petit Formal Script", "Canto", "Great Vibes", cursive',
+    note: 'Upright, formal handwriting. Steadier than Script.',
+  },
 ];
 
 const FONT_STACKS: Record<string, string> = Object.fromEntries(
@@ -88,7 +120,7 @@ const FONT_STACKS: Record<string, string> = Object.fromEntries(
 
 const PLATE_FONT_STYLESHEET_ID = 'bw-plate-fonts';
 const PLATE_FONT_STYLESHEET =
-  'https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Great+Vibes&display=swap';
+  'https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Great+Vibes&family=Jost:wght@300;400;500&family=Petit+Formal+Script&family=Yatra+One&display=swap';
 
 function usePlateFonts() {
   useEffect(() => {
@@ -243,6 +275,38 @@ export const PREVIEW_PRESETS: Record<string, Partial<PreviewConfig>> = {
     defaults: { plateColor: 'black', textColor: 'white', fontFamily: 'grotesque' },
     placeholders: { line1: 'SIGN TEXT' },
   },
+
+  /*
+   * The three decorated designs.
+   *
+   * Each carries its own typeface as a default rather than leaving the house
+   * grotesque on it: the ornament and the lettering were drawn together, and a
+   * flowering Marathi plate set in Space Grotesk is not the thing the studio
+   * sells. A customer who is offered a font field still overrides it.
+   *
+   * Their placeholders show two names, because that is the arrangement these
+   * designs exist for and an empty one should say so before anybody types.
+   */
+  'plate-botanical': {
+    aspect: { width: 860, height: 645 },
+    plate: { inset: 0, radius: 4, showScrews: false, borderOnLight: false },
+    defaults: { plateColor: '#4A4D50', textColor: '#FFFFFF', fontFamily: 'geometric' },
+    placeholders: { line1: 'FIRST NAME', line2: 'SECOND NAME' },
+  },
+  'plate-vine': {
+    aspect: { width: 1020, height: 685 },
+    plate: { inset: 0, radius: 0, showScrews: false, borderOnLight: false },
+    // The plate colour is the cream ground of the artwork and is not offered as
+    // a choice; see VINE_PALETTE for why this design keeps its own colours.
+    defaults: { plateColor: '#F7F3EA', textColor: '#33302C', fontFamily: 'devanagari' },
+    placeholders: { line1: 'आडनाव', line2: 'नाव | नाव', number: 'B -102' },
+  },
+  'plate-cubes': {
+    aspect: { width: 860, height: 641 },
+    plate: { inset: 0, radius: 4, showScrews: false, borderOnLight: false },
+    defaults: { plateColor: '#4A4D50', textColor: '#FFFFFF', fontFamily: 'formal-script' },
+    placeholders: { number: 'A 105', line1: 'First name', line2: '& Second name' },
+  },
 };
 
 /** Deep-merges the preset for `template` and the product's stored overrides. */
@@ -273,6 +337,15 @@ interface LivePreviewProps {
   /** Hidden where something outside the frame already names it. */
   hideLabel?: boolean;
   /**
+   * Drops the line under the plate.
+   *
+   * That line promises a customer their artwork will be confirmed before
+   * production, which is true on a product page and meaningless on a row of
+   * thumbnails in Settings -- there it is a promise repeated seven times to
+   * the person making it.
+   */
+  hideCaption?: boolean;
+  /**
    * Placeholder copy shown before the customer has typed anything. Overrides
    * the placeholders that come from the product's configuration.
    */
@@ -281,7 +354,9 @@ interface LivePreviewProps {
   config?: Record<string, unknown> | null;
 }
 
-export function LivePreview({ template, slots, className, placeholders, config, hideLabel }: LivePreviewProps) {
+export function LivePreview({
+  template, slots, className, placeholders, config, hideLabel, hideCaption,
+}: LivePreviewProps) {
   usePlateFonts();
   // Namespaces this instance's SVG defs so two previews on one page cannot
   // steal each other's filters and gradients.
@@ -313,6 +388,12 @@ export function LivePreview({ template, slots, className, placeholders, config, 
 
   const body = (() => {
     switch (template) {
+      case 'plate-botanical':
+        return <PlateBotanical {...shared} />;
+      case 'plate-vine':
+        return <PlateVine {...shared} />;
+      case 'plate-cubes':
+        return <PlateCubes {...shared} />;
       case 'sign-square':
         return <SignSquare {...shared} />;
       case 'desk-plate':
@@ -331,7 +412,7 @@ export function LivePreview({ template, slots, className, placeholders, config, 
         <span className="eyebrow absolute left-4 top-4 text-ink-300">Live preview</span>
       )}
       {body}
-      {resolved.caption ? (
+      {resolved.caption && !hideCaption ? (
         <p className="mt-4 text-center text-2xs text-ink-400">{resolved.caption}</p>
       ) : null}
     </div>
@@ -636,13 +717,325 @@ function SignSquare({ slots, plate, text, font, config, uid }: TemplateProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// The decorated designs
+// ---------------------------------------------------------------------------
+
+/**
+ * The size at which one line fills `room`, never larger than `max`.
+ *
+ * The three designs below all have a fixed opening for their lettering -- the
+ * window inside a frame, or the half of the plate the ornament leaves -- so the
+ * type has to come down to meet a long name rather than the plate growing to
+ * take it. Same rule the studio set for the minimal nameplate, applied line by
+ * line here because these designs set their lines at different sizes.
+ */
+function fitSize(text: string, room: number, max: number, spacing = 0, capWidth = 0.6): number {
+  const n = text.length;
+  if (!n) return max;
+  const size = (room - Math.max(0, n - 1) * spacing) / (n * capWidth);
+  return Math.max(9, Math.min(max, size));
+}
+
+/**
+ * Brings a stack of lines down until it fits the height it has.
+ *
+ * fitSize only knows about one line at a time, so four of them at their own
+ * best sizes can still add up to more than the opening -- a number, two names
+ * and a detail filled the botanical frame's window to the pixel and put the
+ * first and last lines into the leaves. Scaling the whole stack keeps the
+ * proportions the design was drawn with instead of singling out a line to cut.
+ */
+function squeeze<T extends { size: number; gap: number }>(rows: T[], room: number): T[] {
+  const height = rows.reduce((total, row, index) => total + (index ? row.gap : 0) + row.size, 0);
+  if (height <= room || height <= 0) return rows;
+  const scale = room / height;
+  return rows.map((row) => ({ ...row, size: row.size * scale, gap: row.gap * scale }));
+}
+
+/**
+ * Two names inside a cut botanical frame.
+ *
+ * The frame is the product, so it is drawn at a fixed thickness and the
+ * lettering lives in the window it leaves. The ampersand only appears when
+ * there are in fact two names -- on a plate with one it would be lettering that
+ * means nothing, and the customer would be looking at a plate they cannot buy.
+ */
+function PlateBotanical({ slots, plate, text, font, config, uid }: TemplateProps) {
+  const VW = 860;
+  const VH = 645;
+  const BAND = 148;
+
+  const number = (slots.number ?? '').toUpperCase();
+  const first = (slots.line1 ?? '').toUpperCase();
+  const second = (slots.line2 ?? '').toUpperCase();
+  const detail = (slots.line3 ?? '').toUpperCase();
+
+  const room = VW - BAND * 2 - 76;
+  const midX = VW / 2;
+
+  /*
+   * Measured, not guessed. Each of these three is the widest advance per
+   * character the design's own face actually produced across the studio's
+   * sample names, rounded up -- a figure below the real one is what put "&
+   * Aarna" through the right-hand edge of the cube plate the first time.
+   */
+  const CAP = 0.66;
+
+  const nameMax = second ? 76 : 92;
+  const size1 = fitSize(first, room, nameMax, 7, CAP);
+  const size2 = fitSize(second, room, nameMax, 7, CAP);
+  const nameSize = Math.min(size1, size2 || nameMax);
+
+  const lines: { text: string; size: number; weight: number; spacing: number; gap: number }[] = [];
+  if (number) lines.push({ text: number, size: fitSize(number, room, 30, 6, CAP), weight: 400, spacing: 6, gap: 0 });
+  if (first) lines.push({ text: first, size: nameSize, weight: 300, spacing: 7, gap: 26 });
+  if (first && second) lines.push({ text: '&', size: nameSize * 0.72, weight: 300, spacing: 0, gap: 16 });
+  if (second) lines.push({ text: second, size: nameSize, weight: 300, spacing: 7, gap: 16 });
+  if (detail) lines.push({ text: detail, size: fitSize(detail, room, 26, 5, CAP), weight: 400, spacing: 5, gap: 28 });
+
+  // The window the frame leaves, less a margin so no line sits on the leaves.
+  const rows = squeeze(lines, VH - BAND * 2 - 44);
+  const blockH = rows.reduce((total, row, index) => total + (index ? row.gap : 0) + row.size, 0);
+  let cursor = VH / 2 - blockH / 2;
+
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
+      <defs>
+        <filter id={`shadow-${uid}`} x="-8%" y="-8%" width="116%" height="120%">
+          <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#111111" floodOpacity="0.18" />
+        </filter>
+      </defs>
+
+      <rect x="0" y="0" width={VW} height={VH} rx={config.plate.radius} fill={plate} filter={`url(#shadow-${uid})`} />
+      <LeafFrame width={VW} height={VH} band={BAND} color={text} ground={plate} uid={uid} />
+
+      {rows.map((row, index) => {
+        if (index) cursor += row.gap;
+        const baseline = cursor + row.size * 0.78;
+        cursor += row.size;
+        return (
+          <text
+            key={index}
+            x={midX}
+            y={baseline}
+            textAnchor="middle"
+            fill={text}
+            fontFamily={font}
+            fontSize={row.size}
+            fontWeight={row.weight}
+            letterSpacing={row.spacing}
+            // Centred text with letter-spacing hangs one space off the right,
+            // so shift back by half of it to keep the block on the axis.
+            dx={-row.spacing / 2}
+          >
+            {row.text}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+/**
+ * A flowering band beside a name, for Marathi and Hindi plates.
+ *
+ * Nothing here is uppercased. Devanagari has no case to change, and the one
+ * Latin line is a flat number -- running toUpperCase over the lot would do
+ * nothing visible and would quietly mangle any script that does have case.
+ */
+function PlateVine({ slots, text, font, uid }: TemplateProps) {
+  const VW = 1020;
+  const VH = 685;
+
+  const bandX = 48;
+  const bandW = 292;
+  const textX = bandX + bandW + 46;
+  const room = VW - textX - 48;
+
+  const name = slots.line1 ?? '';
+  const second = slots.line2 ?? '';
+  const number = slots.number ?? '';
+  const detail = slots.line3 ?? '';
+
+  // Devanagari sets wider than Latin caps, and the conjuncts and the matras
+  // above and below need the extra room allowed for here.
+  const CAP = 0.56;
+  const nameSize = fitSize(name, room, 96, 0, CAP);
+  const secondSize = fitSize(second, room, 56, 0, CAP);
+  const numberSize = fitSize(number, room, 50, 1, 0.64);
+
+  const lines: { text: string; size: number; rule?: boolean; gap: number }[] = [];
+  if (name) lines.push({ text: name, size: nameSize, gap: 0 });
+  if (name && (second || number)) lines.push({ text: '', size: 26, rule: true, gap: 14 });
+  if (second) lines.push({ text: second, size: secondSize, gap: 14 });
+  if (number) lines.push({ text: number, size: numberSize, gap: 16 });
+  if (detail) lines.push({ text: detail, size: fitSize(detail, room, 34, 0, CAP), gap: 16 });
+
+  // Inside the inner frame line, with a margin.
+  const rows = squeeze(lines, VH - 104);
+  const blockH = rows.reduce((total, row, index) => total + (index ? row.gap : 0) + row.size, 0);
+  let cursor = VH / 2 - blockH / 2;
+
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} className="mx-auto block w-full max-w-xl" role="img" aria-label="Nameplate preview">
+      <defs>
+        <filter id={`shadow-${uid}`} x="-8%" y="-8%" width="116%" height="120%">
+          <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#111111" floodOpacity="0.18" />
+        </filter>
+      </defs>
+
+      <rect x="0" y="0" width={VW} height={VH} fill={VINE_PALETTE.ground} filter={`url(#shadow-${uid})`} />
+      {/* The double frame: a broad outer band and a hairline inside it. */}
+      <rect x="5" y="5" width={VW - 10} height={VH - 10} fill="none" stroke={VINE_PALETTE.frame} strokeWidth="10" />
+      <rect x="26" y="26" width={VW - 52} height={VH - 52} fill="none" stroke={VINE_PALETTE.frame} strokeWidth="2.5" />
+
+      <VineBand x={bandX} y={48} width={bandW} height={VH - 96} uid={uid} />
+
+      {rows.map((row, index) => {
+        if (index) cursor += row.gap;
+        const top = cursor;
+        cursor += row.size;
+
+        if (row.rule) {
+          const y = top + row.size / 2;
+          const right = textX + Math.min(room, 520);
+          const mid = (textX + right) / 2;
+          return (
+            <g key={index} fill={text} stroke={text}>
+              <line x1={textX} y1={y} x2={mid - 34} y2={y} strokeWidth="3" />
+              <line x1={mid + 34} y1={y} x2={right} y2={y} strokeWidth="3" />
+              {/* The paired diamonds from the studio's artwork. */}
+              <path d={`M${mid - 26} ${y} L${mid - 9} ${y - 11} L${mid} ${y} L${mid - 9} ${y + 11} Z`} />
+              <path d={`M${mid} ${y} L${mid + 9} ${y - 11} L${mid + 26} ${y} L${mid + 9} ${y + 11} Z`} />
+            </g>
+          );
+        }
+
+        return (
+          <text
+            key={index}
+            x={textX}
+            y={top + row.size * 0.8}
+            fill={text}
+            fontFamily={font}
+            fontSize={row.size}
+          >
+            {row.text}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+/**
+ * A cut geometric band beside handwritten names.
+ *
+ * Case is left exactly as typed. The design is set in a formal script, and a
+ * script face in all capitals is the one way to make it look like a mistake.
+ */
+function PlateCubes({ slots, plate, text, font, config, uid }: TemplateProps) {
+  const VW = 860;
+  const VH = 641;
+
+  const bandX = 44;
+  const bandW = 286;
+  const textX = bandX + bandW + 56;
+  const room = VW - textX - 44;
+
+  const number = slots.number ?? '';
+  const first = slots.line1 ?? '';
+  const second = slots.line2 ?? '';
+  const detail = slots.line3 ?? '';
+
+  // Petit Formal Script sets wide for a script, close to Latin caps.
+  const CAP = 0.75;
+  const nameSize = Math.min(
+    fitSize(first, room, 104, 0, CAP),
+    second ? fitSize(second, room, 104, 0, CAP) : 104,
+  );
+  /*
+   * The flat is numbered, not announced.
+   *
+   * Sized on its own, a short number like "C 1204" takes the ceiling while two
+   * long names come down to meet the plate, and the result reads as a door
+   * number with the residents noted underneath. It stays under the names.
+   */
+  const numberSize = Math.min(fitSize(number, room, 86, 0, CAP), nameSize * 0.84);
+
+  const lines: { text: string; size: number; gap: number }[] = [];
+  if (number) lines.push({ text: number, size: numberSize, gap: 0 });
+  if (first) lines.push({ text: first, size: nameSize, gap: 44 });
+  if (second) lines.push({ text: second, size: nameSize, gap: 18 });
+  if (detail) lines.push({ text: detail, size: fitSize(detail, room, 46, 0, CAP), gap: 26 });
+
+  // The height the band occupies, so the lettering keeps to the same field.
+  const rows = squeeze(lines, VH - 112);
+  const blockH = rows.reduce((total, row, index) => total + (index ? row.gap : 0) + row.size, 0);
+  let cursor = VH / 2 - blockH / 2;
+
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
+      <defs>
+        <filter id={`shadow-${uid}`} x="-8%" y="-8%" width="116%" height="120%">
+          <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#111111" floodOpacity="0.18" />
+        </filter>
+      </defs>
+
+      <rect x="0" y="0" width={VW} height={VH} rx={config.plate.radius} fill={plate} filter={`url(#shadow-${uid})`} />
+      <CubeBand x={bandX} y={44} width={bandW} height={VH - 88} color={text} ground={plate} uid={uid} />
+
+      {rows.map((row, index) => {
+        if (index) cursor += row.gap;
+        const baseline = cursor + row.size * 0.74;
+        cursor += row.size;
+        return (
+          <text key={index} x={textX} y={baseline} fill={text} fontFamily={font} fontSize={row.size}>
+            {row.text}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
 export const PREVIEW_TEMPLATES = [
   { value: '', label: 'No live preview' },
   { value: 'nameplate-minimal', label: 'Nameplate — minimal (number, rule, name)' },
   { value: 'nameplate-classic', label: 'Nameplate — classic (centred, framed)' },
   { value: 'desk-plate', label: 'Desk plate (name, designation, degree)' },
   { value: 'sign-square', label: 'Square sign (symbol + caption)' },
+  { value: 'plate-botanical', label: 'Botanical frame (two names in a cut border)' },
+  { value: 'plate-vine', label: 'Floral band (Devanagari name, flowering border)' },
+  { value: 'plate-cubes', label: 'Cube band (script names beside a cut pattern)' },
 ];
+
+/**
+ * The shipped name of each design, which the studio may rename.
+ *
+ * Settings hold only the names that have actually been changed, so a design
+ * nobody has renamed keeps whatever it is called here -- including after this
+ * list is reworded, which is the behaviour you want from a default.
+ */
+export function previewTemplateOptions(
+  names: Record<string, string> | null | undefined,
+): { value: string; label: string }[] {
+  return PREVIEW_TEMPLATES.map((option) => {
+    const custom = option.value ? names?.[option.value]?.trim() : '';
+    return custom ? { ...option, label: custom } : option;
+  });
+}
+
+/** A fresh {} each render would re-run the memo below on every render. */
+const EMPTY_NAMES: Record<string, string> = {};
+
+/** The design list as the studio has named it, for every picker that shows it. */
+export function usePreviewTemplates(): { value: string; label: string }[] {
+  const { get } = useSettings();
+  const names = get<Record<string, string>>('preview.templateNames', EMPTY_NAMES);
+  return useMemo(() => previewTemplateOptions(names), [names]);
+}
 
 export const PREVIEW_SLOTS = [
   { value: '', label: 'Not bound to the preview' },

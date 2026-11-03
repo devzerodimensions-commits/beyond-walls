@@ -209,11 +209,32 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
       { slug: 'premium', label: 'Over ₹2,499', min: 2499, max: null, minExclusive: true },
     ],
   },
+
+  // --- Live preview ----------------------------------------------------------
+  /*
+   * What the studio calls each live preview design.
+   *
+   * One object keyed by the design's id rather than a setting per design, so a
+   * design added later is renameable the day it ships instead of needing a
+   * settings entry and a deploy. Only the names actually changed are stored:
+   * anything absent falls back to the shipped name in LivePreview.tsx, which is
+   * also how a renamed design survives that list being reworded.
+   *
+   * It is in a public group because the shop reads settings from one endpoint,
+   * not because the storefront shows these names. They are the studio's own
+   * labels in the product editor.
+   */
+  {
+    key: 'preview.templateNames',
+    group: 'preview',
+    label: 'Live preview design names',
+    value: {},
+  },
 ];
 
 const PUBLIC_GROUPS = new Set([
   'brand', 'contact', 'hours', 'social', 'footer', 'announcement',
-  'payment', 'shipping', 'tax', 'seo', 'store', 'catalog',
+  'payment', 'shipping', 'tax', 'seo', 'store', 'catalog', 'preview',
 ]);
 
 /** Keys that must never be exposed to the storefront. */
