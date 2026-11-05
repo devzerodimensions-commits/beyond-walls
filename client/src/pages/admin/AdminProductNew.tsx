@@ -8,7 +8,7 @@ import { slugify } from '../../lib/format';
 import { useToast } from '../../context/StoreProvider';
 import { AdminCard, AdminPageHeader, MediaPicker, MultiImageUpload } from '../../components/admin/AdminKit';
 import { ProductCard } from '../../components/product/ProductCard';
-import { PreviewSetup } from '../../components/admin/PreviewSetup';
+import { PhotoPreviewSetup } from '../../components/admin/PhotoPreviewSetup';
 import {
   Badge, Button, Checkbox, CheckIcon, CloseIcon, Input, Select, Textarea, TrashIcon,
 } from '../../components/ui';
@@ -444,8 +444,9 @@ export default function AdminProductNew() {
               description="For a made-to-order piece, the customer can type their text and see it on the plate before buying."
             >
               {productId ? (
-                <PreviewSetup
+                <PhotoPreviewSetup
                   productId={productId}
+                  product={product}
                   hasImage={images.length > 0}
                   onApplied={() => void refresh()}
                 />

@@ -6,6 +6,7 @@ import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../ut
 import { toBool, uniqueSlug } from '../../utils/helpers';
 import { persistUploads, upload } from '../../middleware/upload';
 import { suggestPreviewFromImage } from '../../services/previewSuggest.service';
+import { readPlate } from '../../services/plateText.service';
 import { deleteFileIfUnreferenced } from '../../services/media.service';
 import { isSellable } from '../../services/pricing.service';
 
@@ -693,6 +694,108 @@ router.get(
 
     const suggestion = await suggestPreviewFromImage(image.url);
     return res.json({ success: true, data: suggestion });
+  }),
+);
+
+/*
+ * Build the live preview out of the product's own photograph.
+ *
+ * The other route guesses a shape and leaves the studio to match the piece by
+ * eye. This one does not have to: the photograph is the design, so the sample
+ * name is painted off it and the customer's words go back in its place. A new
+ * design therefore needs an upload rather than a developer, which is the whole
+ * point of it.
+ *
+ * Applied straight away, because there is nothing to approve -- the preview
+ * IS the photograph. Every judgement that could be wrong was made before the
+ * service agreed to return anything, and the studio can still change or clear
+ * it in the editor afterwards.
+ */
+router.post(
+  '/:id/preview-from-photo',
+  asyncHandler(async (req, res) => {
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        personalization: true,
+      },
+    });
+    if (!product) throw ApiError.notFound('Product not found');
+
+    const image = product.images.find((i) => i.isPrimary) ?? product.images[0];
+    if (!image) {
+      return res.json({
+        success: true,
+        data: { ok: false, reason: 'Add a photograph first and this can read it.', image: null, aspect: null, plateColor: null, textColor: null, boxes: [] },
+      });
+    }
+
+    const read = await readPlate(image.url);
+    if (!read.ok || !read.image) return res.json({ success: true, data: read });
+
+    /*
+     * Which question each line asks.
+     *
+     * Taken from the order the lines sit in, because nothing in a picture says
+     * that the short line at the top is a flat number rather than a surname.
+     * The studio renames the fields in the editor; what matters here is that
+     * every line found gets one, so no part of the plate is left unanswerable.
+     */
+    const SLOTS = ['line1', 'line2', 'line3', 'number'] as const;
+    const LABELS: Record<string, string> = {
+      line1: 'First line',
+      line2: 'Second line',
+      line3: 'Third line',
+      number: 'House / flat number',
+    };
+    const boxes = read.boxes.slice(0, SLOTS.length).map((box, index) => ({
+      ...box,
+      slot: SLOTS[index],
+    }));
+
+    await prisma.product.update({
+      where: { id: product.id },
+      data: {
+        livePreviewEnabled: true,
+        livePreviewTemplate: 'photo',
+        livePreviewConfig: {
+          aspect: read.aspect ?? undefined,
+          defaults: {
+            ...(read.plateColor ? { plateColor: read.plateColor } : {}),
+            ...(read.textColor ? { textColor: read.textColor } : {}),
+          },
+          photo: { image: read.image, boxes },
+        },
+      },
+    });
+
+    /*
+     * Fields are only created for a product that has none. Re-reading a
+     * photograph after the studio has worded its own questions must not bury
+     * them under a second set saying "First line".
+     */
+    let fields = product.personalization.length;
+    if (!fields) {
+      for (const [index, box] of boxes.entries()) {
+        await prisma.personalizationField.create({
+          data: {
+            productId: product.id,
+            key: box.slot,
+            label: LABELS[box.slot] ?? box.slot,
+            type: 'TEXT',
+            required: index === 0,
+            maxLength: 40,
+            sortOrder: index,
+            status: 'PUBLISHED',
+            previewSlot: box.slot,
+          },
+        });
+      }
+      fields = boxes.length;
+    }
+
+    return res.json({ success: true, data: { ...read, boxes, fields } });
   }),
 );
 router.post(

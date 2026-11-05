@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import type { PersonalizationField } from '../../lib/types';
 import { assetUrl } from '../../lib/api';
@@ -221,6 +221,27 @@ export interface PreviewConfig {
   };
   /** The line under the preview. Keep it honest — it is a promise to a customer. */
   caption: string;
+  /**
+   * Set only on a plate built from the product's own photograph.
+   *
+   * The image is the piece with its sample name painted out, and each box is
+   * where one of those names sat, as a fraction of the picture so it survives
+   * any resize. Written by the server when the photograph is read; there is
+   * nothing here for a studio to fill in by hand.
+   */
+  photo?: {
+    image: string;
+    boxes: {
+      slot: keyof PreviewSlots;
+      y: number;
+      h: number;
+      align: 'left' | 'center' | 'right';
+      /** The point the line is set from: its left edge, centre or right edge. */
+      anchor: number;
+      /** Clear plate available from that anchor. A limit, not a target. */
+      room: number;
+    }[];
+  };
 }
 
 const BASE_CONFIG: PreviewConfig = {
@@ -327,6 +348,9 @@ export function resolvePreviewConfig(
       text: overrides.palette?.text ?? preset.palette?.text ?? BASE_CONFIG.palette.text,
     },
     caption: overrides.caption ?? preset.caption ?? BASE_CONFIG.caption,
+    // Only ever comes from the product: it is measurements taken off that
+    // product's own photograph, so there is no base or preset to fall back to.
+    photo: overrides.photo,
   };
 }
 
@@ -388,6 +412,8 @@ export function LivePreview({
 
   const body = (() => {
     switch (template) {
+      case 'photo':
+        return <PlatePhoto {...shared} />;
       case 'plate-botanical':
         return <PlateBotanical {...shared} />;
       case 'plate-vine':
@@ -730,6 +756,71 @@ function SignSquare({ slots, plate, text, font, config, uid }: TemplateProps) {
  * take it. Same rule the studio set for the minimal nameplate, applied line by
  * line here because these designs set their lines at different sizes.
  */
+/**
+ * Real text metrics, measured in the browser rather than estimated.
+ *
+ * The drawn templates each fix their own typeface, so a measured constant per
+ * template was enough. A plate taken from a photograph fixes nothing: any of
+ * the faces, in any script, in a box whose size came off the artwork. A
+ * constant that is a little low is exactly what pushed a name off the edge of
+ * the cube plate once already, and no single constant can be right for Latin
+ * capitals and for Devanagari at the same time.
+ *
+ * So the browser is asked. Everything is measured at 100px and returned as a
+ * fraction of the font size, which is what the caller needs to invert.
+ */
+interface TextMetrics {
+  /** Width of the string, as a multiple of the font size. */
+  width: number;
+  /** Height of the marks themselves, ascender to descender. */
+  ink: number;
+  /** How far the top of the marks sits above the baseline. */
+  ascent: number;
+}
+
+/** Conservative enough to stay inside a box when nothing can be measured. */
+const UNMEASURED: TextMetrics = { width: 0.62, ink: 1, ascent: 0.75 };
+
+const REFERENCE = 100;
+let scratch: CanvasRenderingContext2D | null | undefined;
+
+function useTextMetrics(): (value: string, stack: string) => TextMetrics {
+  /*
+   * Measured again once the webfonts arrive.
+   *
+   * The first paint happens in the fallback face, and Yatra One is a good
+   * deal wider than the serif standing in for it, so a plate measured then
+   * and never remeasured would be laid out for a font the customer is no
+   * longer looking at.
+   */
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void document.fonts?.ready.then(() => { if (live) setReady(true); });
+    return () => { live = false; };
+  }, []);
+
+  return useMemo(() => {
+    void ready;
+    return (value: string, stack: string): TextMetrics => {
+      if (scratch === undefined) scratch = document.createElement('canvas').getContext('2d');
+      if (!scratch) return UNMEASURED;
+      scratch.font = `${REFERENCE}px ${stack}`;
+      const m = scratch.measureText(value);
+      const ascent = m.actualBoundingBoxAscent;
+      const descent = m.actualBoundingBoxDescent;
+      if (!Number.isFinite(ascent) || !Number.isFinite(descent) || ascent + descent <= 0) {
+        return { ...UNMEASURED, width: m.width / REFERENCE || UNMEASURED.width };
+      }
+      return {
+        width: m.width / REFERENCE,
+        ink: (ascent + descent) / REFERENCE,
+        ascent: ascent / REFERENCE,
+      };
+    };
+  }, [ready]);
+}
+
 function fitSize(text: string, room: number, max: number, spacing = 0, capWidth = 0.6): number {
   const n = text.length;
   if (!n) return max;
@@ -1000,6 +1091,73 @@ function PlateCubes({ slots, plate, text, font, config, uid }: TemplateProps) {
   );
 }
 
+/**
+ * A plate drawn from the product's own photograph.
+ *
+ * Every other design here is a drawing: a developer reads the artwork and
+ * builds it in SVG, which means a design the studio makes on a Tuesday cannot
+ * be sold until someone writes code for it. This one is not drawn at all. The
+ * server takes the photograph, paints the sample name off it and measures
+ * where that name sat; what is left is the real piece with an empty face, and
+ * all this does is put the customer's words back in the same boxes.
+ *
+ * So the preview cannot drift from the product, because it IS the product --
+ * and a new design needs no code, only an upload.
+ */
+function PlatePhoto({ slots, text, font, config }: TemplateProps) {
+  const photo = config.photo;
+  const measure = useTextMetrics();
+  const VW = config.aspect.width;
+  const VH = config.aspect.height;
+
+  if (!photo?.image) return null;
+
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
+      <image href={assetUrl(photo.image)} x="0" y="0" width={VW} height={VH} preserveAspectRatio="none" />
+
+      {photo.boxes.map((box, index) => {
+        const value = (slots[box.slot] ?? '').trim();
+        if (!value) return null;
+
+        const roomW = box.room * VW;
+        const roomH = box.h * VH;
+        const m = measure(value, font);
+
+        /*
+         * Sized to the ink, not to the font size.
+         *
+         * A box was measured from the sample name's own marks, so the letters
+         * that replace it have to be matched the same way -- by how tall and
+         * wide they actually draw. Going by font size instead would leave
+         * Devanagari, which carries marks above and below, overflowing a box
+         * that Latin capitals sat inside comfortably.
+         */
+        const size = Math.max(
+          6,
+          Math.min(roomH / Math.max(0.01, m.ink), roomW / Math.max(0.01, m.width)),
+        );
+
+        const anchor = box.align === 'center' ? 'middle' : box.align === 'right' ? 'end' : 'start';
+
+        return (
+          <text
+            key={index}
+            x={box.anchor * VW}
+            y={box.y * VH + m.ascent * size}
+            fill={text}
+            fontFamily={font}
+            fontSize={size}
+            textAnchor={anchor}
+          >
+            {value}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
 export const PREVIEW_TEMPLATES = [
   { value: '', label: 'No live preview' },
   { value: 'nameplate-minimal', label: 'Nameplate — minimal (number, rule, name)' },
@@ -1009,6 +1167,13 @@ export const PREVIEW_TEMPLATES = [
   { value: 'plate-botanical', label: 'Botanical frame (two names in a cut border)' },
   { value: 'plate-vine', label: 'Floral band (Devanagari name, flowering border)' },
   { value: 'plate-cubes', label: 'Cube band (script names beside a cut pattern)' },
+  /*
+   * Listed so a product set up from its photograph shows what it is in the
+   * editor, but it is not something to pick from here: it carries measurements
+   * taken off one particular picture, and choosing it for a product that has
+   * none would draw an empty plate. It is set by reading a photograph.
+   */
+  { value: 'photo', label: 'From the product photograph (set up automatically)' },
 ];
 
 /**
