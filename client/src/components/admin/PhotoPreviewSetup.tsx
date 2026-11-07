@@ -20,11 +20,15 @@ import { Badge, Button } from '../ui';
  * the customer's words go back where that name sat, which means the preview
  * cannot drift from the product: it is the product.
  *
- * It runs on its own as soon as the step opens, because a studio that has
- * just uploaded the artwork has already said what they want. When the
- * photograph cannot be read -- a sign shot on a wall, a picture rather than
- * flat artwork -- it says why in a sentence and hands over to the older
- * manual setup rather than leaving the step empty.
+ * It asks one question first. Most of the catalogue is not personalised --
+ * a stock sign is sold as photographed -- and reading the artwork of a
+ * product nobody types their name onto is work done for nothing, as well as
+ * a preview the shop then has to be told to ignore. Once the studio says the
+ * piece is made to order, the rest happens without being asked for.
+ *
+ * When the photograph cannot be read -- a sign shot on a wall, a picture
+ * rather than flat artwork -- it says why in a sentence and hands over to the
+ * older manual setup rather than leaving the step empty.
  */
 
 interface PlateBox {
@@ -67,6 +71,8 @@ export function PhotoPreviewSetup({
   const { push } = useToast();
   const [result, setResult] = useState<PlateResult | null>(null);
   const [byHand, setByHand] = useState(false);
+  /** Null until the studio says whether this piece is personalised at all. */
+  const [personalised, setPersonalised] = useState<boolean | null>(null);
 
   const read = useMutation({
     mutationFn: () => api.post<PlateResult>(`/admin/products/${productId}/preview-from-photo`, {}),
@@ -81,6 +87,29 @@ export function PhotoPreviewSetup({
   });
 
   /*
+   * Turning it back off has to reach the product, not just the screen.
+   *
+   * Saying the piece is made to order writes the preview immediately, so a
+   * studio that changes its mind afterwards would otherwise be left with a
+   * product the shop still offers to personalise while this step says it does
+   * not.
+   */
+  const clear = useMutation({
+    mutationFn: () =>
+      api.patch(`/admin/products/${productId}`, {
+        livePreviewEnabled: false,
+        livePreviewTemplate: null,
+      }),
+    onSuccess: () => {
+      started.current = false;
+      setResult(null);
+      setPersonalised(false);
+      onApplied();
+    },
+    onError: (err) => push(err instanceof ApiError ? err.message : 'Could not turn it off', 'error'),
+  });
+
+  /*
    * Run once, by itself.
    *
    * Guarded by a ref rather than by the mutation's own state: in development
@@ -90,10 +119,47 @@ export function PhotoPreviewSetup({
    */
   const started = useRef(false);
   useEffect(() => {
-    if (started.current || !hasImage || byHand) return;
+    if (started.current || !hasImage || byHand || personalised !== true) return;
     started.current = true;
     read.mutate();
-  }, [hasImage, byHand, read]);
+  }, [hasImage, byHand, personalised, read]);
+
+  if (personalised === null) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-ink-600">
+          A live preview lets the customer type their own text and see it on the piece before they
+          buy. It suits anything made to order; a stock sign sold exactly as photographed does not
+          need one.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => setPersonalised(true)} disabled={!hasImage}>
+            Made to order — the customer types their text
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setPersonalised(false)}>
+            Regular product — sold as photographed
+          </Button>
+        </div>
+        {hasImage ? null : (
+          <p className="text-xs text-ink-500">Add a photograph first and this can read it.</p>
+        )}
+      </div>
+    );
+  }
+
+  if (personalised === false) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-ink-600">
+          No live preview. The piece is sold as photographed, and the customer is not asked for
+          anything that has to be approved before it is made.
+        </p>
+        <Button size="sm" variant="ghost" onClick={() => setPersonalised(null)}>
+          Change that
+        </Button>
+      </div>
+    );
+  }
 
   if (!hasImage) {
     return (
@@ -130,6 +196,9 @@ export function PhotoPreviewSetup({
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setByHand(true)}>
             Set it up by hand
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => { started.current = false; setResult(null); setPersonalised(null); }}>
+            It is not personalised after all
           </Button>
         </div>
       </div>
@@ -173,6 +242,10 @@ export function PhotoPreviewSetup({
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setByHand(true)}>
           Set it up by hand instead
+        </Button>
+        <span className="flex-1" />
+        <Button size="sm" variant="ghost" loading={clear.isPending} onClick={() => clear.mutate()}>
+          Remove the live preview
         </Button>
       </div>
     </div>

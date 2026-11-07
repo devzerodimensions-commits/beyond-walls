@@ -89,11 +89,17 @@ const MIN_CONTRAST = 0.18;
  */
 const MAX_ROUGHNESS = 0.085;
 /**
- * More colours than this and it is a photograph, not artwork.
+ * More shading than this and it is a photograph, not artwork.
  *
- * Set between the two groups measured, not on either: the studio's artboards
- * reached twelve and the catalogue's photographs started at nineteen.
+ * Set between the two groups measured, not on either: every artboard came in
+ * under 0.19 and everything else from 0.22 up. A heavily compressed artboard
+ * could in principle be refused by this, which is the safe way round -- it
+ * says it cannot rather than leaving a smudge on the plate.
  */
+const MAX_SHADING = 0.2;
+/** A line taller than this share of the field is not writing. */
+const MAX_LINE_SHARE = 0.5;
+/** A busy picture, caught cheaply. Not sufficient alone; see shading(). */
 const MAX_PALETTE = 15;
 /** Fewer lines than this and nothing was found; more and it is not a nameplate. */
 const MAX_LINES = 6;
@@ -123,15 +129,12 @@ function dominant(data: Buffer, ch: number, pixels: number[]): Rgb & { share: nu
 /**
  * How many colours the picture genuinely uses.
  *
- * This is what tells flat artwork from a photograph, and it is the check that
- * matters most, because the failure it prevents is the ugly one: a photograph
- * of a sign on a wall passes every other test here -- a smooth sky is as even
- * as a plate -- and comes back with a block of sky painted across it.
- *
- * Artwork is drawn from a handful of flat colours. A photograph, however
- * plain it looks, is thousands of shades. Measured over the studio's own
- * files and the catalogue's photographs the two do not overlap: every artboard
- * came in at twelve colours or fewer, every photograph at nineteen or more.
+ * A second opinion only. Counting colours was the first thing tried for
+ * telling artwork from a photograph and it is not sufficient on its own: a
+ * pale studio render -- a gold ring on a cream wall, shot in soft light --
+ * uses barely more colours than an artboard does, and went straight through a
+ * limit set from the catalogue's street photographs. It still catches a busy
+ * picture cheaply, so it stays alongside the check below.
  */
 function paletteSize(data: Buffer, ch: number, pixels: number[]): number {
   const buckets = new Map<string, number>();
@@ -142,6 +145,41 @@ function paletteSize(data: Buffer, ch: number, pixels: number[]): number {
   let n = 0;
   for (const count of buckets.values()) if (count / pixels.length > 0.01) n += 1;
   return n;
+}
+
+/**
+ * How much of the picture sits on a gentle slope.
+ *
+ * This is the check that tells artwork from a photograph, and it separates on
+ * the thing that actually differs between them rather than on a symptom.
+ *
+ * Flat artwork is piecewise constant: a pixel is either inside a shape, where
+ * there is no slope at all, or on its edge, where there is a cliff. Shading
+ * -- the gentle middle ground -- is the one thing it never produces. A
+ * photograph is shading nearly everywhere, however few colours it happens to
+ * be made of, because light falls off and lenses blur.
+ *
+ * That is why this catches what counting colours could not. Measured over the
+ * studio's artboards, the catalogue's photographs and the pale render that
+ * got through: every artboard came in under 0.19, and everything else from
+ * 0.22 up, with the render that failed sitting at 0.30.
+ */
+function shading(data: Buffer, ch: number, w: number, h: number): number {
+  if (w < 3 || h < 3) return 1;
+  const lum = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i += 1) {
+    const p = i * ch;
+    lum[i] = 0.2126 * data[p] + 0.7152 * data[p + 1] + 0.0722 * data[p + 2];
+  }
+  let sloped = 0;
+  for (let y = 1; y < h - 1; y += 1) {
+    for (let x = 1; x < w - 1; x += 1) {
+      const i = y * w + x;
+      const g = Math.abs(lum[i + 1] - lum[i - 1]) + Math.abs(lum[i + w] - lum[i - w]);
+      if (g > 3 && g < 25) sloped += 1;
+    }
+  }
+  return sloped / ((w - 2) * (h - 2));
 }
 
 const away = (data: Buffer, i: number, c: Rgb) =>
@@ -229,12 +267,10 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
 
   const all: number[] = [];
   for (let p = 0; p < w * h; p += 1) all.push(p * ch);
-  const palette = paletteSize(data, ch, all);
-  if (palette > MAX_PALETTE) {
-    return no(
-      'This is a photograph rather than flat artwork — it has too many shades in it for the sample name to be painted out without leaving a mark. Upload the design file the plate was made from, or set the preview up by hand below.',
-    );
-  }
+  const notArtwork =
+    'This is a photograph rather than flat artwork — it is shaded, so the sample name cannot be painted off it without leaving a mark where the name used to be. Upload the design file the plate is cut from, or set the preview up by hand below.';
+  if (shading(data, ch, w, h) > MAX_SHADING) return no(notArtwork);
+  if (paletteSize(data, ch, all) > MAX_PALETTE) return no(notArtwork);
 
   const plate = dominant(data, ch, all);
   const inked = (x: number, y: number) => away(data, (y * w + x) * ch, plate) >= TOL;
@@ -382,6 +418,20 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
 
   const writing = lines.filter((l) => !l.ornament);
   if (!writing.length) return no('Only ornament was found on this plate, not writing.');
+
+  /*
+   * No single line of a nameplate is half the plate tall.
+   *
+   * Belt and braces behind the artwork check above. When that check was wrong
+   * and a photograph got through, what it called a line of writing was most
+   * of the face of the plate -- and the customer's name was then set to match
+   * it, which is how a name ended up drawn across the whole picture. Nothing
+   * genuine comes near this: the largest line on the studio's own plates is
+   * just over a fifth of the height.
+   */
+  if (writing.some((line) => line.height > field.h * MAX_LINE_SHARE)) {
+    return no('What was found does not read as lines of writing on a plate, so it was left alone.');
+  }
 
   /*
    * Is the plate flat enough behind the writing to paint over?
