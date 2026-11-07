@@ -6,29 +6,36 @@ import { getStorage } from './storage.service';
 /**
  * Turning a product photograph into a live preview, by itself.
  *
- * Until now a new design meant new code: each plate was a hand-drawn SVG
- * template, so the studio could not add one without a developer. That does
- * not survive a catalogue that grows every week.
+ * A new design used to mean new code: each plate was a hand-drawn SVG, so a
+ * design the studio made on a Tuesday could not be sold until a developer had
+ * redrawn it. This reads the picture instead -- it finds the sample name,
+ * measures how it sits, paints it off the plate and hands back the boxes the
+ * customer's own words go into. The preview cannot drift from the product
+ * because it IS the product, with the name swapped.
  *
- * This takes the other road. The photograph already IS the design, so the
- * preview keeps it and changes only the writing: find the sample name the
- * artwork was made with, measure where and how it sits, paint it out, and
- * hand back a blank plate plus the boxes the customer's own words go into.
- * Nothing about the piece is redrawn, so the preview cannot drift from the
- * product -- it is the product, with the name swapped.
+ * ---- Why it does not look for the plate ----
  *
- * ---- What it can and cannot see ----
+ * The first version of this did. It assumed a rectangle with its ornament in
+ * bands along the edges, found the clear field inside those bands, and took
+ * the writing from it. That held for three artboards and fell over on the
+ * fourth real product, a round plate: there are no edges to walk in from and
+ * no rectangle to find, so nothing applied.
  *
- * It reads flat artwork: the plate square to the frame, lit evenly, the
- * writing sitting on plain plate. That is what the studio's artboards are,
- * and on those it is reliable.
+ * So nothing here asks what shape anything is. It looks for the writing
+ * directly -- marks that stand clear of their own surroundings, shaped like
+ * letters, sitting on a line -- and then only ever touches the plate in the
+ * immediate neighbourhood of a line it found. A circle, an oval, a cut shape
+ * or a rectangle all read the same way, and whatever else is in the picture
+ * is never painted over, because nothing outside a line of writing is.
  *
- * It cannot read a photograph of a sign already on a wall -- held in a hand,
- * at an angle, against a street. There the writing cannot be painted out
- * without the patch showing, and a preview with a smudge where the name used
- * to be is worse than no preview. Every check below exists to say so rather
- * than to return something that looks almost right, and the caller offers the
- * result for the studio to accept instead of applying it silently.
+ * ---- What it will refuse ----
+ *
+ * Painting a name out means refilling that patch from the plate around it,
+ * which only disappears if the plate is plain there. So the test is applied
+ * where it matters: around each line, not over the picture as a whole. That
+ * is deliberate -- an earlier version judged the whole image and refused a
+ * perfectly good plate for having a photographed wall behind it, while
+ * accepting a render whose shading it had no way to see.
  */
 
 /** Everything is a fraction of the image, so it survives any resize. */
@@ -57,198 +64,208 @@ export interface PlatePreview {
   boxes: PlateBox[];
 }
 
-/** Analysis width. Letter strokes survive this; the work stays cheap. */
-const WORK = 520;
-/** How far a pixel may sit from the plate colour and still count as plate. */
-const TOL = 46;
-/** A line or column this inked belongs to an ornament rather than to writing. */
-const BUSY = 0.25;
-/** An ornament band has to start this near its edge, or it is not a band. */
-const MARGIN_MAX = 0.1;
-/** A clear run this long ends a band rather than being a gap inside it. */
-const GAP_MIN = 0.03;
-/** Thinner than this is an exported hairline, not a band. */
-const MIN_BAND = 0.025;
-/** An ornament inks nearly every line it covers; writing does not. */
-const BAND_MEAN = 0.3;
-/** A line this much wider than it is tall is a rule, not writing. */
-const RULE_ASPECT = 8;
-/** A line inked end to end is a border rule. */
-const RULE = 0.6;
-/** How far in from an edge a border rule is looked for. */
-const RULE_REACH = 0.08;
-/** Writing and plate must differ by at least this much to be separable. */
-const MIN_CONTRAST = 0.18;
-/**
- * How uneven the plate behind the writing may be, 0..1.
- *
- * This is the check that keeps a sign photographed on a wall out. Painting
- * the sample name out means refilling that patch with the plate's own colour,
- * which only disappears if the plate is near enough to one colour there. On a
- * street photograph it is not, and the fill would land as a visible block.
- */
-const MAX_ROUGHNESS = 0.085;
-/**
- * More shading than this and it is a photograph, not artwork.
- *
- * Set between the two groups measured, not on either: every artboard came in
- * under 0.19 and everything else from 0.22 up. A heavily compressed artboard
- * could in principle be refused by this, which is the safe way round -- it
- * says it cannot rather than leaving a smudge on the plate.
- */
-const MAX_SHADING = 0.2;
-/** A line taller than this share of the field is not writing. */
-const MAX_LINE_SHARE = 0.5;
-/** A busy picture, caught cheaply. Not sufficient alone; see shading(). */
-const MAX_PALETTE = 15;
-/** Fewer lines than this and nothing was found; more and it is not a nameplate. */
-const MAX_LINES = 6;
+/** The analysis, with the blank plate as bytes rather than a stored file. */
+export interface PlateAnalysis extends Omit<PlatePreview, 'image'> {
+  blank: Buffer | null;
+}
 
-const luma = (r: number, g: number, b: number) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+/** Analysis width. Letter strokes survive this; the work stays cheap. */
+const WORK = 760;
+/** Nothing larger is written out, so one huge upload cannot exhaust memory. */
+const MAX_OUT = 2600;
+/** How far a mark must stand clear of its surroundings to count as ink. */
+const INK = 16;
+/** Writing and plate must differ by at least this much to be separable. */
+const MIN_CONTRAST = 0.17;
+/**
+ * How uneven the plate may be around a line, 0..1.
+ *
+ * The one check that decides whether a name can be painted out invisibly.
+ * Measured on the plate beside the writing and nowhere else: a plate is
+ * plain where its name sits even when the photograph around it is not.
+ */
+const MAX_ROUGHNESS = 0.072;
+/** Less clear plate than this around the marks and it is ornament, not writing. */
+const MIN_OPENNESS = 0.62;
+/** How far the plate above a line may differ from the plate below it. */
+const MAX_STEP = 16;
+/** A line needs at least this share of the width clear beside it. */
+const MIN_ROOM = 0.28;
+/** More than this is a page of text, not a nameplate. */
+const MAX_LINES = 6;
+/**
+ * A mark taller than this share of the picture is not a letter.
+ *
+ * Set from the largest real lettering seen rather than from caution: the
+ * surname on the floral plate is a single joined Devanagari word a fifth of
+ * the picture tall, and a cap set just under that quietly dropped it while
+ * erasing the two smaller lines beneath, leaving the plate with its biggest
+ * name still on it.
+ */
+const MAX_LINE_TALL = 0.3;
+/** Lines are the same plate if their backgrounds are this close. */
+const SAME_PLATE = 30;
+
+const lumaOf = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
 const hex = (r: number, g: number, b: number) =>
   '#' + [r, g, b].map((n) => Math.round(n).toString(16).padStart(2, '0')).join('');
 
 interface Rgb { r: number; g: number; b: number }
 
-/** The commonest colour, quantised first so near-shades count as one. */
-function dominant(data: Buffer, ch: number, pixels: number[]): Rgb & { share: number } {
-  const buckets = new Map<string, { n: number; r: number; g: number; b: number }>();
-  for (const i of pixels) {
-    const key = `${data[i] >> 4}-${data[i + 1] >> 4}-${data[i + 2] >> 4}`;
-    const cur = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
-    cur.n += 1; cur.r += data[i]; cur.g += data[i + 1]; cur.b += data[i + 2];
-    buckets.set(key, cur);
+/** Mean over a square window, by summed-area table so the radius is free. */
+function boxBlur(src: Float32Array, w: number, h: number, r: number): Float32Array {
+  const sat = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y += 1) {
+    let row = 0;
+    for (let x = 0; x < w; x += 1) {
+      row += src[y * w + x];
+      sat[(y + 1) * (w + 1) + x + 1] = sat[y * (w + 1) + x + 1] + row;
+    }
   }
-  let best: { n: number; r: number; g: number; b: number } | null = null;
-  for (const c of buckets.values()) if (!best || c.n > best.n) best = c;
-  if (!best) return { r: 0, g: 0, b: 0, share: 0 };
-  return { r: best.r / best.n, g: best.g / best.n, b: best.b / best.n, share: best.n / pixels.length };
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y += 1) {
+    const y0 = Math.max(0, y - r);
+    const y1 = Math.min(h - 1, y + r);
+    for (let x = 0; x < w; x += 1) {
+      const x0 = Math.max(0, x - r);
+      const x1 = Math.min(w - 1, x + r);
+      const area = (y1 - y0 + 1) * (x1 - x0 + 1);
+      out[y * w + x] =
+        (sat[(y1 + 1) * (w + 1) + x1 + 1] - sat[y0 * (w + 1) + x1 + 1]
+          - sat[(y1 + 1) * (w + 1) + x0] + sat[y0 * (w + 1) + x0]) / area;
+    }
+  }
+  return out;
+}
+
+interface Mark {
+  minX: number; maxX: number; minY: number; maxY: number;
+  n: number; w: number; h: number;
+  polarity: 'dark' | 'light';
 }
 
 /**
- * How many colours the picture genuinely uses.
+ * Mean over a window, counting only the pixels a mask allows.
  *
- * A second opinion only. Counting colours was the first thing tried for
- * telling artwork from a photograph and it is not sufficient on its own: a
- * pale studio render -- a gold ring on a cream wall, shot in soft light --
- * uses barely more colours than an artboard does, and went straight through a
- * limit set from the catalogue's street photographs. It still catches a busy
- * picture cheaply, so it stays alongside the check below.
+ * A plain blur is not good enough to stand in for the plate. Next to
+ * something strongly contrasting -- the white leaves of a cut border -- the
+ * window fills with leaf and the estimate is dragged far off the plate, so
+ * the plain dark panel beside the frame comes out reading as ink. That wiped
+ * out the open plate around the lettering, and with it the lettering, which
+ * was then dismissed along with the ornament it was supposed to be told from.
+ *
+ * Measuring the plate from pixels already thought to be plate fixes it: the
+ * leaves stop voting on what the plate beside them looks like.
  */
-function paletteSize(data: Buffer, ch: number, pixels: number[]): number {
-  const buckets = new Map<string, number>();
-  for (const i of pixels) {
-    const key = `${data[i] >> 4}-${data[i + 1] >> 4}-${data[i + 2] >> 4}`;
-    buckets.set(key, (buckets.get(key) ?? 0) + 1);
-  }
-  let n = 0;
-  for (const count of buckets.values()) if (count / pixels.length > 0.01) n += 1;
-  return n;
-}
-
-/**
- * How much of the picture sits on a gentle slope.
- *
- * This is the check that tells artwork from a photograph, and it separates on
- * the thing that actually differs between them rather than on a symptom.
- *
- * Flat artwork is piecewise constant: a pixel is either inside a shape, where
- * there is no slope at all, or on its edge, where there is a cliff. Shading
- * -- the gentle middle ground -- is the one thing it never produces. A
- * photograph is shading nearly everywhere, however few colours it happens to
- * be made of, because light falls off and lenses blur.
- *
- * That is why this catches what counting colours could not. Measured over the
- * studio's artboards, the catalogue's photographs and the pale render that
- * got through: every artboard came in under 0.19, and everything else from
- * 0.22 up, with the render that failed sitting at 0.30.
- */
-function shading(data: Buffer, ch: number, w: number, h: number): number {
-  if (w < 3 || h < 3) return 1;
-  const lum = new Float32Array(w * h);
-  for (let i = 0; i < w * h; i += 1) {
-    const p = i * ch;
-    lum[i] = 0.2126 * data[p] + 0.7152 * data[p + 1] + 0.0722 * data[p + 2];
-  }
-  let sloped = 0;
-  for (let y = 1; y < h - 1; y += 1) {
-    for (let x = 1; x < w - 1; x += 1) {
+function maskedBlur(
+  src: Float32Array, keep: Uint8Array, w: number, h: number, r: number, fallback: Float32Array,
+): Float32Array {
+  const satV = new Float64Array((w + 1) * (h + 1));
+  const satN = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y += 1) {
+    let rowV = 0;
+    let rowN = 0;
+    for (let x = 0; x < w; x += 1) {
       const i = y * w + x;
-      const g = Math.abs(lum[i + 1] - lum[i - 1]) + Math.abs(lum[i + w] - lum[i - w]);
-      if (g > 3 && g < 25) sloped += 1;
+      if (keep[i]) { rowV += src[i]; rowN += 1; }
+      satV[(y + 1) * (w + 1) + x + 1] = satV[y * (w + 1) + x + 1] + rowV;
+      satN[(y + 1) * (w + 1) + x + 1] = satN[y * (w + 1) + x + 1] + rowN;
     }
   }
-  return sloped / ((w - 2) * (h - 2));
-}
-
-const away = (data: Buffer, i: number, c: Rgb) =>
-  (Math.abs(data[i] - c.r) + Math.abs(data[i + 1] - c.g) + Math.abs(data[i + 2] - c.b)) / 3;
-
-/**
- * Where the ornament along one edge ends, in steps from that edge; -1 for none.
- *
- * An ornament is a border or a band: it meets an edge and runs the LENGTH of
- * it. That is what tells it from the writing, and it is measured over the
- * whole plate rather than locally -- a column crossing a band is inked top to
- * bottom, while a column crossing the writing is inked only where its two or
- * three lines pass. Averaged over the full height the two are far apart even
- * when the strokes are identical, which is where thickness and local density
- * both failed.
- *
- * Two things are turned away. A run thinner than a band is the hairline the
- * artboard was exported with -- one light pixel along the edge, which
- * otherwise ends the search before it starts. A run that is thick but THIN ON
- * AVERAGE is writing: on the cube plate the script reaches within a tenth of
- * the right edge, near enough to pass for a band, but most of the columns
- * under it carry almost no ink while an ornament inks nearly every one.
- */
-function bandEnd(profile: Float32Array, len: number, maxEat: number): number {
-  const gapMin = Math.max(3, Math.round(len * GAP_MIN));
-  const minBand = Math.max(3, Math.round(len * MIN_BAND));
-  let k = 0;
-  while (k < len * MARGIN_MAX) {
-    while (k < len && profile[k] <= BUSY) k += 1;
-    if (k >= len || k > len * MARGIN_MAX) return -1;
-
-    const first = k;
-    let lastBusy = k;
-    let clear = 0;
-    for (; k < len * maxEat; k += 1) {
-      if (profile[k] > BUSY) { lastBusy = k; clear = 0; continue; }
-      clear += 1;
-      if (clear >= gapMin) break;
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y += 1) {
+    const y0 = Math.max(0, y - r);
+    const y1 = Math.min(h - 1, y + r);
+    for (let x = 0; x < w; x += 1) {
+      const x0 = Math.max(0, x - r);
+      const x1 = Math.min(w - 1, x + r);
+      const at = (yy: number, xx: number) => yy * (w + 1) + xx;
+      const n = satN[at(y1 + 1, x1 + 1)] - satN[at(y0, x1 + 1)] - satN[at(y1 + 1, x0)] + satN[at(y0, x0)];
+      if (n < 12) { out[y * w + x] = fallback[y * w + x]; continue; }
+      const v = satV[at(y1 + 1, x1 + 1)] - satV[at(y0, x1 + 1)] - satV[at(y1 + 1, x0)] + satV[at(y0, x0)];
+      out[y * w + x] = v / n;
     }
-
-    let sum = 0;
-    for (let i = first; i <= lastBusy; i += 1) sum += profile[i];
-    if (lastBusy - first + 1 >= minBand && sum / (lastBusy - first + 1) >= BAND_MEAN) return lastBusy;
   }
-  return -1;
+  return out;
 }
 
-/** The analysis, with the blank plate as bytes rather than a stored file. */
-export interface PlateAnalysis extends Omit<PlatePreview, 'image'> {
-  blank: Buffer | null;
+/** Connected runs of ink, eight-connected. */
+function components(mask: Uint8Array, w: number, h: number, polarity: 'dark' | 'light'): Mark[] {
+  const seen = new Uint8Array(w * h);
+  const stack = new Int32Array(w * h);
+  const out: Mark[] = [];
+  for (let start = 0; start < w * h; start += 1) {
+    if (!mask[start] || seen[start]) continue;
+    let top = 0;
+    stack[top++] = start;
+    seen[start] = 1;
+    let minX = w, maxX = 0, minY = h, maxY = 0, n = 0;
+    while (top) {
+      const i = stack[--top];
+      const x = i % w;
+      const y = (i - x) / w;
+      n += 1;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const j = ny * w + nx;
+          if (mask[j] && !seen[j]) { seen[j] = 1; stack[top++] = j; }
+        }
+      }
+    }
+    out.push({ minX, maxX, minY, maxY, n, w: maxX - minX + 1, h: maxY - minY + 1, polarity });
+  }
+  return out;
 }
 
 /**
- * The whole of the reading, on bytes alone.
+ * Shaped like writing? Nothing here is about what it says.
  *
- * Kept apart from storage so it can be run over a folder of artwork and
- * checked by eye, which is the only way to be sure of something that is
- * ultimately a judgement about a picture.
+ * Width is capped loosely on purpose: a whole word arrives as one blob
+ * whenever its letters touch or share a drop shadow, which is how the round
+ * plate's name came in. What the cap still rejects is a rule or a border,
+ * which is thirty times longer than it is tall.
  */
+function glyphLike(c: Mark, w: number, h: number): boolean {
+  if (c.minX === 0 || c.minY === 0 || c.maxX === w - 1 || c.maxY === h - 1) return false;
+  const tall = c.h / h;
+  if (tall < 0.012 || tall > MAX_LINE_TALL) return false;
+  if (c.w > c.h * 12) return false;
+  if (c.h > c.w * 14) return false;
+  const fill = c.n / (c.w * c.h);
+  if (fill <= 0.08) return false;
+  // A solid block is not a letter, but a stem -- I, l, 1 -- fills its box
+  // completely and is. Without the exception the I of SAANVI was left
+  // standing on the plate after the rest of the name had gone.
+  return fill < 0.97 || c.w < c.h * 0.5;
+}
+
+interface Line {
+  polarity: 'dark' | 'light';
+  left: number; right: number; top: number; bottom: number;
+  ink: number;
+  parts: Mark[];
+  bg: Rgb;
+  fg: Rgb;
+  roughness: number;
+  contrast: number;
+}
+
 export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
   const no = (reason: string): PlateAnalysis => ({
     ok: false, reason, blank: null, aspect: null, plateColor: null, textColor: null, boxes: [],
   });
 
-  const stored = { buffer: source };
-
   let meta;
   try {
-    meta = await sharp(stored.buffer).metadata();
+    meta = await sharp(source).metadata();
   } catch {
     return no('That file is not an image this can read.');
   }
@@ -258,301 +275,620 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
 
   const w = Math.min(WORK, fullW);
   const h = Math.max(1, Math.round((fullH * w) / fullW));
-  const { data, info } = await sharp(stored.buffer)
+  const { data, info } = await sharp(source)
     .resize(w, h, { fit: 'fill' })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
   const ch = info.channels;
 
-  const all: number[] = [];
-  for (let p = 0; p < w * h; p += 1) all.push(p * ch);
-  const notArtwork =
-    'This is a photograph rather than flat artwork — it is shaded, so the sample name cannot be painted off it without leaving a mark where the name used to be. Upload the design file the plate is cut from, or set the preview up by hand below.';
-  if (shading(data, ch, w, h) > MAX_SHADING) return no(notArtwork);
-  if (paletteSize(data, ch, all) > MAX_PALETTE) return no(notArtwork);
-
-  const plate = dominant(data, ch, all);
-  const inked = (x: number, y: number) => away(data, (y * w + x) * ch, plate) >= TOL;
-
-  // How inked each column and each row is, over the whole plate.
-  const colProfile = new Float32Array(w);
-  const rowProfile = new Float32Array(h);
-  for (let y = 0; y < h; y += 1) {
-    for (let x = 0; x < w; x += 1) {
-      if (inked(x, y)) { colProfile[x] += 1; rowProfile[y] += 1; }
-    }
+  const lum = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i += 1) {
+    lum[i] = lumaOf(data[i * ch], data[i * ch + 1], data[i * ch + 2]);
   }
-  for (let x = 0; x < w; x += 1) colProfile[x] /= h;
-  for (let y = 0; y < h; y += 1) rowProfile[y] /= w;
-
-  /** No edge may claim more than this, so dense writing cannot pass for a band. */
-  const MAX_EAT = 0.45;
-  const gap = Math.max(2, Math.round(w / 180));
-  const flip = (p: Float32Array) => Float32Array.from(p).reverse();
-
-  const left = bandEnd(colProfile, w, MAX_EAT);
-  const rightK = bandEnd(flip(colProfile), w, MAX_EAT);
-  const top = bandEnd(rowProfile, h, MAX_EAT);
-  const bottomK = bandEnd(flip(rowProfile), h, MAX_EAT);
-
-  const field = {
-    x: left >= 0 ? left + gap : 0,
-    y: top >= 0 ? top + gap : 0,
-    w: 0,
-    h: 0,
-  };
-  field.w = (rightK >= 0 ? w - 1 - rightK - gap : w - 1) - field.x + 1;
-  field.h = (bottomK >= 0 ? h - 1 - bottomK - gap : h - 1) - field.y + 1;
 
   /*
-   * Then step inside any ruled border the field still holds.
-   *
-   * The floral plate is framed by two thin brown rules, far too thin to read
-   * as ornament bands, so the field kept them -- and a rule running the height
-   * of the field puts ink in every row, which left the writing looking like a
-   * single line from the top of the plate to the bottom. A rule gives itself
-   * away by inking a line end to end, which no line of writing does.
+   * The background is the plate as it would look with nothing written on it:
+   * a blur wide enough that a letter cannot colour its own surroundings. Ink
+   * is whatever stands clear of that, which is what lets this work on a plate
+   * that shades across its face as well as on flat artwork.
    */
-  const insideRules = (profile: Float32Array, start: number, extent: number, forward: boolean) => {
-    const limit = Math.round(extent * RULE_REACH);
-    let last = -1;
-    for (let k = 0; k < limit; k += 1) {
-      const i = forward ? start + k : start - k;
-      if (i >= 0 && i < profile.length && profile[i] > RULE) last = k;
-    }
-    return last >= 0 ? last + 1 + gap : 0;
-  };
-  const cutL = insideRules(colProfile, field.x, w, true);
-  const cutR = insideRules(colProfile, field.x + field.w - 1, w, false);
-  const cutT = insideRules(rowProfile, field.y, h, true);
-  const cutB = insideRules(rowProfile, field.y + field.h - 1, h, false);
-  field.x += cutL; field.w -= cutL + cutR;
-  field.y += cutT; field.h -= cutT + cutB;
-
-  if (field.w < w * 0.1 || field.h < h * 0.08) {
-    return no('No clear area was found on this plate for a name to sit in.');
+  /*
+   * The radius is a compromise and both ends of it were measured.
+   *
+   * Wide enough and a letter cannot colour its own surroundings, but the
+   * estimate then stops following the plate: on the round plate, lit from one
+   * side, the brighter half of the face came out reading as ink and the name
+   * on it was thrown away. Narrow enough to follow that lighting, and each
+   * letter drags the plate beside it dark, ringing every word with a halo of
+   * false ink. A twentieth of the width sits between the two.
+   *
+   * The passes are what make the narrow radius safe: each one measures the
+   * plate using only what still looks like plate, so the letters drop out of
+   * their own background and the halo closes up. It settles after about four.
+   */
+  const radius = Math.max(10, Math.round(w / 19));
+  const rough = boxBlur(lum, w, h, radius);
+  let bgLum = rough;
+  for (let pass = 0; pass < 3; pass += 1) {
+    const plain = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i += 1) plain[i] = Math.abs(lum[i] - bgLum[i]) <= INK ? 1 : 0;
+    bgLum = maskedBlur(lum, plain, w, h, radius, rough);
   }
 
-  // The writing: what is left inside the field that is not plate.
-  const lineInk = new Int32Array(h);
-  let inkR = 0, inkG = 0, inkB = 0, inkN = 0;
-  for (let y = field.y; y < field.y + field.h; y += 1) {
-    for (let x = field.x; x < field.x + field.w; x += 1) {
-      if (!inked(x, y)) continue;
-      const i = (y * w + x) * ch;
-      lineInk[y] += 1;
-      inkR += data[i]; inkG += data[i + 1]; inkB += data[i + 2]; inkN += 1;
-    }
+  const dark = new Uint8Array(w * h);
+  const light = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i += 1) {
+    const d = lum[i] - bgLum[i];
+    if (d < -INK) dark[i] = 1;
+    else if (d > INK) light[i] = 1;
   }
-  if (!inkN) return no('Nothing is written on this plate, so there is no name to replace.');
+  const anyInk = (i: number) => dark[i] === 1 || light[i] === 1;
 
-  const ink = { r: inkR / inkN, g: inkG / inkN, b: inkB / inkN };
-  const contrast = Math.abs(luma(ink.r, ink.g, ink.b) - luma(plate.r, plate.g, plate.b));
-  if (contrast < MIN_CONTRAST) {
-    return no('The plate and the writing on it are too close in colour to tell apart.');
-  }
-
-  // Rows carrying ink, grouped into lines.
-  const minRow = Math.max(1, Math.round(field.w * 0.012));
-  const runs: { top: number; bottom: number }[] = [];
-  let start = -1;
-  for (let y = field.y; y < field.y + field.h; y += 1) {
-    const on = lineInk[y] >= minRow;
-    if (on && start < 0) start = y;
-    const last = y === field.y + field.h - 1;
-    if ((!on || last) && start >= 0) {
-      const end = on && last ? y : y - 1;
-      if (end - start >= 2) runs.push({ top: start, bottom: end });
-      start = -1;
+  const glyphs: Mark[] = [];
+  /** Ink that is not writing — rules, borders, the ornament. Never painted. */
+  const fixtures: Mark[] = [];
+  for (const [polarity, mask] of [['dark', dark], ['light', light]] as const) {
+    for (const c of components(mask, w, h, polarity)) {
+      if (glyphLike(c, w, h)) glyphs.push(c);
+      else if (c.n > w * 0.02) fixtures.push(c);
     }
   }
-  if (!runs.length) return no('No line of writing could be made out on this plate.');
-  if (runs.length > MAX_LINES) {
-    return no('This looks like a page of text rather than a nameplate, so it was left alone.');
+  if (!glyphs.length) return no('No writing could be made out on this picture.');
+
+  // Marks that overlap vertically and are of a like size belong to one line.
+  /*
+   * A mark joins a line by where its middle sits, not by whether it overlaps.
+   *
+   * Overlap was tested against the group's whole span, and the span grew with
+   * every mark that joined -- so each addition loosened the test that admitted
+   * the next. On the botanical plate that ran away completely: the cut border
+   * is a continuous chain of leaves, it swallowed the lettering that sat level
+   * with it, and ninety-four leaves and letters came back as one line reaching
+   * from one edge of the plate to the other.
+   *
+   * Measuring from the middle of the line cannot run away, because the middle
+   * of a line of writing does not move as more of its letters are found.
+   */
+  interface Group { polarity: 'dark' | 'light'; centre: number; medianH: number; parts: Mark[] }
+  const middle = (m: Mark) => (m.minY + m.maxY) / 2;
+  const groups: Group[] = [];
+  for (const g of [...glyphs].sort((a, b) => a.minY - b.minY)) {
+    const fit = groups.find((L) => {
+      if (L.polarity !== g.polarity) return false;
+      const ratio = Math.max(L.medianH, g.h) / Math.min(L.medianH, g.h);
+      return Math.abs(middle(g) - L.centre) < L.medianH * 0.6 && ratio < 2.4;
+    });
+    if (fit) {
+      fit.parts.push(g);
+      const hs = fit.parts.map((p) => p.h).sort((a, b) => a - b);
+      const cs = fit.parts.map(middle).sort((a, b) => a - b);
+      fit.medianH = hs[Math.floor(hs.length / 2)];
+      fit.centre = cs[Math.floor(cs.length / 2)];
+    } else {
+      groups.push({ polarity: g.polarity, centre: middle(g), medianH: g.h, parts: [g] });
+    }
   }
 
-  // Each line's horizontal extent, and whether it is writing at all.
-  const lines = runs.map((run) => {
-    let min = w, max = 0;
-    for (let y = run.top; y <= run.bottom; y += 1) {
-      for (let x = field.x; x < field.x + field.w; x += 1) {
-        if (!inked(x, y)) continue;
-        if (x < min) min = x;
-        if (x > max) max = x;
+  const candidates: Line[] = [];
+  for (const group of groups) {
+    const parts = group.parts.sort((a, b) => a.minX - b.minX);
+    let run: Mark[] = [parts[0]];
+    const runs: Mark[][] = [run];
+    for (let i = 1; i < parts.length; i += 1) {
+      if (parts[i].minX - run[run.length - 1].maxX > group.medianH * 2.2) {
+        run = [];
+        runs.push(run);
       }
+      run.push(parts[i]);
     }
-    const width = max - min + 1;
-    const height = run.bottom - run.top + 1;
-    return {
-      ...run,
-      left: min,
-      right: max,
-      width,
-      height,
+
+    for (const whole of runs) {
+      if (!whole.length) continue;
+
       /*
-       * A divider rule reads as a line of writing -- it is ink in a row of its
-       * own. It is kept on the plate rather than painted out, because it is
-       * part of the design, and no slot is offered for it: a customer cannot
-       * type over an ornament.
+       * Letters of one word are one colour.
+       *
+       * A run gathers marks that sit at the same height and are close enough
+       * along the line, and on the round plate that reached past the last
+       * letter and took in a piece of the gold ring. The run then stretched
+       * to the edge of the piece, so the name was measured as both wider and
+       * further right than it is, and came out hanging over the side of the
+       * plate. Dropping marks that are not the colour of the rest leaves the
+       * word.
        */
-      ornament: width / height > RULE_ASPECT,
-    };
-  });
+      const mask = group.polarity === 'dark' ? dark : light;
+      const inkColour = (m: Mark): Rgb | null => {
+        let r2 = 0, g2 = 0, b2 = 0, n2 = 0;
+        for (let y = m.minY; y <= m.maxY; y += 1) {
+          for (let x = m.minX; x <= m.maxX; x += 1) {
+            const i = y * w + x;
+            if (!mask[i]) continue;
+            const p = i * ch;
+            r2 += data[p]; g2 += data[p + 1]; b2 += data[p + 2]; n2 += 1;
+          }
+        }
+        return n2 ? { r: r2 / n2, g: g2 / n2, b: b2 / n2 } : null;
+      };
+      const tinted = whole.map((m) => ({ m, c: inkColour(m) })).filter((t) => t.c);
+      if (!tinted.length) continue;
+      const mid = (pick: (c: Rgb) => number) => {
+        const v = tinted.map((t) => pick(t.c!)).sort((a, b) => a - b);
+        return v[Math.floor(v.length / 2)];
+      };
+      const tone = { r: mid((c) => c.r), g: mid((c) => c.g), b: mid((c) => c.b) };
+      const r = tinted
+        .filter((t) => (Math.abs(t.c!.r - tone.r) + Math.abs(t.c!.g - tone.g) + Math.abs(t.c!.b - tone.b)) / 3 < 45)
+        .map((t) => t.m);
+      if (!r.length) continue;
+      /*
+       * One mark counts as a line only when it is word-shaped. Letters that
+       * touch come in as a single blob, and refusing those would mean
+       * refusing every plate set in a script.
+       */
+      const lone =
+        r.length === 1
+        && r[0].w > r[0].h * 2.2
+        // A word leaves gaps between its letters; a single cut leaf is solid,
+        // and without this every leaf lying on its side read as a word.
+        && r[0].n / (r[0].w * r[0].h) < 0.55;
+      if (r.length < 2 && !lone) continue;
 
-  /*
-   * A joining mark between two names is design, not a name.
-   *
-   * The botanical plate reads AARAV / & / SAANVI, and taken literally that is
-   * three lines of writing -- so the second name was offered the ampersand's
-   * box and came out a fifth of the size of the first. The ampersand is part
-   * of the piece: it is far narrower than the lines it sits between, and it
-   * sits BETWEEN them rather than at either end, which no name does. It stays
-   * on the plate and is never offered to a customer.
-   */
-  const inner = lines.slice(1, -1);
-  const widest = Math.max(...lines.map((l) => l.width));
-  for (const line of inner) {
-    if (line.width < widest * 0.25) line.ornament = true;
-  }
+      /*
+       * Letters on a line stand on a common baseline. Ornament that happens
+       * to line up does not, which is what stops a row of cut leaves being
+       * read as a word.
+       */
+      if (!lone) {
+        const bottoms = r.map((p) => p.maxY);
+        const mean = bottoms.reduce((a, b) => a + b, 0) / bottoms.length;
+        const spread = Math.sqrt(bottoms.reduce((a, b) => a + (b - mean) ** 2, 0) / bottoms.length);
+        const hs = r.map((p) => p.h).sort((a, b) => a - b);
+        const med = hs[Math.floor(hs.length / 2)];
+        if (spread > med * 0.34) continue;
 
-  const writing = lines.filter((l) => !l.ornament);
-  if (!writing.length) return no('Only ornament was found on this plate, not writing.');
-
-  /*
-   * No single line of a nameplate is half the plate tall.
-   *
-   * Belt and braces behind the artwork check above. When that check was wrong
-   * and a photograph got through, what it called a line of writing was most
-   * of the face of the plate -- and the customer's name was then set to match
-   * it, which is how a name ended up drawn across the whole picture. Nothing
-   * genuine comes near this: the largest line on the studio's own plates is
-   * just over a fifth of the height.
-   */
-  if (writing.some((line) => line.height > field.h * MAX_LINE_SHARE)) {
-    return no('What was found does not read as lines of writing on a plate, so it was left alone.');
-  }
-
-  /*
-   * Is the plate flat enough behind the writing to paint over?
-   *
-   * Measured on the plate pixels around the writing, not on the whole frame:
-   * what matters is whether the patch that gets refilled will disappear. A
-   * studio artboard scores near zero here. A sign photographed on a wall does
-   * not, and is turned away above rather than returned with a visible block
-   * where its name used to be.
-   */
-  let n = 0, sum = 0, sumSq = 0;
-  for (const line of writing) {
-    const pad = Math.round(line.height * 0.6);
-    for (let y = Math.max(field.y, line.top - pad); y <= Math.min(field.y + field.h - 1, line.bottom + pad); y += 1) {
-      for (let x = field.x; x < field.x + field.w; x += 1) {
-        if (inked(x, y)) continue;
-        const v = luma(data[(y * w + x) * ch], data[(y * w + x) * ch + 1], data[(y * w + x) * ch + 2]);
-        n += 1; sum += v; sumSq += v * v;
+        /*
+         * Writing on one line is set at one size.
+         *
+         * Without this the bottom border of the botanical plate passed every
+         * other test -- a long row of marks, level along the bottom, sitting
+         * on clean plate -- and was painted out, taking that side of the cut
+         * border off the product. Its leaves are all sizes, which a line of
+         * letters never is.
+         */
+        const vary = Math.sqrt(
+          r.reduce((a, p) => a + (p.h - med) ** 2, 0) / r.length,
+        ) / Math.max(1, med);
+        if (vary > 0.42) continue;
       }
+
+      const left = Math.min(...r.map((p) => p.minX));
+      const right = Math.max(...r.map((p) => p.maxX));
+      const top = Math.min(...r.map((p) => p.minY));
+      const bottom = Math.max(...r.map((p) => p.maxY));
+      const tall = bottom - top + 1;
+
+      // A line of writing runs along. A clump of ornament roughly as tall as
+      // it is wide is not a line however neatly its pieces happen to sit.
+      if (right - left + 1 < tall * 1.8) continue;
+
+      /*
+       * The plate beside this line: its colour, and how even it is. Taken
+       * from a band around the line, ignoring the ink itself, because what
+       * is being judged is the surface a patch would have to disappear into.
+       */
+      /*
+       * Only above and below, never out to the sides.
+       *
+       * Reaching sideways as well put the gold ring of the round plate into
+       * the reading for its longest line: the background came back part gold,
+       * the unevenness came back enormous, and the name of the product was
+       * thrown away while the flat number under it survived. The surface a
+       * patch has to disappear into is the plate directly over and under the
+       * writing, so that is what is measured.
+       */
+      const reach = Math.round(tall * 0.6);
+      let bgR = 0, bgG = 0, bgB = 0, bgN = 0, sum = 0, sumSq = 0;
+      const strip = (from: number, to: number) => {
+        let clear = 0;
+        let area = 0;
+        let r2 = 0, g2 = 0, b2 = 0, n2 = 0;
+        for (let y = Math.max(0, from); y <= Math.min(h - 1, to); y += 1) {
+          for (let x = left; x <= right; x += 1) {
+            area += 1;
+            const i = y * w + x;
+            if (anyInk(i)) continue;
+            const p = i * ch;
+            bgR += data[p]; bgG += data[p + 1]; bgB += data[p + 2];
+            r2 += data[p]; g2 += data[p + 1]; b2 += data[p + 2]; n2 += 1;
+            const v = lum[i] / 255;
+            sum += v; sumSq += v * v; bgN += 1; clear += 1;
+          }
+        }
+        return {
+          open: area ? clear / area : 0,
+          colour: n2 ? { r: r2 / n2, g: g2 / n2, b: b2 / n2 } : null,
+        };
+      };
+      const over = strip(top - reach, top - 1);
+      const under = strip(bottom + 1, bottom + reach);
+      const openAbove = over.open;
+      const openBelow = under.open;
+      if (bgN < 40) continue;
+      const bg = { r: bgR / bgN, g: bgG / bgN, b: bgB / bgN };
+      const roughness = Math.sqrt(Math.max(0, sumSq / bgN - (sum / bgN) ** 2));
+
+      /*
+       * The plate above the writing and the plate below it must match.
+       *
+       * A line is painted out by running the plate down through it from the
+       * rows above to the rows below, so this is the condition under which
+       * that is honest. On artwork and on a plain plate the two are the same
+       * surface and it disappears. Where they are not -- a sign photographed
+       * on a wall, its face in light above the writing and in shadow below,
+       * or a lens that has blurred one and not the other -- the fill has to
+       * invent the difference and lands as a visible streak, which is how a
+       * photographed billboard came back with its top half wiped.
+       */
+      if (over.colour && under.colour) {
+        const step =
+          (Math.abs(over.colour.r - under.colour.r)
+            + Math.abs(over.colour.g - under.colour.g)
+            + Math.abs(over.colour.b - under.colour.b)) / 3;
+        if (step > MAX_STEP) continue;
+      }
+
+      /*
+       * Writing sits on open plate; ornament does not.
+       *
+       * This is what tells a line of letters from a row of cut leaves that
+       * happens to line up, and it had to be measured because evenness does
+       * not: the plate showing between the leaves of the botanical frame is
+       * as even as the panel in the middle of it, so the frame read as line
+       * after line of writing and the plate was dismissed as a page of text.
+       * What differs is how much clear plate surrounds the marks.
+       */
+      /*
+       * A line of writing has clear plate above it or below it.
+       *
+       * Measuring the clear plate around the whole line did not work: big
+       * lettering with a drop shadow fills its own band, so the name on the
+       * round plate scored lower than the ornament this was meant to reject.
+       * What a line of writing really has is LEADING -- a clear strip over it
+       * or under it. A row of cut leaves has more leaves in both directions,
+       * because it is a field rather than a line.
+       */
+      const openness = Math.max(openAbove, openBelow);
+      if (openness < MIN_OPENNESS) continue;
+
+      let fgR = 0, fgG = 0, fgB = 0, fgN = 0;
+      for (const part of r) {
+        for (let y = part.minY; y <= part.maxY; y += 1) {
+          for (let x = part.minX; x <= part.maxX; x += 1) {
+            const i = y * w + x;
+            if (!anyInk(i)) continue;
+            const p = i * ch;
+            fgR += data[p]; fgG += data[p + 1]; fgB += data[p + 2]; fgN += 1;
+          }
+        }
+      }
+      if (!fgN) continue;
+      const fg = { r: fgR / fgN, g: fgG / fgN, b: fgB / fgN };
+      const contrast =
+        Math.abs(lumaOf(fg.r, fg.g, fg.b) - lumaOf(bg.r, bg.g, bg.b)) / 255;
+
+      candidates.push({
+        polarity: group.polarity,
+        left, right, top, bottom,
+        ink: r.reduce((a, p) => a + p.n, 0),
+        parts: r, bg, fg, roughness, contrast,
+      });
     }
   }
-  const roughness = n ? Math.sqrt(Math.max(0, sumSq / n - (sum / n) ** 2)) : 1;
-  if (roughness > MAX_ROUGHNESS) {
+
+
+  /*
+   * One line of writing, not two.
+   *
+   * Light lettering is found as light marks, and the plate showing between
+   * its letters is found again as dark ones, so the same name arrives twice
+   * -- once per polarity. Keeping the heavier reading of any pair that covers
+   * the same ground leaves one line where there is one line.
+   */
+  const deduped: Line[] = [];
+  for (const line of [...candidates].sort((a, b) => b.ink - a.ink)) {
+    const area = (line.right - line.left + 1) * (line.bottom - line.top + 1);
+    const covered = deduped.some((kept) => {
+      const ox = Math.min(kept.right, line.right) - Math.max(kept.left, line.left) + 1;
+      const oy = Math.min(kept.bottom, line.bottom) - Math.max(kept.top, line.top) + 1;
+      return ox > 0 && oy > 0 && (ox * oy) / area > 0.5;
+    });
+    if (!covered) deduped.push(line);
+  }
+
+  const usable = deduped.filter(
+    (l) => l.roughness <= MAX_ROUGHNESS && l.contrast >= MIN_CONTRAST,
+  );
+  if (!usable.length) {
     return no(
-      'The plate is not evenly lit behind the writing — this looks like a photograph of a sign in place rather than flat artwork. Painting the sample name out would leave a mark, so it was left alone.',
+      'The writing on this picture sits on a surface too uneven to paint it off cleanly — a wall, a texture or a strong shadow behind it. Upload the design file the plate is cut from, or set the preview up by hand below.',
     );
   }
 
   /*
-   * Paint each line out, line by line rather than filling the whole field.
+   * How much clear plate each line has beside it.
    *
-   * Filling the field in one go also erased the divider rule on the floral
-   * plate, which is part of the design and not something a customer replaces.
-   * Each line is refilled with the plate colour read from just around it, so
-   * a plate that shades slightly across its face is matched locally.
+   * Walked outward along the line's own band until the surface stops looking
+   * like the plate. It is measured per line and never assumed from a shape,
+   * which is what makes a round plate work: the room narrows towards the top
+   * and bottom of the circle because the plate does.
    *
-   * Each patch is then held inside its own line's share of the plate. The
-   * padding that covers a letter's soft edge is a fraction of the line's
-   * height, and on a large line that was enough to reach the rule below it
-   * and rub it out after all -- so a patch may never cross into the line
-   * above or below, ornament or writing.
+   * It also decides what is writing at all. Two rows of leaves at the edge of
+   * the botanical panel passed every other test -- level, evenly sized,
+   * sitting on clean dark plate -- and painting them out took a corner of the
+   * cut border off the product. What they did not have is a plate to sit on:
+   * ornament pressed in on both sides, leaving a fifth of the width clear,
+   * where the names above had four fifths. Writing is given room; ornament is
+   * packed in.
    */
-  const scale = fullW / w;
-  const composites = await Promise.all(writing.map(async (line) => {
-    const pad = Math.max(2, Math.round(line.height * 0.35));
-    const at = lines.indexOf(line);
-    const above = at > 0 ? lines[at - 1].bottom + 1 : field.y;
-    const below = at < lines.length - 1 ? lines[at + 1].top - 1 : field.y + field.h - 1;
-    const topPx = Math.max(above, line.top - pad);
-    const bottomPx = Math.min(below, line.bottom + pad);
-
-    const box = {
-      left: Math.max(0, Math.round((line.left - pad) * scale)),
-      top: Math.max(0, Math.round(topPx * scale)),
-      width: 0,
-      height: 0,
-    };
-    box.width = Math.min(fullW - box.left, Math.round((line.width + pad * 2) * scale));
-    box.height = Math.min(fullH - box.top, Math.round((bottomPx - topPx + 1) * scale));
-
-    const around: number[] = [];
-    const reach = Math.round(line.height * 0.8);
-    for (let y = Math.max(0, line.top - reach); y <= Math.min(h - 1, line.bottom + reach); y += 1) {
-      for (let x = field.x; x < field.x + field.w; x += 1) {
-        if (!inked(x, y)) around.push((y * w + x) * ch);
-      }
+  const plateHere = (x: number, top: number, bottom: number, bg: Rgb): boolean => {
+    let hit = 0, seen = 0;
+    for (let y = top; y <= bottom; y += 1) {
+      const i = y * w + x;
+      if (anyInk(i)) continue;
+      seen += 1;
+      const p = i * ch;
+      /*
+       * Judged on the channel that differs most, not on the average.
+       *
+       * The ring around the round plate is broken into arcs by design, so a
+       * column can pass between them and the walk carries on to the wall --
+       * and a cream wall against a white face differs by only a few points
+       * once the three channels are averaged together, far too little to
+       * stop it. The difference is almost all in one channel, which is what
+       * the eye reads as a different colour and what is used here.
+       */
+      const d = Math.max(
+        Math.abs(data[p] - bg.r),
+        Math.abs(data[p + 1] - bg.g),
+        Math.abs(data[p + 2] - bg.b),
+      );
+      if (d < 15) hit += 1;
     }
-    const local = around.length ? dominant(data, ch, around) : plate;
+    /*
+     * A column that is mostly ink is the edge of the plate, not more plate.
+     *
+     * Skipping ink and judging on what was left let the walk tunnel straight
+     * through the gold ring of the round plate: the ring is ink, so it was
+     * passed over, and the cream wall beyond it is close enough to the white
+     * face to be taken for more of it. The name was then given room out to
+     * the wall and set wide enough to hang over both sides of the piece.
+     */
+    if (seen < (bottom - top + 1) * 0.78) return false;
+    return seen > 0 && hit / seen > 0.75;
+  };
 
-    const patch = await sharp({
-      create: {
-        width: Math.max(1, box.width),
-        height: Math.max(1, box.height),
-        channels: 3,
-        background: { r: Math.round(local.r), g: Math.round(local.g), b: Math.round(local.b) },
-      },
-    }).png().toBuffer();
-    return { input: patch, left: box.left, top: box.top };
-  }));
+  const measured = usable.map((line) => {
+    let clearL = line.left;
+    let clearR = line.right;
+    while (clearL > 0 && plateHere(clearL - 1, line.top, line.bottom, line.bg)) clearL -= 1;
+    while (clearR < w - 1 && plateHere(clearR + 1, line.top, line.bottom, line.bg)) clearR += 1;
+    /*
+     * A margin, so a long name stops short of the edge rather than on it.
+     *
+     * The clear run is measured to the last column that still looks like
+     * plate, and a name set to exactly that width grazes whatever stops it --
+     * on the round plate, the gold ring. Nobody cuts a plate with the
+     * lettering hard against the border, so neither does this.
+     */
+    const margin = Math.round((clearR - clearL + 1) * 0.05);
+    return { line, clearL: clearL + margin, clearR: clearR - margin };
+  }).filter((m) => (m.clearR - m.clearL + 1) / w >= MIN_ROOM);
 
-  const blank = await sharp(stored.buffer)
-    .composite(composites)
-    .webp({ quality: 90 })
-    .toBuffer();
+  if (!measured.length) {
+    return no('What was found is packed in by ornament rather than set on open plate, so it was left alone.');
+  }
 
   /*
-   * A line's box is the room it has, not the room the sample happened to use.
+   * Which lines are the plate.
    *
-   * Measuring the width off the sample looked right until a long name met a
-   * short one: "SAANVI" was handed the width of the word above it and shrank
-   * to fit, when the plate had half its face free. What the sample does fix is
-   * the SIZE of the lettering -- that is the design's own type size, and the
-   * customer's name is set at it -- and where the line is anchored. The width
-   * only ever acts as a limit, and that limit is the clear plate, so a name
-   * keeps the design's size until it genuinely runs out of room.
+   * A picture of a piece in place holds other writing: a watermark in the
+   * corner, a number on a door behind it. Lines that belong to one plate sit
+   * on the same colour, so they are grouped by background and the heaviest
+   * group wins -- the name on the plate is the subject of the photograph and
+   * carries far more ink than a caption in a corner.
    */
-  const fieldLeft = field.x / w;
-  const fieldRight = (field.x + field.w) / w;
-  const boxes: PlateBox[] = writing.map((line) => {
-    const centre = (line.left + line.right) / 2 / w;
-    const off = (centre - (fieldLeft + fieldRight) / 2) / (fieldRight - fieldLeft);
+  const roomOf = new Map(measured.map((m) => [m.line, m]));
+  const clusters: Line[][] = [];
+  for (const { line } of measured) {
+    const near = clusters.find((c) => {
+      const b = c[0].bg;
+      return (Math.abs(b.r - line.bg.r) + Math.abs(b.g - line.bg.g) + Math.abs(b.b - line.bg.b)) / 3 < SAME_PLATE;
+    });
+    if (near) near.push(line);
+    else clusters.push([line]);
+  }
+  const group = clusters.sort(
+    (a, b) => b.reduce((n, l) => n + l.ink, 0) - a.reduce((n, l) => n + l.ink, 0),
+  )[0];
+
+  /*
+   * The lines of a nameplate stand one above another.
+   *
+   * The heaviest line is the name, and anything belonging with it shares its
+   * column of the plate. Without this the bottom row of the cube band -- off
+   * to the left of the lettering, on the same black plate, level and evenly
+   * sized -- was taken for a line of the name and smeared away, which took a
+   * row of the cut pattern off the product.
+   */
+  const anchorLine = group.reduce((a, b) => (b.ink > a.ink ? b : a));
+  const chosen = group
+    .filter((line) => {
+      const overlap =
+        Math.min(anchorLine.right, line.right) - Math.max(anchorLine.left, line.left) + 1;
+      const narrower = Math.min(anchorLine.right - anchorLine.left, line.right - line.left) + 1;
+      return overlap / narrower > 0.25;
+    })
+    .sort((a, b) => a.top - b.top);
+
+  if (chosen.length > MAX_LINES) {
+    return no('This reads as a page of text rather than a nameplate, so it was left alone.');
+  }
+
+  const boxes: PlateBox[] = [];
+  for (const line of chosen) {
+    const { clearL, clearR } = roomOf.get(line)!;
+    const centre = (line.left + line.right + 1) / 2;
+    const mid = (clearL + clearR + 1) / 2;
+    const span = Math.max(1, clearR - clearL + 1);
+    const off = (centre - mid) / span;
     const align = Math.abs(off) < 0.06 ? 'center' : off < 0 ? 'left' : 'right';
-    const anchor = align === 'center' ? centre : align === 'left' ? line.left / w : (line.right + 1) / w;
+    const anchorPx = align === 'center' ? centre : align === 'left' ? line.left : line.right + 1;
     const room =
       align === 'center'
-        ? Math.min(anchor - fieldLeft, fieldRight - anchor) * 2
+        ? Math.min(anchorPx - clearL, clearR + 1 - anchorPx) * 2
         : align === 'left'
-          ? fieldRight - anchor
-          : anchor - fieldLeft;
-    return {
-      y: line.top / h,
-      h: line.height / h,
-      align,
-      anchor,
-      room,
-    };
-  });
+          ? clearR + 1 - anchorPx
+          : anchorPx - clearL;
 
+    boxes.push({
+      y: line.top / h,
+      h: (line.bottom - line.top + 1) / h,
+      align,
+      anchor: anchorPx / w,
+      room: room / w,
+    });
+  }
+
+  /*
+   * Paint each line out, over the marks themselves and nothing else.
+   *
+   * Filling the line's whole rectangle was wrong twice over. A run can pick
+   * up a stray mark off to one side, and the rectangle then stretches out to
+   * meet it -- on the round plate that reached past the face and flattened a
+   * section of the gold ring, which is the one thing a preview must never do
+   * to a product. And a rectangle covers plate that had nothing on it, so any
+   * error in the fill shows up over an area far larger than the writing.
+   *
+   * So the patch is the ink, grown by a little to take the soft edge of a
+   * letter and its shadow with it. Every column is then closed by running the
+   * plate from just above the marks to just below them, which keeps a plate
+   * that is lit from one side looking lit.
+   */
+  const outW = Math.min(fullW, MAX_OUT);
+  const outH = Math.max(1, Math.round((fullH * outW) / fullW));
+  const big = await sharp(source).resize(outW, outH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const sx = outW / w;
+  const sy = outH / h;
+
+  /*
+   * Everything inside a line's own box goes, except a rule.
+   *
+   * Covering only the marks that qualified as letters left crumbs behind --
+   * the dot of an i, the tail of a letter, a piece of a shadow that was too
+   * small or too thin to be called writing on its own, each of them sitting
+   * on the plate after the name around it had gone. Inside the box the line
+   * occupies, anything that is not plate belongs to that line.
+   *
+   * A rule is the exception and is protected: it runs far longer than it is
+   * tall, it is part of the design rather than part of the name, and half of
+   * one left behind would be worse than leaving all of it.
+   */
+  const protect = new Uint8Array(w * h);
+  for (const f of fixtures) {
+    if (f.w <= f.h * 8) continue;
+    for (let y = f.minY; y <= f.maxY; y += 1) {
+      for (let x = f.minX; x <= f.maxX; x += 1) protect[y * w + x] = 1;
+    }
+  }
+
+  const cover = new Uint8Array(w * h);
+  for (const line of chosen) {
+    for (let y = line.top; y <= line.bottom; y += 1) {
+      for (let x = line.left; x <= line.right; x += 1) {
+        const i = y * w + x;
+        if (anyInk(i) && !protect[i]) cover[i] = 1;
+      }
+    }
+  }
+
+  // Grown by a share of the lettering's own height, so the amount of spread
+  // suits the size of the writing rather than the size of the picture.
+  const tallest = Math.max(...chosen.map((l) => l.bottom - l.top + 1));
+  const grow = Math.max(2, Math.round(tallest * 0.1));
+  const grown = new Uint8Array(w * h);
+  const spread = new Uint8Array(w * h);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      let on = 0;
+      for (let k = -grow; k <= grow && !on; k += 1) {
+        const xx = x + k;
+        if (xx >= 0 && xx < w && cover[y * w + xx]) on = 1;
+      }
+      spread[y * w + x] = on;
+    }
+  }
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      let on = 0;
+      for (let k = -grow; k <= grow && !on; k += 1) {
+        const yy = y + k;
+        if (yy >= 0 && yy < h && spread[yy * w + x]) on = 1;
+      }
+      grown[y * w + x] = on;
+    }
+  }
+
+  const painted = (X: number, Y: number) => {
+    const x = Math.min(w - 1, Math.floor(X / sx));
+    const y = Math.min(h - 1, Math.floor(Y / sy));
+    return grown[y * w + x] === 1;
+  };
+
+  /** A few rows of plate either side of the marks, averaged for steadiness. */
+  const SAMPLE = 3;
+  for (let X = 0; X < outW; X += 1) {
+    let Y = 0;
+    while (Y < outH) {
+      if (!painted(X, Y)) { Y += 1; continue; }
+      let end = Y;
+      while (end + 1 < outH && painted(X, end + 1)) end += 1;
+
+      const a = [0, 0, 0];
+      const b = [0, 0, 0];
+      let an = 0, bn = 0;
+      for (let y = Math.max(0, Y - SAMPLE); y < Y; y += 1) {
+        const p = (y * outW + X) * 3;
+        a[0] += big[p]; a[1] += big[p + 1]; a[2] += big[p + 2]; an += 1;
+      }
+      for (let y = end + 1; y <= Math.min(outH - 1, end + SAMPLE); y += 1) {
+        const p = (y * outW + X) * 3;
+        b[0] += big[p]; b[1] += big[p + 1]; b[2] += big[p + 2]; bn += 1;
+      }
+      if (an || bn) {
+        const topC = an ? a.map((v) => v / an) : b.map((v) => v / bn);
+        const botC = bn ? b.map((v) => v / bn) : topC;
+        for (let y = Y; y <= end; y += 1) {
+          const t = (y - Y + 1) / (end - Y + 2);
+          const p = (y * outW + X) * 3;
+          big[p] = topC[0] + (botC[0] - topC[0]) * t;
+          big[p + 1] = topC[1] + (botC[1] - topC[1]) * t;
+          big[p + 2] = topC[2] + (botC[2] - topC[2]) * t;
+        }
+      }
+      Y = end + 1;
+    }
+  }
+
+  const blank = await sharp(big, { raw: { width: outW, height: outH, channels: 3 } })
+    .webp({ quality: 92 })
+    .toBuffer();
+
+  const plate = chosen[0].bg;
+  const ink = chosen[0].fg;
   return {
     ok: true,
-    reason: `Read ${writing.length} line${writing.length === 1 ? '' : 's'} of writing on a ${fullW}×${fullH} plate and painted ${writing.length === 1 ? 'it' : 'them'} out. The design is untouched.`,
+    reason: `Read ${chosen.length} line${chosen.length === 1 ? '' : 's'} of writing on a ${fullW}×${fullH} picture and painted ${chosen.length === 1 ? 'it' : 'them'} out. Everything else is untouched.`,
     blank,
     aspect: { width: fullW, height: fullH },
     plateColor: hex(plate.r, plate.g, plate.b),
