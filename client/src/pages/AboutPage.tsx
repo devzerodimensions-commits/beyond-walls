@@ -164,6 +164,95 @@ const DIFFERENCE = [
   },
 ];
 
+/**
+ * The page's own words, with anything the studio has rewritten laid over them.
+ *
+ * Taken a section at a time rather than wholesale, so a half-filled setting --
+ * or one saved by an older version that did not have a section yet -- still
+ * leaves every other part of the page reading properly. A list is only taken
+ * when it actually has rows: an empty array means nobody has written one, not
+ * that the strip should disappear.
+ */
+function merged<T extends object>(fallback: T, stored: unknown): T {
+  if (!stored || typeof stored !== 'object') return fallback;
+  const out = { ...fallback } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
+    if (value === undefined || value === null || value === '') continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    out[key] = value;
+  }
+  return out as T;
+}
+
+/*
+ * The page's own words, used when nothing has been written in the admin and
+ * whenever a stored section is missing or empty.
+ *
+ * They are kept here rather than only on the server so the page can never come
+ * out as a column of blanks: if the settings call fails, or a section is saved
+ * half-filled, what shows is this, which reads properly.
+ */
+const DEFAULT_HERO = {
+  eyebrow: 'About us',
+  heading: 'We design, make, and bring spaces to life.',
+  body: 'Beyond Walls creates thoughtful signage, spaces and custom pieces by bringing together design thinking, material knowledge and in-house making.',
+  buttonLabel: 'Our story',
+};
+
+const DEFAULT_STORY = {
+  eyebrow: 'Our story',
+  heading: 'From a small signage business to a design-led brand.',
+  photoCaption: 'Patel Corporation, Ahmedabad — where it started.',
+  paragraphs: [
+    'In 2004 we started as Patel Corporation, an offline signage manufacturing business.',
+    'For more than two decades we have worked with materials, finishes, spaces and businesses to turn ideas into physical signs. That experience taught us something simple: the right detail can change how a space feels.',
+    'Now the second generation is carrying that experience forward in a new direction — from making signs to a design-led brand for personal spaces.',
+  ],
+};
+
+/** The first figure counts itself from 2004 when its value is left blank. */
+const DEFAULT_STATS = [
+  { value: '', label: 'Years of making', text: 'Signage manufacturing since 2004, now in its second generation.' },
+  { value: 'In-house', label: 'Manufacturing', text: 'Production happens at our own facility, from material to finishing.' },
+  { value: 'One roof', label: 'Design and production', text: 'The people who draw it and the people who make it work together.' },
+];
+
+const DEFAULT_DIFFERENCE = {
+  eyebrow: 'Why Beyond Walls',
+  heading: 'Design meets making.',
+  body: 'We do not stop at how something looks. We understand what happens after the design leaves the screen: the materials, the making, and the challenges that come with turning an idea into a physical product.',
+  items: DIFFERENCE,
+};
+
+const DEFAULT_PROCESS = {
+  eyebrow: 'Our process',
+  heading: 'A clear journey from idea to your space.',
+  items: PROCESS,
+};
+
+const DEFAULT_WORK = {
+  heading: 'Spaces we have made.',
+  linkLabel: 'View the full gallery →',
+  items: WORK,
+};
+
+const DEFAULT_PEOPLE_TEXT = {
+  eyebrow: 'The people behind the work',
+  heading: 'Made by us. Fitted by us.',
+  paragraphs: [
+    'A sign is not finished when it leaves the facility. It is finished when it is on the wall, level, and looking like the drawing.',
+    'So the last step stays with us too. The same studio that draws a piece and makes it is the one that turns up with the ladder.',
+  ],
+  captions: PEOPLE.map((photo) => photo.caption),
+};
+
+const DEFAULT_CTA = {
+  eyebrow: 'Let us make something',
+  heading: 'Have a space, sign or idea in mind?',
+  body: 'Send us the sizes, the material and the artwork, and we will come back to you with a quote.',
+  buttonLabel: 'Start a custom order',
+};
+
 export default function AboutPage() {
   /* Only for the SEO fields, which stay editable in the admin. */
   const { data: page } = useQuery({
@@ -175,6 +264,23 @@ export default function AboutPage() {
   const settings = useSettings();
   const established = 2004;
   const years = new Date().getFullYear() - established;
+
+  /*
+   * Everything written on this page, editable in Admin -> Settings -> About
+   * page. The layout stays in the design; only the words come from there.
+   */
+  const stored = settings.get<Record<string, unknown>>('about.content', {}) ?? {};
+  const hero = merged(DEFAULT_HERO, stored.hero);
+  const story = merged(DEFAULT_STORY, stored.story);
+  const difference = merged(DEFAULT_DIFFERENCE, stored.difference);
+  const process = merged(DEFAULT_PROCESS, stored.process);
+  const work = merged(DEFAULT_WORK, stored.work);
+  const people = merged(DEFAULT_PEOPLE_TEXT, stored.people);
+  const cta = merged(DEFAULT_CTA, stored.cta);
+  const journey = Array.isArray(stored.journey) && stored.journey.length
+    ? (stored.journey as typeof JOURNEY) : JOURNEY;
+  const stats = Array.isArray(stored.stats) && stored.stats.length
+    ? (stored.stats as typeof DEFAULT_STATS) : DEFAULT_STATS;
 
   return (
     <>
@@ -198,13 +304,12 @@ export default function AboutPage() {
       <section className="border-b border-stone-line bg-paper-warm">
         <div className="container-site grid items-stretch lg:grid-cols-12 lg:min-h-[26rem]">
           <div className="flex flex-col justify-center py-12 lg:col-span-6 lg:py-16 lg:pr-14">
-            <p className="eyebrow mb-4">About us</p>
+            <p className="eyebrow mb-4">{hero.eyebrow}</p>
             <h1 className="text-balance text-[1.9rem] leading-[1.14] sm:text-[2.3rem] lg:text-[2.6rem]">
-              We design, make, and bring spaces to life.
+              {hero.heading}
             </h1>
             <p className="mt-5 max-w-[46ch] text-[0.975rem] leading-[1.75] text-ink-600">
-              Beyond Walls creates thoughtful signage, spaces and custom pieces by bringing together
-              design thinking, material knowledge and in-house making.
+              {hero.body}
             </p>
             {/*
               A plain anchor, not a router Link. ScrollToTop only fires on a
@@ -218,7 +323,7 @@ export default function AboutPage() {
                 href="#our-story"
                 className="inline-flex items-center gap-2 border border-ink bg-ink px-6 py-3 text-2xs uppercase tracking-architect text-paper transition-colors hover:bg-transparent hover:text-ink"
               >
-                Our story
+                {hero.buttonLabel}
                 <ArrowRight size={13} />
               </a>
             </div>
@@ -281,29 +386,18 @@ export default function AboutPage() {
             <figcaption className="mt-3.5 flex items-baseline gap-3 border-t border-stone-line pt-3.5">
               <span className="text-lg leading-none text-ink">{established}</span>
               <span className="text-xs leading-relaxed text-ink-500">
-                Patel Corporation, Ahmedabad — where it started.
+                {story.photoCaption}
               </span>
             </figcaption>
           </figure>
 
           <div className="lg:col-span-7 lg:pt-1">
-            <p className="eyebrow mb-4">Our story</p>
+            <p className="eyebrow mb-4">{story.eyebrow}</p>
             <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
-              From a small signage business to a design-led brand.
+              {story.heading}
             </h2>
             <div className="mt-6 max-w-[58ch] space-y-4 text-[0.975rem] leading-[1.78] text-ink-600">
-              <p>
-                In 2004 we started as Patel Corporation, an offline signage manufacturing business.
-              </p>
-              <p>
-                For more than two decades we have worked with materials, finishes, spaces and
-                businesses to turn ideas into physical signs. That experience taught us something
-                simple: the right detail can change how a space feels.
-              </p>
-              <p>
-                Now the second generation is carrying that experience forward in a new direction —
-                from making signs to a design-led brand for personal spaces.
-              </p>
+              {story.paragraphs.map((text) => <p key={text}>{text}</p>)}
             </div>
 
             {/*
@@ -317,7 +411,7 @@ export default function AboutPage() {
                 className="absolute left-[5px] top-10 bottom-5 w-px bg-stone-line sm:left-0 sm:right-0 sm:top-[calc(2rem+5px)] sm:bottom-auto sm:h-px sm:w-auto"
               />
               <div className="grid gap-7 sm:grid-cols-2 sm:gap-x-8 lg:grid-cols-4 lg:gap-x-6">
-                {JOURNEY.map((entry) => (
+                {journey.map((entry) => (
                   <li key={entry.marker} className="relative pl-6 sm:pl-0 sm:pt-6">
                     <span
                       aria-hidden="true"
@@ -342,28 +436,17 @@ export default function AboutPage() {
       {/* ------------------------------------------------------------------ */}
       <section className="bg-ink py-10 text-paper lg:py-12">
         <div className="container-site grid gap-8 sm:grid-cols-3 lg:gap-12">
-          <div>
-            {/* Counted from 2004 rather than written down, so it stays true. */}
-            <p className="text-[2rem] leading-none lg:text-[2.5rem]">{years}+</p>
-            <p className="mt-3 text-2xs font-semibold uppercase tracking-architect">Years of making</p>
-            <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-paper/60">
-              Signage manufacturing since 2004, now in its second generation.
-            </p>
-          </div>
-          <div>
-            <p className="text-[2rem] leading-none lg:text-[2.5rem]">In-house</p>
-            <p className="mt-3 text-2xs font-semibold uppercase tracking-architect">Manufacturing</p>
-            <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-paper/60">
-              Production happens at our own facility, from material to finishing.
-            </p>
-          </div>
-          <div>
-            <p className="text-[2rem] leading-none lg:text-[2.5rem]">One roof</p>
-            <p className="mt-3 text-2xs font-semibold uppercase tracking-architect">Design and production</p>
-            <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-paper/60">
-              The people who draw it and the people who make it work together.
-            </p>
-          </div>
+          {stats.map((stat) => (
+            <div key={stat.label}>
+              {/*
+                * Left blank, the first figure counts itself from 2004 rather
+                * than being written down, so it cannot quietly go stale.
+                */}
+              <p className="text-[2rem] leading-none lg:text-[2.5rem]">{stat.value || `${years}+`}</p>
+              <p className="mt-3 text-2xs font-semibold uppercase tracking-architect">{stat.label}</p>
+              <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-paper/60">{stat.text}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -373,19 +456,17 @@ export default function AboutPage() {
       <section className="container-site py-14 lg:py-20">
         <div className="grid gap-9 lg:grid-cols-12 lg:gap-14">
           <div className="lg:col-span-4">
-            <p className="eyebrow mb-4">Why Beyond Walls</p>
+            <p className="eyebrow mb-4">{difference.eyebrow}</p>
             <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
-              Design meets making.
+              {difference.heading}
             </h2>
             <p className="mt-5 max-w-[42ch] text-[0.975rem] leading-[1.78] text-ink-600">
-              We do not stop at how something looks. We understand what happens after the design
-              leaves the screen: the materials, the making, and the challenges that come with
-              turning an idea into a physical product.
+              {difference.body}
             </p>
           </div>
 
           <div className="grid gap-x-8 gap-y-7 sm:grid-cols-2 lg:col-span-8">
-            {DIFFERENCE.map((item, index) => (
+            {difference.items.map((item, index) => (
               <div key={item.title} className="border-t border-stone-line pt-4">
                 <span
                   className="block text-2xs font-medium"
@@ -408,13 +489,13 @@ export default function AboutPage() {
         <div className="container-site">
           <div className="flex flex-wrap items-baseline justify-between gap-x-10 gap-y-3">
             <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
-              A clear journey from idea to your space.
+              {process.heading}
             </h2>
-            <p className="eyebrow">Our process</p>
+            <p className="eyebrow">{process.eyebrow}</p>
           </div>
 
           <ol className="mt-10 grid gap-x-6 gap-y-8 sm:grid-cols-2 lg:mt-12 lg:grid-cols-5">
-            {PROCESS.map((entry, index) => (
+            {process.items.map((entry, index) => (
               <li key={entry.title} className="border-t border-ink/15 pt-5">
                 <span
                   className="block text-xl font-light leading-none"
@@ -438,15 +519,15 @@ export default function AboutPage() {
       <section className="container-site py-14 lg:py-20">
         <div className="mb-8 flex flex-wrap items-baseline justify-between gap-x-10 gap-y-3 lg:mb-10">
           <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
-            Spaces we have made.
+            {work.heading}
           </h2>
           <Link to="/gallery" className="link-underline text-sm text-ink">
-            View the full gallery →
+            {work.linkLabel}
           </Link>
         </div>
 
         <div className="grid grid-cols-2 gap-x-5 gap-y-7 lg:grid-cols-4 lg:gap-x-6">
-          {WORK.map((item) => (
+          {work.items.map((item) => (
             <figure key={item.src} className="group">
               <div className="aspect-[4/5] overflow-hidden bg-paper-warm">
                 <img
@@ -480,19 +561,12 @@ export default function AboutPage() {
         <div className="container-site">
           <div className="grid gap-9 lg:grid-cols-12 lg:gap-14">
             <div className="lg:col-span-4">
-              <p className="eyebrow mb-4">The people behind the work</p>
+              <p className="eyebrow mb-4">{people.eyebrow}</p>
               <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
-                Made by us. Fitted by us.
+                {people.heading}
               </h2>
               <div className="mt-5 max-w-[40ch] space-y-4 text-[0.975rem] leading-[1.78] text-ink-600">
-                <p>
-                  A sign is not finished when it leaves the facility. It is finished when it is on
-                  the wall, level, and looking like the drawing.
-                </p>
-                <p>
-                  So the last step stays with us too. The same studio that draws a piece and makes
-                  it is the one that turns up with the ladder.
-                </p>
+                {people.paragraphs.map((text) => <p key={text}>{text}</p>)}
               </div>
             </div>
 
@@ -507,7 +581,7 @@ export default function AboutPage() {
               caption from stretching its neighbours.
             */}
             <div className="flex flex-col items-start gap-5 sm:flex-row lg:col-span-8 lg:gap-6">
-              {PEOPLE.map((photo) => (
+              {PEOPLE.map((photo, index) => (
                 <figure
                   key={photo.src}
                   className="w-full min-w-0 sm:w-auto"
@@ -527,7 +601,7 @@ export default function AboutPage() {
                     />
                   </div>
                   <figcaption className="mt-3 text-[0.8125rem] text-ink-500">
-                    {photo.caption}
+                    {people.captions[index] || photo.caption}
                   </figcaption>
                 </figure>
               ))}
@@ -542,13 +616,12 @@ export default function AboutPage() {
       <section className="bg-ink py-12 text-paper lg:py-16">
         <div className="container-site flex flex-wrap items-center justify-between gap-7">
           <div>
-            <p className="eyebrow mb-3 text-paper/50">Let us make something</p>
+            <p className="eyebrow mb-3 text-paper/50">{cta.eyebrow}</p>
             <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2rem]">
-              Have a space, sign or idea in mind?
+              {cta.heading}
             </h2>
             <p className="mt-3 max-w-[46ch] text-[0.875rem] leading-relaxed text-paper/65">
-              Send us the sizes, the material and the artwork, and we will come back to you with a
-              quote.
+              {cta.body}
             </p>
           </div>
           {/*
@@ -560,7 +633,7 @@ export default function AboutPage() {
             to="/custom-order"
             className="inline-flex shrink-0 items-center gap-2 border border-paper bg-paper px-6 py-3 text-2xs uppercase tracking-architect text-ink transition-colors hover:bg-transparent hover:text-paper"
           >
-            Start a custom order
+            {cta.buttonLabel}
             <ArrowRight size={13} />
           </Link>
         </div>

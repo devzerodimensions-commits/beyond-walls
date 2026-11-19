@@ -18,7 +18,7 @@ import {
 type Group =
   | 'brand' | 'contact' | 'hours' | 'social' | 'footer'
   | 'announcement' | 'payment' | 'shipping' | 'tax' | 'seo' | 'store' | 'catalog'
-  | 'preview';
+  | 'preview' | 'about';
 
 const GROUPS: { id: Group; label: string; description: string }[] = [
   { id: 'brand', label: 'Brand & logo', description: 'Your logo, name and tagline.' },
@@ -31,6 +31,7 @@ const GROUPS: { id: Group; label: string; description: string }[] = [
   { id: 'store', label: 'Store behaviour', description: 'Wishlist, reviews, checkout and budget filters.' },
   { id: 'catalog', label: 'Product images', description: 'How product photos are shaped across the shop.' },
   { id: 'preview', label: 'Live preview designs', description: 'What each plate design is called.' },
+  { id: 'about', label: 'About page', description: 'Every word on your About page.' },
   { id: 'footer', label: 'Footer', description: 'Footer text and copyright.' },
   { id: 'seo', label: 'SEO defaults', description: 'Titles, descriptions and the canonical site URL.' },
 ];
@@ -107,6 +108,25 @@ export default function AdminSettings() {
   const savedDesigns = (Array.isArray(values['preview.savedDesigns'])
     ? values['preview.savedDesigns']
     : []) as { id: string; name: string; template: string; config: Record<string, unknown> }[];
+
+  /*
+   * The About page is stored as one setting rather than sixty.
+   *
+   * Its sections nest -- a heading with a list of steps under it -- which the
+   * flat key/value settings do not express, and sixty keys would also mean
+   * sixty rows to keep in step with each other. Reading and writing is done a
+   * section at a time, merging rather than replacing, so editing a heading
+   * cannot drop the list beneath it.
+   */
+  const about = (values['about.content'] ?? {}) as Record<string, any>;
+  const aboutSet = (section: string, patch: Record<string, unknown>) =>
+    set('about.content', { ...about, [section]: { ...(about[section] ?? {}), ...patch } });
+  const aboutList = (section: string, rows: unknown[]) =>
+    set('about.content', { ...about, [section]: rows });
+  const aboutItems = (section: string, rows: unknown[]) =>
+    aboutSet(section, { items: rows });
+  /** A section's field, or '' so a box is never given undefined. */
+  const aText = (section: string, field: string) => String(about[section]?.[field] ?? '');
 
   const bool = (key: string) => Boolean(values[key]);
   const num = (key: string) => (values[key] === null || values[key] === undefined ? '' : String(values[key]));
@@ -514,6 +534,223 @@ export default function AdminSettings() {
             </AdminCard>
           ) : null}
           {/* ---- Footer ---- */}
+          {group === 'about' ? (
+            <div className="space-y-6">
+              <AdminCard
+                title="The opening"
+                description="The first thing anyone reads, with the photograph beside it."
+              >
+                <div className="space-y-5">
+                  <Input
+                    label="Small label above the heading" value={aText('hero', 'eyebrow')}
+                    onChange={(e) => aboutSet('hero', { eyebrow: e.target.value })}
+                  />
+                  <Input
+                    label="Heading" value={aText('hero', 'heading')}
+                    onChange={(e) => aboutSet('hero', { heading: e.target.value })}
+                  />
+                  <Textarea
+                    label="Paragraph" rows={3} value={aText('hero', 'body')}
+                    onChange={(e) => aboutSet('hero', { body: e.target.value })}
+                  />
+                  <Input
+                    label="Button" value={aText('hero', 'buttonLabel')}
+                    onChange={(e) => aboutSet('hero', { buttonLabel: e.target.value })}
+                  />
+                </div>
+              </AdminCard>
+
+              <AdminCard title="Your story" description="Beside the 2004 photograph.">
+                <div className="space-y-5">
+                  <Input
+                    label="Small label above the heading" value={aText('story', 'eyebrow')}
+                    onChange={(e) => aboutSet('story', { eyebrow: e.target.value })}
+                  />
+                  <Input
+                    label="Heading" value={aText('story', 'heading')}
+                    onChange={(e) => aboutSet('story', { heading: e.target.value })}
+                  />
+                  <Textarea
+                    label="The story" rows={8}
+                    hint="Leave an empty line between paragraphs."
+                    value={(about.story?.paragraphs ?? []).join('\n\n')}
+                    onChange={(e) => aboutSet('story', {
+                      paragraphs: e.target.value.split(/\n\s*\n/).map((s: string) => s.trim()).filter(Boolean),
+                    })}
+                  />
+                  <Input
+                    label="Caption under the old photograph" value={aText('story', 'photoCaption')}
+                    onChange={(e) => aboutSet('story', { photoCaption: e.target.value })}
+                  />
+                </div>
+              </AdminCard>
+
+              <AdminCard title="The journey" description="The four moments beside your story.">
+                <RowsEditor
+                  rows={about.journey ?? []}
+                  onChange={(rows) => aboutList('journey', rows)}
+                  blank={{ marker: '', title: '', text: '' }}
+                  addLabel="Add a moment"
+                  fields={[
+                    { key: 'marker', label: 'Year or stage', type: 'text' },
+                    { key: 'title', label: 'Title', type: 'text' },
+                    { key: 'text', label: 'Description', type: 'textarea' },
+                  ]}
+                />
+              </AdminCard>
+
+              <AdminCard
+                title="The three figures"
+                description="The dark band. Leave the first figure blank and it counts the years from 2004 by itself."
+              >
+                <RowsEditor
+                  rows={about.stats ?? []}
+                  onChange={(rows) => aboutList('stats', rows)}
+                  blank={{ value: '', label: '', text: '' }}
+                  addLabel="Add a figure"
+                  fields={[
+                    { key: 'value', label: 'The big words', type: 'text' },
+                    { key: 'label', label: 'Underneath', type: 'text' },
+                    { key: 'text', label: 'Description', type: 'textarea' },
+                  ]}
+                />
+              </AdminCard>
+
+              <AdminCard title="Why Beyond Walls" description="The four numbered points.">
+                <div className="space-y-5">
+                  <Input
+                    label="Small label above the heading" value={aText('difference', 'eyebrow')}
+                    onChange={(e) => aboutSet('difference', { eyebrow: e.target.value })}
+                  />
+                  <Input
+                    label="Heading" value={aText('difference', 'heading')}
+                    onChange={(e) => aboutSet('difference', { heading: e.target.value })}
+                  />
+                  <Textarea
+                    label="Paragraph" rows={4} value={aText('difference', 'body')}
+                    onChange={(e) => aboutSet('difference', { body: e.target.value })}
+                  />
+                  <RowsEditor
+                    rows={about.difference?.items ?? []}
+                    onChange={(rows) => aboutItems('difference', rows)}
+                    blank={{ title: '', text: '' }}
+                    addLabel="Add a point"
+                    fields={[
+                      { key: 'title', label: 'Title', type: 'text' },
+                      { key: 'text', label: 'Description', type: 'textarea' },
+                    ]}
+                  />
+                </div>
+              </AdminCard>
+
+              <AdminCard title="How you work" description="The numbered steps from idea to installation.">
+                <div className="space-y-5">
+                  <Input
+                    label="Heading" value={aText('process', 'heading')}
+                    onChange={(e) => aboutSet('process', { heading: e.target.value })}
+                  />
+                  <Input
+                    label="Small label beside the heading" value={aText('process', 'eyebrow')}
+                    onChange={(e) => aboutSet('process', { eyebrow: e.target.value })}
+                  />
+                  <RowsEditor
+                    rows={about.process?.items ?? []}
+                    onChange={(rows) => aboutItems('process', rows)}
+                    blank={{ title: '', text: '' }}
+                    addLabel="Add a step"
+                    fields={[
+                      { key: 'title', label: 'Step', type: 'text' },
+                      { key: 'text', label: 'What happens', type: 'textarea' },
+                    ]}
+                  />
+                </div>
+              </AdminCard>
+
+              <AdminCard title="Spaces you have made" description="The four photographs of finished work.">
+                <div className="space-y-5">
+                  <Input
+                    label="Heading" value={aText('work', 'heading')}
+                    onChange={(e) => aboutSet('work', { heading: e.target.value })}
+                  />
+                  <Input
+                    label="Link to the gallery" value={aText('work', 'linkLabel')}
+                    onChange={(e) => aboutSet('work', { linkLabel: e.target.value })}
+                  />
+                  <RowsEditor
+                    rows={about.work?.items ?? []}
+                    onChange={(rows) => aboutItems('work', rows)}
+                    blank={{ src: '', label: '', name: '' }}
+                    addLabel="Add a piece"
+                    fields={[
+                      { key: 'src', label: 'Photograph', type: 'image' },
+                      { key: 'label', label: 'Kind of space', type: 'text' },
+                      { key: 'name', label: 'What it is', type: 'text' },
+                    ]}
+                  />
+                </div>
+              </AdminCard>
+
+              <AdminCard
+                title="The people behind the work"
+                description="The three installation photographs are part of the design; their captions are yours."
+              >
+                <div className="space-y-5">
+                  <Input
+                    label="Small label above the heading" value={aText('people', 'eyebrow')}
+                    onChange={(e) => aboutSet('people', { eyebrow: e.target.value })}
+                  />
+                  <Input
+                    label="Heading" value={aText('people', 'heading')}
+                    onChange={(e) => aboutSet('people', { heading: e.target.value })}
+                  />
+                  <Textarea
+                    label="Paragraphs" rows={6}
+                    hint="Leave an empty line between paragraphs."
+                    value={(about.people?.paragraphs ?? []).join('\n\n')}
+                    onChange={(e) => aboutSet('people', {
+                      paragraphs: e.target.value.split(/\n\s*\n/).map((s: string) => s.trim()).filter(Boolean),
+                    })}
+                  />
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    {[0, 1, 2].map((i) => (
+                      <Input
+                        key={i}
+                        label={`Caption ${i + 1}`}
+                        value={String(about.people?.captions?.[i] ?? '')}
+                        onChange={(e) => {
+                          const next = [...(about.people?.captions ?? ['', '', ''])];
+                          next[i] = e.target.value;
+                          aboutSet('people', { captions: next });
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </AdminCard>
+
+              <AdminCard title="The closing invitation" description="The dark band at the foot of the page.">
+                <div className="space-y-5">
+                  <Input
+                    label="Small label above the heading" value={aText('cta', 'eyebrow')}
+                    onChange={(e) => aboutSet('cta', { eyebrow: e.target.value })}
+                  />
+                  <Input
+                    label="Heading" value={aText('cta', 'heading')}
+                    onChange={(e) => aboutSet('cta', { heading: e.target.value })}
+                  />
+                  <Textarea
+                    label="Paragraph" rows={3} value={aText('cta', 'body')}
+                    onChange={(e) => aboutSet('cta', { body: e.target.value })}
+                  />
+                  <Input
+                    label="Button" value={aText('cta', 'buttonLabel')}
+                    onChange={(e) => aboutSet('cta', { buttonLabel: e.target.value })}
+                  />
+                </div>
+              </AdminCard>
+            </div>
+          ) : null}
+
           {group === 'footer' ? (
             <AdminCard title="Footer">
               <div className="space-y-5">
@@ -936,6 +1173,81 @@ function BudgetBands({
         onClick={() => onChange([...bands, { slug: '', label: '', min: null, max: null }])}
       >
         + Add band
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * A short list of small records — a journey moment, a step, a finished piece.
+ *
+ * Written here rather than reusing a textarea because the rows are objects:
+ * a textarea renders them as "[object Object]" and, far worse, replaces the
+ * whole list with a flat string the moment anyone types into it.
+ */
+function RowsEditor({
+  rows, onChange, fields, blank, addLabel,
+}: {
+  rows: Record<string, string>[];
+  onChange: (rows: Record<string, string>[]) => void;
+  fields: { key: string; label: string; type: 'text' | 'textarea' | 'image' }[];
+  blank: Record<string, string>;
+  addLabel: string;
+}) {
+  const list = Array.isArray(rows) ? rows : [];
+  const patch = (index: number, key: string, value: string) => {
+    const next = list.map((row, i) => (i === index ? { ...row, [key]: value } : row));
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-4">
+      {list.map((row, index) => (
+        // eslint-disable-next-line react/no-array-index-key
+        <div key={index} className="border border-stone-line p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-2xs uppercase tracking-architect text-ink-400">{index + 1}</span>
+            <button
+              type="button"
+              className="text-2xs text-ink-400 underline underline-offset-2 hover:text-state-danger"
+              onClick={() => onChange(list.filter((_, i) => i !== index))}
+            >
+              Remove
+            </button>
+          </div>
+          <div className="space-y-3">
+            {fields.map((field) => (
+              field.type === 'image' ? (
+                <ImageField
+                  key={field.key}
+                  label={field.label}
+                  folder="photos"
+                  value={row[field.key] ?? ''}
+                  onChange={(url) => patch(index, field.key, url ?? '')}
+                />
+              ) : field.type === 'textarea' ? (
+                <Textarea
+                  key={field.key}
+                  label={field.label}
+                  rows={2}
+                  value={row[field.key] ?? ''}
+                  onChange={(e) => patch(index, field.key, e.target.value)}
+                />
+              ) : (
+                <Input
+                  key={field.key}
+                  label={field.label}
+                  value={row[field.key] ?? ''}
+                  onChange={(e) => patch(index, field.key, e.target.value)}
+                />
+              )
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <Button type="button" size="sm" variant="secondary" onClick={() => onChange([...list, { ...blank }])}>
+        {addLabel}
       </Button>
     </div>
   );

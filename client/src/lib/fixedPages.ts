@@ -17,10 +17,9 @@
  * draw their own blocks and are edited normally. About is the only one.
  */
 export const FIXED_LAYOUT_PAGES: Record<string, string> = {
-  about: 'The About page has its own design, with the words and photographs drawn into it. '
-    + 'The blocks below are left over from an earlier version and are not shown on the website — '
-    + 'changing them here will not change the page. The page title and the search-engine fields '
-    + 'are still read from here.',
+  about: 'The About page has its own design, so it is not built from these blocks — the ones below '
+    + 'are left over from an earlier version and are not shown on the website. Its words are edited '
+    + 'in Settings → About page, and the page title and search-engine fields are still read from here.',
 };
 
 /** The explanation for a page the editor cannot change, or null if it can. */

@@ -34,6 +34,172 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
    */
   { key: 'brand.color', group: 'brand', label: 'Brand colour', value: '#0E7A57' },
 
+  // --- About page ------------------------------------------------------------
+  /*
+   * The words on /about.
+   *
+   * That page is laid out by hand rather than built from section blocks, so
+   * its text used to live in the component and could not be changed without a
+   * developer. The layout still belongs to the design; only the words and the
+   * captions are kept here, which is the part a studio actually rewrites.
+   *
+   * The default below is the page exactly as it was written, so nothing moves
+   * until somebody edits it. The component keeps its own copy as a fallback:
+   * if this ever arrives empty or malformed, the page still reads properly
+   * rather than rendering a column of blanks.
+   */
+  { key: 'about.content', group: 'about', label: 'About page text', value: {
+    "hero": {
+      "eyebrow": "About us",
+      "heading": "We design, make, and bring spaces to life.",
+      "body": "Beyond Walls creates thoughtful signage, spaces and custom pieces by bringing together design thinking, material knowledge and in-house making.",
+      "buttonLabel": "Our story"
+    },
+    "story": {
+      "eyebrow": "Our story",
+      "heading": "From a small signage business to a design-led brand.",
+      "photoCaption": "Patel Corporation, Ahmedabad — where it started.",
+      "paragraphs": [
+        "In 2004 we started as Patel Corporation, an offline signage manufacturing business.",
+        "For more than two decades we have worked with materials, finishes, spaces and businesses to turn ideas into physical signs. That experience taught us something simple: the right detail can change how a space feels.",
+        "Now the second generation is carrying that experience forward in a new direction — from making signs to a design-led brand for personal spaces."
+      ]
+    },
+    "journey": [
+      {
+        "marker": "2004",
+        "title": "Patel Corporation",
+        "text": "An offline signage manufacturing business in Ahmedabad, making signs for other businesses."
+      },
+      {
+        "marker": "Two decades",
+        "title": "Materials and making",
+        "text": "Years of brass, acrylic and the finishes around them, and of learning how each behaves in a real space."
+      },
+      {
+        "marker": "Second generation",
+        "title": "A new direction",
+        "text": "The next generation takes two decades of manufacturing experience and points it at design."
+      },
+      {
+        "marker": "Today",
+        "title": "Beyond Walls",
+        "text": "A design-led brand for personal spaces — drawn, made and fitted by the same studio."
+      }
+    ],
+    "stats": [
+      {
+        "value": "",
+        "label": "Years of making",
+        "text": "Signage manufacturing since 2004, now in its second generation."
+      },
+      {
+        "value": "In-house",
+        "label": "Manufacturing",
+        "text": "Production happens at our own facility, from material to finishing."
+      },
+      {
+        "value": "One roof",
+        "label": "Design and production",
+        "text": "The people who draw it and the people who make it work together."
+      }
+    ],
+    "difference": {
+      "eyebrow": "Why Beyond Walls",
+      "heading": "Design meets making.",
+      "body": "We do not stop at how something looks. We understand what happens after the design leaves the screen: the materials, the making, and the challenges that come with turning an idea into a physical product.",
+      "items": [
+        {
+          "title": "Design-led thinking",
+          "text": "We approach a piece with a design mindset — the space, the material, the purpose."
+        },
+        {
+          "title": "Materials and finishes",
+          "text": "Two decades of working out how materials behave, and how they perform in a real space."
+        },
+        {
+          "title": "Made in-house",
+          "text": "Production happens at our own facility, so quality, finish and timing stay with us."
+        },
+        {
+          "title": "Design and making together",
+          "text": "Our design experience creates with intention. Our manufacturing experience makes it work."
+        }
+      ]
+    },
+    "process": {
+      "eyebrow": "Our process",
+      "heading": "A clear journey from idea to your space.",
+      "items": [
+        {
+          "title": "Understand",
+          "text": "We listen, and work out the idea behind the request — the space it is going into, and what it has to do once it is there."
+        },
+        {
+          "title": "Design",
+          "text": "Every piece begins as an idea, brought to life digitally first: the design, the proportions and the details."
+        },
+        {
+          "title": "Prototype",
+          "text": "Smaller versions of the design, made to understand how it looks, how it feels and how it comes together."
+        },
+        {
+          "title": "Produce",
+          "text": "Production begins at our in-house facility. From choosing the material to assembly and finishing."
+        },
+        {
+          "title": "Install",
+          "text": "The finished piece is fitted on site by our own team, so how it sits on the wall is part of the work."
+        }
+      ]
+    },
+    "work": {
+      "heading": "Spaces we have made.",
+      "linkLabel": "View the full gallery →",
+      "items": [
+        {
+          "src": "/uploads/photos/bw-photo-11.webp",
+          "label": "Residential",
+          "name": "Shridha, acrylic and brass"
+        },
+        {
+          "src": "/uploads/photos/bw-photo-06.webp",
+          "label": "Commercial",
+          "name": "Company plates, brass"
+        },
+        {
+          "src": "/uploads/photos/bw-photo-05.webp",
+          "label": "Apartment",
+          "name": "Door number, brass on black"
+        },
+        {
+          "src": "/uploads/photos/bw-photo-03.webp",
+          "label": "Interior",
+          "name": "Door number, 405"
+        }
+      ]
+    },
+    "people": {
+      "eyebrow": "The people behind the work",
+      "heading": "Made by us. Fitted by us.",
+      "paragraphs": [
+        "A sign is not finished when it leaves the facility. It is finished when it is on the wall, level, and looking like the drawing.",
+        "So the last step stays with us too. The same studio that draws a piece and makes it is the one that turns up with the ladder."
+      ],
+      "captions": [
+        "Rasik Vatika, on the day.",
+        "Going up.",
+        "The same sign, finished."
+      ]
+    },
+    "cta": {
+      "eyebrow": "Let us make something",
+      "heading": "Have a space, sign or idea in mind?",
+      "body": "Send us the sizes, the material and the artwork, and we will come back to you with a quote.",
+      "buttonLabel": "Start a custom order"
+    }
+  } },
+
   // --- Contact ---------------------------------------------------------------
   { key: 'contact.phone', group: 'contact', label: 'Phone', value: '+91 7600738785' },
   { key: 'contact.whatsapp', group: 'contact', label: 'WhatsApp number', value: '+91 7600738785' },
@@ -257,7 +423,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
 const PUBLIC_GROUPS = new Set([
   'brand', 'contact', 'hours', 'social', 'footer', 'announcement',
-  'payment', 'shipping', 'tax', 'seo', 'store', 'catalog', 'preview',
+  'payment', 'shipping', 'tax', 'seo', 'store', 'catalog', 'preview', 'about',
 ]);
 
 /** Keys that must never be exposed to the storefront. */
