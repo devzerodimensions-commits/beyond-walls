@@ -6,11 +6,31 @@ import { formatPrice, toNumber } from '../../lib/format';
 import { FieldWrap, Input, Select, Spinner, Textarea, UploadIcon, CloseIcon } from '../ui';
 import { fontStack } from './LivePreview';
 
+/** One colour a product offers: the stored value, its name and its swatch. */
+export interface PaletteChoice {
+  value: string;
+  label: string;
+  hex: string;
+}
+
 interface Props {
   fields: PersonalizationField[];
   values: Record<string, string>;
   errors?: Record<string, string>;
   onChange: (key: string, value: string) => void;
+  /**
+   * The product's own colour lists, used when a colour question carries none
+   * of its own.
+   *
+   * There were two places a product's colours could be written down -- the
+   * question's options and the preview's palette -- and only the first was
+   * ever shown to a customer. Setting up the palette, which is where the
+   * admin panel invites you to record a product's finishes, left the customer
+   * looking at an empty row of swatches and no way to tell why. The palette
+   * now stands in wherever a question has nothing of its own, so filling in
+   * either one works.
+   */
+  palette?: { plate: PaletteChoice[]; text: PaletteChoice[] };
 }
 
 /** Renders the admin-defined personalization fields for a product. */
@@ -100,7 +120,7 @@ function groupOf(field: PersonalizationField): (typeof GROUPS)[number]['key'] {
   return field.previewSlot ? 'says' : 'extra';
 }
 
-export function PersonalizationForm({ fields, values, errors = {}, onChange }: Props) {
+export function PersonalizationForm({ fields, values, errors = {}, onChange, palette }: Props) {
   const active = fields.filter((f) => f.status === 'PUBLISHED').sort((a, b) => a.sortOrder - b.sortOrder);
   if (!active.length) return null;
 
@@ -110,6 +130,7 @@ export function PersonalizationForm({ fields, values, errors = {}, onChange }: P
       field={field}
       value={values[field.key] ?? ''}
       error={errors[field.key]}
+      palette={palette}
       onChange={(value) => onChange(field.key, value)}
     />
   );
@@ -146,12 +167,13 @@ function priceSuffix(delta: number | string | undefined): string {
 }
 
 function PersonalizationInput({
-  field, value, error, onChange,
+  field, value, error, onChange, palette,
 }: {
   field: PersonalizationField;
   value: string;
   error?: string;
   onChange: (value: string) => void;
+  palette?: { plate: PaletteChoice[]; text: PaletteChoice[] };
 }) {
   const label = `${field.label}${priceSuffix(field.priceDelta)}`;
   // Whether an answer is compulsory is the admin's call, field by field, and
@@ -244,11 +266,32 @@ function PersonalizationInput({
         </FieldWrap>
       );
 
-    case 'COLOR':
+    case 'COLOR': {
+      /*
+       * The question's own options, or the product's palette when it has
+       * none. Which palette depends on what the question drives: a question
+       * bound to the plate offers plate colours, one bound to the lettering
+       * offers lettering colours. A question bound to neither has only its
+       * own options to go on.
+       */
+      const fallback = field.previewSlot === 'plateColor'
+        ? palette?.plate
+        : field.previewSlot === 'textColor'
+          ? palette?.text
+          : undefined;
+      const choices = field.options.length
+        ? field.options
+        : (fallback ?? []).map((entry) => ({
+          value: entry.value,
+          label: entry.label,
+          hex: entry.hex,
+          priceDelta: 0,
+        }));
+
       return (
         <FieldWrap label={label} required={required} error={error} hint={field.helpText ?? undefined}>
           <div className="flex flex-wrap gap-2.5">
-            {field.options.map((opt) => {
+            {choices.map((opt) => {
               const selected = value === opt.value;
               return (
                 <button
@@ -275,6 +318,7 @@ function PersonalizationInput({
           </div>
         </FieldWrap>
       );
+    }
 
     case 'FONT':
       return (

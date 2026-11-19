@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { PersonalizationField } from '../../lib/types';
-import { LivePreview, buildPreviewSlots } from '../product/LivePreview';
+import { LivePreview, buildPreviewSlots, resolvePreviewConfig } from '../product/LivePreview';
 import { PersonalizationForm } from '../product/PersonalizationForm';
 
 /**
@@ -48,6 +48,7 @@ export function CustomerPreview({
             <PersonalizationForm
               fields={published}
               values={values}
+              palette={resolvePreviewConfig(template, config).palette}
               onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
             />
           </div>

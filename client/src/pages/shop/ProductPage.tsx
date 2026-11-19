@@ -11,7 +11,7 @@ import { useCart, useSettings, useToast, useWishlist } from '../../context/Store
 import { useRecentlyViewed } from '../../hooks/useRecentlyViewed';
 import { ProductCard, ProductGrid } from '../../components/product/ProductCard';
 import { GalleryBadges, ProductGallery } from '../../components/product/ProductGallery';
-import { LivePreview, buildPreviewSlots } from '../../components/product/LivePreview';
+import { LivePreview, buildPreviewSlots, resolvePreviewConfig } from '../../components/product/LivePreview';
 import {
   PersonalizationForm,
   defaultPersonalizationValues,
@@ -151,6 +151,16 @@ export default function ProductPage() {
   const saved = isWishlisted(product.id);
   const wishlistEnabled = get<boolean>('store.enableWishlist', true);
   const previewSlots = buildPreviewSlots(fields, values);
+  /*
+   * The colours this product sells, for any colour question that carries none
+   * of its own. Resolved the same way the preview resolves them, so the
+   * swatches a customer picks from and the colours the plate is drawn in can
+   * never be two different lists.
+   */
+  const previewPalette = resolvePreviewConfig(
+    product?.livePreviewTemplate ?? null,
+    (product?.livePreviewConfig ?? null) as Record<string, unknown> | null,
+  ).palette;
 
   const shareProduct = async () => {
     const url = `${window.location.origin}/product/${product.slug}`;
@@ -474,6 +484,7 @@ export default function ProductPage() {
                       an asterisk are the ones we cannot make it without.
                     </p>
                     <PersonalizationForm
+                      palette={previewPalette}
                       fields={fields}
                       values={values}
                       errors={errors}
@@ -854,6 +865,7 @@ export default function ProductPage() {
             ) : null}
 
             <PersonalizationForm
+              palette={previewPalette}
               fields={fields}
               values={values}
               errors={errors}
