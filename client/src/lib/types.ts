@@ -39,7 +39,8 @@ export type SectionType =
   | 'SHOP_BY_ATTRIBUTE' | 'PERSONALISATION_DEMO'
   | 'SECTION_HEADING' | 'IMAGE_TEXT' | 'CONTACT_BLOCK'
   | 'PAGE_HERO' | 'STEPS'
-  | 'GUIDED_FINDER' | 'PRODUCT_RAIL';
+  | 'GUIDED_FINDER' | 'PRODUCT_RAIL'
+  | 'VIDEO';
 
 export interface User {
   id: string;

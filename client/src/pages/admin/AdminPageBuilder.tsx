@@ -7,7 +7,7 @@ import type { ContentStatus, HomeSection, SectionType } from '../../lib/types';
 import { useToast } from '../../context/StoreProvider';
 import { useAdminTheme } from '../../lib/adminTheme';
 import { ImageField, ProductPicker } from '../../components/admin/AdminKit';
-import { SectionRenderer } from '../../components/home/Sections';
+import { SectionRenderer, SPACE_STEPS } from '../../components/home/Sections';
 import {
   ArrowRight, Badge, Button, ChevronDown, CloseIcon, ConfirmDialog, CopyIcon, DragIcon, EyeIcon,
   Input, PageLoader, PlusIcon, SearchIcon, Select, Textarea, TrashIcon,
@@ -1056,6 +1056,39 @@ function SectionFields({
               );
           }
         })}
+      </div>
+
+      {/*
+        * Room around the block, offered on every block rather than listed in
+        * each widget: "these two sit too close together" is a complaint about
+        * any two blocks, and a studio should not have to find out which kinds
+        * happen to support it.
+        */}
+      <div className="mt-8 border-t border-stone-line pt-6">
+        <p className="text-2xs uppercase tracking-architect text-ink">Room around this block</p>
+        <p className="mb-4 mt-1 text-2xs leading-relaxed text-ink-400">
+          Every block already has the spacing the design gives it. These nudge it.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Select
+            label="Space above"
+            value={String(config.spaceTop ?? '')}
+            options={SPACE_STEPS.map((step) => ({ value: step.value, label: step.label }))}
+            onChange={(e) => commit(
+              { key: 'spaceTop', label: 'Space above', type: 'select', inConfig: true },
+              e.target.value,
+            )}
+          />
+          <Select
+            label="Space below"
+            value={String(config.spaceBottom ?? '')}
+            options={SPACE_STEPS.map((step) => ({ value: step.value, label: step.label }))}
+            onChange={(e) => commit(
+              { key: 'spaceBottom', label: 'Space below', type: 'select', inConfig: true },
+              e.target.value,
+            )}
+          />
+        </div>
       </div>
 
       {widget.manages === 'faqs' ? <FaqEditor /> : null}

@@ -256,7 +256,20 @@ export const WIDGETS: WidgetDefinition[] = [
     name: 'Section title',
     description: 'A heading and a line of text, with nothing else.',
     group: 'Layout',
-    fields: [...HEADED, ALIGN],
+    fields: [
+      ...HEADED,
+      ALIGN,
+      {
+        key: 'variant',
+        label: 'Treatment',
+        type: 'select',
+        inConfig: true,
+        options: [
+          { value: '', label: 'Standard' },
+          { value: 'statement', label: 'Statement — large, with rules above and below' },
+        ],
+      },
+    ],
     defaults: { title: 'A section heading' },
   },
 
@@ -367,9 +380,69 @@ export const WIDGETS: WidgetDefinition[] = [
           { value: 'right', label: 'Right' },
         ],
       },
+      /*
+       * The shape of the picture, which the storefront has always honoured and
+       * the editor never offered. Without it every image in this block was cut
+       * to 4:3 whatever shape it really was, and the only way to change that
+       * was to write the setting into the database by hand.
+       */
+      {
+        key: 'ratio',
+        label: 'Picture shape',
+        type: 'select',
+        inConfig: true,
+        hint: 'Natural keeps the picture exactly as it was taken.',
+        options: [
+          { value: 'landscape', label: 'Landscape (4:3)' },
+          { value: 'portrait', label: 'Portrait (4:5)' },
+          { value: 'square', label: 'Square' },
+          { value: 'auto', label: 'Natural — do not crop' },
+        ],
+      },
+      {
+        key: 'variant',
+        label: 'Size on the page',
+        type: 'select',
+        inConfig: true,
+        options: [
+          { value: '', label: 'Standard' },
+          { value: 'editorial', label: 'Roomier — wider picture, more space' },
+        ],
+      },
       ...CTA,
     ],
-    defaults: { title: 'A heading', config: { imageSide: 'left' } },
+    defaults: { title: 'A heading', config: { imageSide: 'left', ratio: 'landscape' } },
+  },
+  {
+    type: 'VIDEO',
+    name: 'Video',
+    description: 'A film: YouTube, Vimeo, or a file you upload.',
+    group: 'Content',
+    fields: [
+      EYEBROW,
+      TITLE,
+      BODY,
+      {
+        key: 'video',
+        label: 'Video link',
+        type: 'text',
+        inConfig: true,
+        placeholder: 'https://www.youtube.com/watch?v=…',
+        hint: 'A YouTube or Vimeo link, or an uploaded .mp4. Nothing plays on its own.',
+      },
+      {
+        key: 'ratio',
+        label: 'Shape',
+        type: 'select',
+        inConfig: true,
+        options: [
+          { value: 'wide', label: 'Wide (16:9)' },
+          { value: 'square', label: 'Square' },
+          { value: 'tall', label: 'Tall (9:16) — for a phone film' },
+        ],
+      },
+    ],
+    defaults: { title: '', config: { ratio: 'wide' } },
   },
   {
     type: 'GALLERY',
@@ -425,6 +498,16 @@ export const WIDGETS: WidgetDefinition[] = [
         itemFields: [
           { key: 'title', label: 'Short heading', type: 'text' },
           { key: 'text', label: 'One line about it', type: 'textarea' },
+        ],
+      },
+      {
+        key: 'variant',
+        label: 'Treatment',
+        type: 'select',
+        inConfig: true,
+        options: [
+          { value: '', label: 'Standard — a thin strip' },
+          { value: 'feature', label: 'Roomier — a tinted band with larger type' },
         ],
       },
     ],

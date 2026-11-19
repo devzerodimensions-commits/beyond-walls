@@ -1,0 +1,13 @@
+-- A video block for the page builder.
+--
+-- The studio can already put a video on a product; it could not put one on a
+-- page, which is the place a film of a piece being made or fitted actually
+-- belongs. Everything needed to play one was already here -- the resolver that
+-- turns a YouTube, Vimeo or uploaded link into something playable is the same
+-- one the product gallery uses -- so all that was missing was somewhere on a
+-- page to put it.
+--
+-- Additive and safe to re-run: adding a value to an enum cannot affect a row
+-- that does not use it, and IF NOT EXISTS makes a second run a no-op. Nothing
+-- reads 'VIDEO' until a studio adds such a block.
+ALTER TYPE "SectionType" ADD VALUE IF NOT EXISTS 'VIDEO';

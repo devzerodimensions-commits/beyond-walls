@@ -1489,13 +1489,113 @@ export function ProductRail({ section }: { section: HomeSection }) {
 }
 
 /**
+ * A film on a page.
+ *
+ * The link is resolved by the same reader the product gallery uses, so a
+ * YouTube, Vimeo or uploaded file all behave the same way here as they do
+ * there. Nothing autoplays: a video that starts by itself while somebody is
+ * reading is an ambush, and on a phone it is an ambush that costs them data.
+ *
+ * A link that cannot be played draws nothing at all rather than an empty black
+ * rectangle -- on the live page that is the honest outcome, and in the editor
+ * the field's own hint says what will play.
+ */
+export function VideoSection({ section }: { section: HomeSection }) {
+  const config = (section.config ?? {}) as { video?: string; ratio?: string; eyebrow?: string };
+  const video = resolveVideo(config.video);
+
+  const shape = {
+    wide: 'aspect-video',
+    square: 'aspect-square',
+    tall: 'aspect-[9/16] mx-auto max-w-sm',
+  }[config.ratio ?? 'wide'] ?? 'aspect-video';
+
+  if (!video) return null;
+
+  return (
+    <section className="container-site py-14 lg:py-20">
+      {config.eyebrow ? <p className="eyebrow mb-3">{config.eyebrow}</p> : null}
+      {section.title ? (
+        <h2 className="text-balance text-[1.55rem] leading-tight sm:text-[1.8rem] lg:text-[2.05rem]">
+          {section.title}
+        </h2>
+      ) : null}
+      {section.bodyText ? (
+        <p className="mt-4 max-w-[58ch] text-[0.975rem] leading-[1.78] text-ink-600">
+          {section.bodyText}
+        </p>
+      ) : null}
+
+      <div className={clsx('mt-7 overflow-hidden bg-ink', shape)}>
+        {video.kind === 'file' ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video src={video.src} controls playsInline className="h-full w-full object-contain" />
+        ) : (
+          <iframe
+            src={video.src}
+            title={section.title || 'Video'}
+            loading="lazy"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="h-full w-full border-0"
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * How much room a block is given above and below it.
+ *
+ * Steps rather than a box to type a number into. Every block already carries
+ * the spacing the design gives it, and what a studio wants is "these two are
+ * too close together", not 73 pixels: a free number is a way to break the
+ * page's rhythm one block at a time, and it cannot be undone by eye
+ * afterwards. Five steps either side of "as designed" covers the real
+ * complaint and always lands back on the scale the rest of the site uses.
+ *
+ * Shrinking is bounded well inside a section's own padding, so the tightest
+ * setting closes a gap rather than letting two blocks overlap.
+ */
+export const SPACE_STEPS = [
+  { value: 'much-less', label: 'Much less', rem: -2.5 },
+  { value: 'less', label: 'A little less', rem: -1.25 },
+  { value: '', label: 'As designed', rem: 0 },
+  { value: 'more', label: 'A little more', rem: 1.5 },
+  { value: 'much-more', label: 'Much more', rem: 3.5 },
+] as const;
+
+const spaceRem = (value: unknown): number =>
+  SPACE_STEPS.find((step) => step.value === String(value ?? ''))?.rem ?? 0;
+
+/**
  * Dispatches a section to its renderer.
  *
  * Shared by the homepage, every content page and the admin page builder, so the
- * builder's preview is the real thing rather than an approximation of it.
+ * builder's preview is the real thing rather than an approximation of it --
+ * which is also why the spacing is applied here and not in the editor: what
+ * the studio nudges is the page itself, not a drawing of it.
  */
 export function SectionRenderer({ section }: { section: HomeSection }) {
+  const config = (section.config ?? {}) as Record<string, unknown>;
+  const top = spaceRem(config.spaceTop);
+  const bottom = spaceRem(config.spaceBottom);
+
+  const body = renderSection(section);
+  if (!top && !bottom) return body;
+
+  return (
+    <div style={{ marginTop: `${top}rem`, marginBottom: `${bottom}rem` }}>
+      {body}
+    </div>
+  );
+}
+
+function renderSection(section: HomeSection) {
   switch (section.type) {
+    case 'VIDEO':
+      return <VideoSection section={section} />;
     case 'HERO':
       return <HeroSection section={section} />;
     case 'USP_STRIP':

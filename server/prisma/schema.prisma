@@ -157,6 +157,8 @@ enum SectionType {
   // and a row of products that scrolls sideways instead of down.
   GUIDED_FINDER
   PRODUCT_RAIL
+  // A film on a page: YouTube, Vimeo, or a file the studio uploads.
+  VIDEO
 }
 
 enum BannerPlacement {
