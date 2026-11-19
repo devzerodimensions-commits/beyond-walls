@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -14,6 +14,7 @@ import { GalleryBadges, ProductGallery } from '../../components/product/ProductG
 import {
   LivePreview, buildPreviewSlots, previewScript, resolvePreviewConfig,
 } from '../../components/product/LivePreview';
+import { SavePreview } from '../../components/product/SavePreview';
 import { ReviewForm } from '../../components/product/ReviewForm';
 import {
   PersonalizationForm,
@@ -171,6 +172,15 @@ export default function ProductPage() {
    * buying one has a keyboard for it.
    */
   const script = previewScript(previewSettings);
+
+  /*
+   * The two previews on this page are saved separately rather than sharing
+   * one reference: both are mounted at once on a tablet, and whichever
+   * mounted last would otherwise be the one that got saved, which on a phone
+   * is the sheet the customer cannot see.
+   */
+  const previewRef = useRef<HTMLDivElement>(null);
+  const sheetPreviewRef = useRef<HTMLDivElement>(null);
 
   const shareProduct = async () => {
     const url = `${window.location.origin}/product/${product.slug}`;
@@ -342,13 +352,18 @@ export default function ProductPage() {
                   <p className="eyebrow text-ink">Your plate</p>
                   <p className="text-2xs text-ink-400">Updates as you type</p>
                 </div>
-                <LivePreview
-                  template={product.livePreviewTemplate}
-                  config={product.livePreviewConfig}
-                  slots={previewSlots}
-                  // The strip above already says what this is.
-                  hideLabel
-                />
+                <div ref={previewRef}>
+                  <LivePreview
+                    template={product.livePreviewTemplate}
+                    config={product.livePreviewConfig}
+                    slots={previewSlots}
+                    // The strip above already says what this is.
+                    hideLabel
+                  />
+                </div>
+                <div className="px-4 pb-4">
+                  <SavePreview target={previewRef} name={product.name} />
+                </div>
               </div>
             ) : null}
           </div>
@@ -874,12 +889,15 @@ export default function ProductPage() {
 
             {/* The plate updates as they type, which is the whole point. */}
             {product.livePreviewEnabled ? (
-              <LivePreview
-                template={product.livePreviewTemplate}
-                config={product.livePreviewConfig}
-                slots={previewSlots}
-                className="mb-6 border border-stone-line"
-              />
+              <div ref={sheetPreviewRef} className="mb-2">
+                <LivePreview
+                  template={product.livePreviewTemplate}
+                  config={product.livePreviewConfig}
+                  slots={previewSlots}
+                  className="border border-stone-line"
+                />
+                <SavePreview target={sheetPreviewRef} name={product.name} />
+              </div>
             ) : null}
 
             <PersonalizationForm

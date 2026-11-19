@@ -119,7 +119,7 @@ const FONT_STACKS: Record<string, string> = Object.fromEntries(
 );
 
 const PLATE_FONT_STYLESHEET_ID = 'bw-plate-fonts';
-const PLATE_FONT_STYLESHEET =
+export const PLATE_FONT_STYLESHEET =
   'https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Great+Vibes&family=Jost:wght@300;400;500&family=Petit+Formal+Script&family=Yatra+One&display=swap';
 
 function usePlateFonts() {
@@ -505,7 +505,15 @@ export function LivePreview({
       {hideLabel ? null : (
         <span className="eyebrow absolute left-4 top-4 text-ink-300">Live preview</span>
       )}
-      {body}
+      {/*
+        * Marked so the plate can be found again.
+        *
+        * Saving the preview has to pick the drawing out of the page, and
+        * "the first svg inside" is not it: an icon anywhere above it wins,
+        * and what gets saved is a 24-pixel glyph. The drawing says which one
+        * it is rather than leaving the saver to guess.
+        */}
+      <div data-plate="">{body}</div>
       {resolved.caption && !hideCaption ? (
         <p className="mt-4 text-center text-2xs text-ink-400">{resolved.caption}</p>
       ) : null}
