@@ -332,6 +332,21 @@ export default function AdminProductEdit() {
   const parentCategories = categoriesQuery.data ?? [];
   const subcategories = parentCategories.find((c) => c.id === form.categoryId)?.children ?? [];
 
+  /*
+   * Whether a customer could actually buy this right now.
+   *
+   * Stock only counts when the product is counting it: a made-to-order plate
+   * is cut when the order arrives, so its stock number is ignored everywhere
+   * and must be ignored here too. With sizes, it is sold out only when every
+   * size a customer can see is sold out.
+   */
+  const sellable = (product?.variants ?? []).filter((v) => v.status === 'PUBLISHED');
+  const cannotBeBought = form.status === 'PUBLISHED' && form.trackInventory && (
+    sellable.length
+      ? sellable.every((v) => (v.stock ?? 0) <= 0)
+      : (form.stock ?? 0) <= 0
+  );
+
   return (
     <>
       <AdminPageHeader
@@ -375,6 +390,18 @@ export default function AdminProductEdit() {
           <Badge tone="warning">Price not confirmed</Badge>
         ) : null}
         {form.livePreviewEnabled ? <Badge tone="info">Live preview on</Badge> : null}
+        {/*
+          * Said here, where it is caused, not only out on the shop.
+          *
+          * A product that counts stock and has none is published, priced and
+          * complete, and the shop quietly refuses to sell it -- the buy bar is
+          * not drawn at all, because there is nothing to buy. Everything in
+          * the editor looked right, so the only way to find out was to open
+          * the shop and notice something missing, which nobody does.
+          */}
+        {cannotBeBought ? (
+          <Badge tone="danger">No stock — customers cannot buy it</Badge>
+        ) : null}
         {!isNew ? (
           <span className="ml-auto font-mono text-2xs text-ink-300">/product/{form.slug}</span>
         ) : null}
@@ -659,7 +686,13 @@ export default function AdminProductEdit() {
             loading={save.isPending}
             onContinue={() => save.mutate({ publish: false, continueTo: 'variants' })}
           />
-        ) : <VariantsTab productId={id!} variants={product?.variants ?? []} />
+        ) : (
+          <VariantsTab
+            productId={id!}
+            variants={product?.variants ?? []}
+            countsStock={form.trackInventory}
+          />
+        )
       ) : null}
 
       {/* ---------------- Personalisation ---------------- */}
@@ -1724,7 +1757,21 @@ const EMPTY_VARIANT: VariantDraft = {
   label: '', sku: '', price: null, stock: 0, isDefault: false, status: 'PUBLISHED', options: [],
 };
 
-function VariantsTab({ productId, variants }: { productId: string; variants: ProductVariant[] }) {
+function VariantsTab({
+  productId, variants, countsStock,
+}: {
+  productId: string;
+  variants: ProductVariant[];
+  /**
+   * Whether this product counts stock.
+   *
+   * When it does not, every stock figure on every size is ignored by the shop,
+   * so showing them is worse than useless: it invites a shopkeeper to set a
+   * number that changes nothing, and to read "stock 0" as a fault when there
+   * is none.
+   */
+  countsStock: boolean;
+}) {
   const queryClient = useQueryClient();
   const { push } = useToast();
   const [editing, setEditing] = useState<VariantDraft | null>(null);
@@ -1797,8 +1844,15 @@ function VariantsTab({ productId, variants }: { productId: string; variants: Pro
                   </p>
                   <p className="mt-0.5 text-2xs text-ink-400">
                     {variant.sku ? `${variant.sku} · ` : ''}
-                    {variant.price !== null ? `₹${variant.price}` : 'Uses product price'} · stock {variant.stock}
+                    {variant.price !== null ? `₹${variant.price}` : 'Same price as the product'}
+                    {countsStock ? ` · ${variant.stock} in stock` : ' · made to order'}
                   </p>
+                  {countsStock && (variant.stock ?? 0) <= 0 ? (
+                    <p className="mt-1 text-2xs text-state-danger">
+                      Customers cannot choose this — give it a stock number, or turn off
+                      “Track inventory” on the Price &amp; stock tab.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex gap-1">
                   <button
@@ -1847,6 +1901,7 @@ function VariantsTab({ productId, variants }: { productId: string; variants: Pro
         {editing ? (
           <VariantForm
             draft={editing}
+            countsStock={countsStock}
             saving={save.isPending}
             onCancel={() => setEditing(null)}
             onSubmit={(draft) => save.mutate(draft)}
@@ -1867,9 +1922,11 @@ function VariantsTab({ productId, variants }: { productId: string; variants: Pro
 }
 
 function VariantForm({
-  draft, saving, onSubmit, onCancel,
+  draft, saving, onSubmit, onCancel, countsStock,
 }: {
   draft: VariantDraft;
+  /** Whether the product counts stock; see VariantsTab. */
+  countsStock: boolean;
   saving: boolean;
   onSubmit: (draft: VariantDraft) => void;
   onCancel: () => void;
@@ -1884,29 +1941,53 @@ function VariantForm({
       }}
       className="space-y-5"
     >
+      {/*
+        * Named for what they do, not for what the database calls them.
+        *
+        * "Label", "SKU" and "Default selection" are schema words. A shopkeeper
+        * adding a second size has to guess at every one of them, and the
+        * guesses are consequential: the field that reads as least important --
+        * stock -- is the one that silently stops the size being sold.
+        */}
       <Input
-        label="Label" required value={form.label}
+        label="Name of this choice" required value={form.label}
         placeholder="e.g. 12 x 6 inches — Acrylic"
-        hint="This is what the customer picks on the product page."
+        hint="Exactly as the customer will see it on the product page."
         onChange={(e) => setForm({ ...form, label: e.target.value })}
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Input label="SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+      <div className={clsx('grid gap-4', countsStock ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+        <Input
+          label="Your own code" value={form.sku}
+          hint="Optional. Only you see this."
+          onChange={(e) => setForm({ ...form, sku: e.target.value })}
+        />
         <Input
           type="number" label="Price (₹)" value={form.price ?? ''}
-          hint="Blank = product price"
+          hint="Leave empty to use the product's price."
           onChange={(e) => setForm({ ...form, price: e.target.value === '' ? null : Number(e.target.value) })}
         />
-        <Input
-          type="number" label="Stock" value={form.stock ?? ''}
-          onChange={(e) => setForm({ ...form, stock: e.target.value === '' ? null : Number(e.target.value) })}
-        />
+        {/*
+          * Shown only where it is read. With stock counting off the shop
+          * ignores this figure entirely, and a 0 sitting in the form reads as
+          * a fault when nothing is wrong.
+          */}
+        {countsStock ? (
+          <Input
+            type="number" label="How many in stock" value={form.stock ?? ''}
+            hint="0 means customers cannot choose it."
+            onChange={(e) => setForm({ ...form, stock: e.target.value === '' ? null : Number(e.target.value) })}
+          />
+        ) : null}
       </div>
 
       {/* Option key/value pairs */}
       <div>
-        <span className="field-label">Options</span>
+        <span className="field-label">Extra details (optional)</span>
+        <p className="mb-2 mt-1 text-2xs leading-relaxed text-ink-400">
+          Only needed if you want this choice to be findable by size or material in the shop
+          filters. Most products do not need it.
+        </p>
         {form.options.map((option, index) => (
           // eslint-disable-next-line react/no-array-index-key
           <div key={index} className="mb-2 flex gap-2">
@@ -1950,12 +2031,12 @@ function VariantForm({
 
       <div className="space-y-3">
         <Checkbox
-          label="Default selection"
+          label="Start the customer on this choice"
           checked={form.isDefault}
           onChange={(v) => setForm({ ...form, isDefault: v })}
         />
         <Checkbox
-          label="Published (visible to customers)"
+          label="Show this choice to customers"
           checked={form.status === 'PUBLISHED'}
           onChange={(v) => setForm({ ...form, status: v ? 'PUBLISHED' : 'DRAFT' })}
         />
