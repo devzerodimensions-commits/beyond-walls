@@ -786,6 +786,16 @@ router.post(
      * product and discarding whatever else is being edited, and working them
      * out a second time on the client is how the two drift apart.
      */
+    /*
+     * A face the studio has already chosen is knowledge the reader does not
+     * have. No photograph carries the typeface it was set in, so re-reading a
+     * picture -- to pick up better artwork, or to fix the lines -- must not
+     * quietly put the lettering back to a plain sans and undo a choice made by
+     * eye. Only a product that has never had one falls back to the alphabet.
+     */
+    const chosenFont = (product.livePreviewConfig as { defaults?: { fontFamily?: string } } | null)
+      ?.defaults?.fontFamily;
+
     const livePreviewConfig = {
       aspect: read.aspect ?? undefined,
       defaults: {
@@ -800,7 +810,9 @@ router.post(
          * plate where everything else came out right, and so the last thing
          * anyone would think to go and change.
          */
-        ...(read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
+        ...(chosenFont
+          ? { fontFamily: chosenFont }
+          : read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
       },
       photo: { image: read.image, boxes },
     };

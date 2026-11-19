@@ -32,6 +32,28 @@ interface ReadResult {
   livePreviewConfig?: Record<string, unknown>;
 }
 
+/**
+ * Something in every line the reader found.
+ *
+ * The shared placeholders only fill the first line, so a plate read as three
+ * lines was compared against a preview showing one -- which says nothing about
+ * whether the other two landed in the right places, the thing the comparison
+ * exists to show. Each box found gets a sample instead.
+ */
+function sampleSlots(config: Record<string, unknown>): Record<string, string> {
+  const SAMPLES: Record<string, string> = {
+    number: 'A 101',
+    line1: 'YOUR NAME',
+    line2: 'FAMILY',
+    line3: 'EST 2020',
+  };
+  const base = resolvePreviewConfig('photo', config).placeholders as Record<string, string>;
+  const boxes = (config.photo as { boxes?: { slot: string }[] } | undefined)?.boxes ?? [];
+  const slots: Record<string, string> = {};
+  for (const box of boxes) slots[box.slot] = base[box.slot] || SAMPLES[box.slot] || 'SAMPLE';
+  return slots;
+}
+
 export function ReadPhotograph({
   productId, hasImage, photoUrl, onRead,
 }: {
@@ -112,7 +134,7 @@ export function ReadPhotograph({
               <LivePreview
                 template="photo"
                 config={made}
-                slots={resolvePreviewConfig('photo', made).placeholders}
+                slots={sampleSlots(made)}
                 hideLabel
                 hideCaption
                 className="border border-stone-line"
