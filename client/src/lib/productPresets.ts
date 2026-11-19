@@ -71,6 +71,10 @@ export const PRESET_FOR_TEMPLATE: Record<string, string> = {
   'plate-botanical': 'Home nameplate',
   'plate-vine': 'Home nameplate',
   'plate-cubes': 'Home nameplate',
+  // Cut lettering asks for the same things as a plain nameplate — a name and
+  // a number — so it takes the same preset rather than leaving the wizard
+  // with nothing to offer.
+  'script-cut': 'Home nameplate',
 };
 
 export function presetByLabel(label: string | null | undefined) {

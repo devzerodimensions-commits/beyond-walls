@@ -14,6 +14,7 @@ import { useToast } from '../../context/StoreProvider';
 import {
   AdminCard, AdminPageHeader, MediaPicker, MultiImageUpload, SortableList, StringListEditor,
 } from '../../components/admin/AdminKit';
+import { CustomerPreview } from '../../components/admin/CustomerPreview';
 import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
 import {
   LivePreview, PLATE_FONTS, PREVIEW_SLOTS, buildPreviewSlots, resolvePreviewConfig,
@@ -158,6 +159,7 @@ export default function AdminProductEdit() {
   const requestedTab = searchParams.get('tab') as Tab | null;
   const [tab, setTab] = useState<Tab>(TABS.some((item) => item.id === requestedTab) ? requestedTab! : 'details');
   const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
+  const [showCustomerView, setShowCustomerView] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [slugTouched, setSlugTouched] = useState(false);
   const [attributeDraft, setAttributeDraft] = useState<{
@@ -348,7 +350,31 @@ export default function AdminProductEdit() {
         {!isNew ? (
           <span className="ml-auto font-mono text-2xs text-ink-300">/product/{form.slug}</span>
         ) : null}
+        {/*
+          * A draft cannot be opened on the shop, so without this the only way
+          * to see what a customer would be shown was to publish it and look --
+          * the wrong order for a piece cut to order from whatever the preview
+          * promised.
+          */}
+        {!isNew && form.livePreviewEnabled ? (
+          <Button size="sm" variant="secondary" onClick={() => setShowCustomerView(true)}>
+            Preview as a customer
+          </Button>
+        ) : null}
       </div>
+
+      <Modal
+        open={showCustomerView}
+        onClose={() => setShowCustomerView(false)}
+        title="What the customer sees"
+        size="lg"
+      >
+        <CustomerPreview
+          fields={product?.personalization ?? []}
+          template={form.livePreviewTemplate}
+          config={form.livePreviewConfig}
+        />
+      </Modal>
 
       {/* Tabs */}
       <div

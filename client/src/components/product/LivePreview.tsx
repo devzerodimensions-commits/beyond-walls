@@ -153,10 +153,26 @@ const COLOR_MAP: Record<string, string> = {
   brass: '#C8A961',
 };
 
-function resolveColor(value: string | undefined, fallback: string): string {
+/**
+ * A colour, which may be a hex, a built-in name, or one this product invented.
+ *
+ * The built-in names are the ones every plate shares -- black, white, brass.
+ * A product that sells its own finishes names them in its own palette, and
+ * those names were resolving to nothing: a plate whose default was written as
+ * "forest" fell through to the fallback and drew in white, on a design whose
+ * whole point was that the lettering is the product. So the product's own
+ * list is asked first, and the shared names only after.
+ */
+function resolveColor(
+  value: string | undefined,
+  fallback: string,
+  palette?: { value: string; hex: string }[],
+): string {
   if (!value) return fallback;
   if (value.startsWith('#')) return value;
-  return COLOR_MAP[value.toLowerCase()] ?? fallback;
+  const named = value.toLowerCase();
+  const own = palette?.find((entry) => entry.value.toLowerCase() === named);
+  return own?.hex ?? COLOR_MAP[named] ?? fallback;
 }
 
 /** Reads the customer's answers into preview slots using the field bindings. */
@@ -338,6 +354,26 @@ export const PREVIEW_PRESETS: Record<string, Partial<PreviewConfig>> = {
     defaults: { plateColor: '#4A4D50', textColor: '#FFFFFF', fontFamily: 'formal-script' },
     placeholders: { number: 'A 105', line1: 'First name', line2: '& Second name' },
   },
+  /*
+   * There is no plate here, so there is no plate colour worth offering: the
+   * lettering is the product and its finish is the only choice a customer
+   * actually makes. The plate list is left with the one entry the wall stands
+   * for, rather than offering colours for a panel that does not exist.
+   */
+  'script-cut': {
+    aspect: { width: 500, height: 180 },
+    plate: { inset: 0, radius: 0, showScrews: false, borderOnLight: false },
+    defaults: { plateColor: '#F2EFE9', textColor: '#1C1C1C', fontFamily: 'script' },
+    placeholders: { line1: 'Your name', number: 'A 101' },
+    palette: {
+      plate: [{ value: 'wall', label: 'Wall', hex: '#F2EFE9' }],
+      text: [
+        { value: 'black', label: 'Black', hex: '#1C1C1C' },
+        { value: 'forest', label: 'Forest', hex: '#1F3B2E' },
+        { value: 'ivory', label: 'Ivory', hex: '#EFE4CE' },
+      ],
+    },
+  },
 };
 
 /** Deep-merges the preset for `template` and the product's stored overrides. */
@@ -411,8 +447,8 @@ export function LivePreview({
     };
   }, [slots, placeholders, resolved]);
 
-  const plate = resolveColor(merged.plateColor, '#111111');
-  const text = resolveColor(merged.textColor, '#FFFFFF');
+  const plate = resolveColor(merged.plateColor, '#111111', resolved.palette.plate);
+  const text = resolveColor(merged.textColor, '#FFFFFF', resolved.palette.text);
   const font = fontStack(merged.fontFamily);
 
   // A light plate needs a visible edge against the light backdrop.
@@ -422,6 +458,8 @@ export function LivePreview({
 
   const body = (() => {
     switch (template) {
+      case 'script-cut':
+        return <ScriptCut {...shared} />;
       case 'photo':
         return <PlatePhoto {...shared} />;
       case 'plate-botanical':
@@ -1280,8 +1318,107 @@ function PlatePhoto({ slots, plate, text, font, config, uid }: TemplateProps) {
   );
 }
 
+/**
+ * Lettering cut out and fixed straight to the wall.
+ *
+ * Every other design here draws a plate and writes on it. This piece has no
+ * plate: the letters themselves are the product, cut from steel and stood off
+ * the wall on studs, with a slim bar running through them and the flat number
+ * under it. Shown on any of the plate designs it came out as a panel with a
+ * name on it -- the wrong product, in the one picture a customer is asked to
+ * approve before anything is made.
+ *
+ * So nothing is drawn behind the lettering and the page shows through where
+ * the wall would be. The shadow is not decoration: it is what the real piece
+ * does standing off a wall, and it is also what keeps a pale finish such as
+ * ivory legible against a pale wall -- exactly as it is in life.
+ */
+function ScriptCut({ slots, text, font, config, uid }: TemplateProps) {
+  const { width: VW, height: VH } = config.aspect;
+  const measure = useTextMetrics();
+
+  const name = (slots.line1 ?? '').trim();
+  const number = (slots.number ?? '').trim();
+  const second = (slots.line2 ?? '').trim();
+
+  const margin = VW * 0.045;
+  const room = VW - margin * 2;
+  /** The bar runs where the script's own baseline sits, as on the piece. */
+  const barY = VH * 0.63;
+  const barH = Math.max(1.5, VH * 0.018);
+
+  /*
+   * The script takes whichever limit bites first: the height above the bar or
+   * the width of the piece. Measured rather than estimated, because a
+   * signature face sets far wider per letter than a text face, and guessing
+   * at that is what pushes a long surname off the end of the metal.
+   */
+  const m = measure(name || 'Name', font);
+  const scriptSize = Math.max(
+    8,
+    Math.min((barY - VH * 0.08) / Math.max(0.01, m.ascent), room / Math.max(0.01, m.width)),
+  );
+
+  const numberFont = fontStack('grotesque');
+  const nm = measure(number || 'A 000', numberFont);
+  const numberSize = Math.max(
+    6,
+    Math.min((VH * 0.2) / Math.max(0.01, nm.ink), (room * 0.5) / Math.max(0.01, nm.width)),
+  );
+
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
+      <defs>
+        <filter id={`lift-${uid}`} x="-12%" y="-12%" width="130%" height="140%">
+          <feDropShadow
+            dx={VW * 0.006} dy={VH * 0.022} stdDeviation={VH * 0.018}
+            floodColor="#2B2520" floodOpacity="0.32"
+          />
+        </filter>
+      </defs>
+
+      <g filter={`url(#lift-${uid})`} fill={text}>
+        <rect x={margin} y={barY} width={room} height={barH} rx={barH / 2} />
+
+        {name ? (
+          <text x={margin} y={barY + barH / 2} fontFamily={font} fontSize={scriptSize}>
+            {name}
+          </text>
+        ) : null}
+
+        {number ? (
+          <text
+            x={VW - margin}
+            y={barY + barH + VH * 0.21}
+            textAnchor="end"
+            fontFamily={numberFont}
+            fontSize={numberSize}
+            letterSpacing={numberSize * 0.06}
+          >
+            {number}
+          </text>
+        ) : null}
+
+        {second ? (
+          <text
+            x={margin}
+            y={barY + barH + VH * 0.21}
+            fontFamily={numberFont}
+            fontSize={numberSize * 0.78}
+            letterSpacing={numberSize * 0.05}
+            opacity="0.85"
+          >
+            {second}
+          </text>
+        ) : null}
+      </g>
+    </svg>
+  );
+}
+
 export const PREVIEW_TEMPLATES = [
   { value: '', label: 'No live preview' },
+  { value: 'script-cut', label: 'Cut lettering (script name on a bar, no plate)' },
   { value: 'nameplate-minimal', label: 'Nameplate — minimal (number, rule, name)' },
   { value: 'nameplate-classic', label: 'Nameplate — classic (centred, framed)' },
   { value: 'desk-plate', label: 'Desk plate (name, designation, degree)' },
