@@ -12,6 +12,7 @@ import { useRecentlyViewed } from '../../hooks/useRecentlyViewed';
 import { ProductCard, ProductGrid } from '../../components/product/ProductCard';
 import { GalleryBadges, ProductGallery } from '../../components/product/ProductGallery';
 import { LivePreview, buildPreviewSlots, resolvePreviewConfig } from '../../components/product/LivePreview';
+import { ReviewForm } from '../../components/product/ReviewForm';
 import {
   PersonalizationForm,
   defaultPersonalizationValues,
@@ -780,28 +781,35 @@ export default function ProductPage() {
         ) : null}
 
         {/* ---------------- Reviews (only if published) ---------------- */}
-        {get<boolean>('store.enableReviews', false) && product.reviews?.length ? (
+        {get<boolean>('store.enableReviews', false) ? (
           <section className="mt-14 border-t border-stone-line pt-12 lg:mt-20">
             <h2 className="mb-7 text-xl lg:text-2xl">Customer reviews</h2>
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {product.reviews.map((review) => (
-                <div key={review.id} className="border border-stone-line p-6">
-                  <div className="mb-3 flex gap-0.5" aria-label={`${review.rating} out of 5`}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      // eslint-disable-next-line react/no-array-index-key
-                      <span key={i} className={i < review.rating ? 'text-ink' : 'text-ink-200'}>
-                        ★
-                      </span>
-                    ))}
-                  </div>
-                  {review.title ? <h3 className="text-sm font-medium">{review.title}</h3> : null}
-                  <p className="mt-2 text-sm leading-relaxed text-ink-500">{review.content}</p>
-                  <p className="mt-4 text-2xs uppercase tracking-architect text-ink-400">
-                    {review.authorName}
-                  </p>
-                </div>
-              ))}
-            </div>
+            {product.reviews?.length ? (
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                        {product.reviews.map((review) => (
+                          <div key={review.id} className="border border-stone-line p-6">
+                            <div className="mb-3 flex gap-0.5" aria-label={`${review.rating} out of 5`}>
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                // eslint-disable-next-line react/no-array-index-key
+                                <span key={i} className={i < review.rating ? 'text-ink' : 'text-ink-200'}>
+                                  ★
+                                </span>
+                              ))}
+                            </div>
+                            {review.title ? <h3 className="text-sm font-medium">{review.title}</h3> : null}
+                            <p className="mt-2 text-sm leading-relaxed text-ink-500">{review.content}</p>
+                            <p className="mt-4 text-2xs uppercase tracking-architect text-ink-400">
+                              {review.authorName}
+                            </p>
+                          </div>
+                        ))}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-500">
+                No reviews yet. The first will come from someone who has had their piece delivered.
+              </p>
+            )}
+            <ReviewForm slug={product.slug} />
           </section>
         ) : null}
 

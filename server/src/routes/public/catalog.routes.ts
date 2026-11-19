@@ -4,6 +4,8 @@ import prisma from '../../lib/prisma';
 import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../utils/http';
 import { getSetting } from '../../services/settings.service';
 import { cachedPublic } from '../../lib/publicCache';
+import { optionalAuth, requireAuth } from '../../middleware/auth';
+import { reviewEligibility, submitReview } from '../../services/review.service';
 
 const router = Router();
 
@@ -468,6 +470,70 @@ router.get(
     });
 
     res.json({ success: true, data: { ...product, related } });
+  }),
+);
+
+/*
+ * Reviews written by customers.
+ *
+ * Both routes resolve the product themselves rather than trusting an id out
+ * of the request body: the slug is what the shop knows, and a published
+ * product is the only thing anyone may review. Who may write one lives in the
+ * service, so both routes answer from the same rules.
+ */
+async function publishedProductId(slug: string): Promise<string> {
+  const product = await prisma.product.findFirst({
+    where: { slug, ...PUBLISHED },
+    select: { id: true },
+  });
+  if (!product) throw ApiError.notFound('Product not found');
+  return product.id;
+}
+
+/*
+ * Whether the signed-in customer may review this piece, and why not.
+ *
+ * optionalAuth is attached here and not to the router: the rest of the
+ * catalogue is cached and shared between everyone, and an answer that depends
+ * on who is asking must never land in that cache.
+ */
+router.get(
+  '/products/:slug/review-eligibility',
+  optionalAuth,
+  asyncHandler(async (req, res) => {
+    if (!(await getSetting<boolean>('store.enableReviews'))) {
+      return res.json({
+        success: true,
+        data: { allowed: false, alreadyReviewed: false, reason: 'Reviews are turned off.' },
+      });
+    }
+    const productId = await publishedProductId(req.params.slug);
+    return res.json({
+      success: true,
+      data: await reviewEligibility(productId, req.user?.sub),
+    });
+  }),
+);
+
+router.post(
+  '/products/:slug/reviews',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (!(await getSetting<boolean>('store.enableReviews'))) {
+      throw ApiError.forbidden('Reviews are turned off.');
+    }
+    const productId = await publishedProductId(req.params.slug);
+    await submitReview(productId, req.user!.sub, req.body ?? {});
+    /*
+     * Says it is waiting rather than thanking them for a review now on the
+     * site. It is not on the site, and discovering that later reads as the
+     * shop having quietly binned it.
+     */
+    res.status(201).json({
+      success: true,
+      data: { pending: true },
+      message: 'Thank you — your review has been sent to the studio and will appear once checked.',
+    });
   }),
 );
 
