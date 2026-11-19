@@ -765,6 +765,16 @@ router.post(
       defaults: {
         ...(read.plateColor ? { plateColor: read.plateColor } : {}),
         ...(read.textColor ? { textColor: read.textColor } : {}),
+        /*
+         * Set in the alphabet the piece is lettered in.
+         *
+         * A picture carries no typeface, so this used to stay on a Latin face
+         * and a plate cut in Devanagari came back with the customer's name in
+         * the wrong alphabet's font -- the one thing that came out wrong on a
+         * plate where everything else came out right, and so the last thing
+         * anyone would think to go and change.
+         */
+        ...(read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
       },
       photo: { image: read.image, boxes },
     };

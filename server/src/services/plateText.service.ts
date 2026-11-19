@@ -38,6 +38,14 @@ import { getStorage } from './storage.service';
  * accepting a render whose shading it had no way to see.
  */
 
+/**
+ * The alphabet the piece is lettered in.
+ *
+ * Only as fine-grained as the preview can act on: it decides which font the
+ * plate is drawn in, and the fonts are grouped the same way.
+ */
+export type PlateScript = 'latin' | 'devanagari';
+
 /** Everything is a fraction of the image, so it survives any resize. */
 export interface PlateBox {
   /** Top of the lettering. */
@@ -62,6 +70,8 @@ export interface PlatePreview {
   textColor: string | null;
   /** Top to bottom. Each one is a line of writing the customer replaces. */
   boxes: PlateBox[];
+  /** Read off the lettering, so the preview can be set in the same alphabet. */
+  script: PlateScript;
 }
 
 /** The analysis, with the blank plate as bytes rather than a stored file. */
@@ -93,6 +103,19 @@ const MAX_STEP = 16;
 const MIN_ROOM = 0.28;
 /** More than this is a page of text, not a nameplate. */
 const MAX_LINES = 6;
+/**
+ * Where a Devanagari headline is looked for, and how solid it must be.
+ *
+ * Both measured off the studio's own plates rather than taken from the
+ * alphabet's rules: the headline ran at 0.99 and 0.84 of its line's width,
+ * between a fifth and a third of the way down, while the Latin flat number
+ * beneath it never got past 0.44 anywhere on its line. The threshold sits in
+ * the gap between those two. The band starts below the top of the line
+ * because a word's matras sit ABOVE its headline, and a band measured from
+ * the very top missed the bar completely.
+ */
+const HEADLINE_BAND: [number, number] = [0.1, 0.45];
+const HEADLINE_INK = 0.7;
 /**
  * A mark taller than this share of the picture is not a letter.
  *
@@ -260,7 +283,7 @@ interface Line {
 
 export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
   const no = (reason: string): PlateAnalysis => ({
-    ok: false, reason, blank: null, aspect: null, plateColor: null, textColor: null, boxes: [],
+    ok: false, reason, blank: null, aspect: null, plateColor: null, textColor: null, boxes: [], script: 'latin',
   });
 
   let meta;
@@ -735,6 +758,42 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
     return no('This reads as a page of text rather than a nameplate, so it was left alone.');
   }
 
+  /*
+   * Which script the piece is lettered in, from the shape of the writing.
+   *
+   * A picture does not carry its typeface, so the preview stayed on a Latin
+   * face and a plate cut in Devanagari came back with the customer's name set
+   * in the wrong alphabet's font -- the one thing on the plate a studio would
+   * never think to go and change, because everything else came out right.
+   *
+   * Devanagari announces itself: nearly every word hangs from a shirorekha, a
+   * headline running unbroken along the top of it. No Latin face puts a
+   * continuous rule across the top of a line, so a row of ink spanning most
+   * of a line's width in the top fifth of its height is that headline and
+   * almost nothing else. Counted across the lines rather than taken from one,
+   * because a plate usually carries its flat number in Latin whatever the
+   * name above it is written in.
+   */
+  const headlined = chosen.filter((line) => {
+    const tall = line.bottom - line.top + 1;
+    const width = line.right - line.left + 1;
+    /*
+     * Looked for below the top of the line, not at it. The matras of a
+     * Devanagari word sit ABOVE its headline, so on the studio's own plate
+     * the bar begins just past a fifth of the way down and a band measured
+     * from the very top missed it entirely.
+     */
+    const from = line.top + Math.round(tall * HEADLINE_BAND[0]);
+    const to = line.top + Math.round(tall * HEADLINE_BAND[1]);
+    for (let y = Math.max(0, from); y <= Math.min(h - 1, to); y += 1) {
+      let run = 0;
+      for (let x = line.left; x <= line.right; x += 1) if (anyInk(y * w + x)) run += 1;
+      if (run / width > HEADLINE_INK) return true;
+    }
+    return false;
+  }).length;
+  const script: PlateScript = headlined * 2 >= chosen.length ? 'devanagari' : 'latin';
+
   const boxes: PlateBox[] = [];
   for (const line of chosen) {
     const { clearL, clearR } = roomOf.get(line)!;
@@ -891,6 +950,7 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
     reason: `Read ${chosen.length} line${chosen.length === 1 ? '' : 's'} of writing on a ${fullW}×${fullH} picture and painted ${chosen.length === 1 ? 'it' : 'them'} out. Everything else is untouched.`,
     blank,
     aspect: { width: fullW, height: fullH },
+    script,
     plateColor: hex(plate.r, plate.g, plate.b),
     textColor: hex(ink.r, ink.g, ink.b),
     boxes,
@@ -906,7 +966,7 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
  */
 export async function readPlate(url: string): Promise<PlatePreview> {
   const fail = (reason: string): PlatePreview => ({
-    ok: false, reason, image: null, aspect: null, plateColor: null, textColor: null, boxes: [],
+    ok: false, reason, image: null, aspect: null, plateColor: null, textColor: null, boxes: [], script: 'latin',
   });
 
   /*
