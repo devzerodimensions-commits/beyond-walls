@@ -4,7 +4,9 @@ import {
 } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
-import { api, ApiError, clearCartSession, tokenStore } from '../lib/api';
+import {
+  api, ApiError, clearCartSession, tokenStore, SESSION_EXPIRED_EVENT,
+} from '../lib/api';
 import type { Cart, SiteSettings, User } from '../lib/types';
 import { STAFF_ROLES } from '../lib/types';
 import {
@@ -209,6 +211,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } finally {
       setAuthLoading(false);
     }
+  }, []);
+
+  /*
+   * A session that ends mid-visit has to reach the screens.
+   *
+   * Without this the cached user outlived the session it came from: the admin
+   * guard kept letting screens open, and every one of them drew itself empty
+   * from a request that had been refused. Dropping the user here puts the
+   * guard back in charge, which sends a studio to the sign-in screen instead
+   * of to a blank product.
+   */
+  useEffect(() => {
+    const ended = () => {
+      setUser(null);
+      writeCachedUser(null);
+      setAuthLoading(false);
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, ended);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, ended);
   }, []);
 
   useEffect(() => {

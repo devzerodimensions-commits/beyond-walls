@@ -75,6 +75,15 @@ export class ApiError extends Error {
  * Only the short-lived access token is held in JS. The refresh token lives in an
  * HttpOnly cookie the browser attaches automatically, so no script can read it.
  */
+/**
+ * Fired when a session is gone for good and could not be renewed.
+ *
+ * The token store is cleared at the same moment, but nothing in React is
+ * watching localStorage, so the screens carry on as though still signed in.
+ * They need telling.
+ */
+export const SESSION_EXPIRED_EVENT = 'bw:session-expired';
+
 export const tokenStore = {
   get access() {
     return localStorage.getItem(ACCESS_KEY);
@@ -148,6 +157,25 @@ function buildUrl(path: string, query?: Record<string, unknown>): string {
 let refreshInFlight: Promise<boolean> | null = null;
 
 /**
+ * Ends the session and says so out loud.
+ *
+ * Clearing the store alone was not enough. The signed-in user is also kept in
+ * localStorage so a reload does not flash the signed-out header, and the admin
+ * guard reads that copy -- so once a session quietly expired mid-visit the
+ * panel still believed it was signed in. It let every screen open, every
+ * request behind them came back 401, and each one rendered its empty state:
+ * a published product at a real price showed as a blank form reading "Draft"
+ * and "No base price", with Save and Publish sitting there ready. Nothing
+ * said to sign in again, because nothing had noticed.
+ */
+function endSession() {
+  tokenStore.clear();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+}
+
+/**
  * Exchanges the HttpOnly refresh cookie for a fresh access token.
  * `credentials: 'include'` is what puts the cookie on the request; there is no
  * refresh token in JavaScript to send.
@@ -163,14 +191,14 @@ async function refreshAccessToken(): Promise<boolean> {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!res.ok) {
-          tokenStore.clear();
+          endSession();
           return false;
         }
         const json = (await res.json()) as ApiEnvelope<{ accessToken: string }>;
         tokenStore.set(json.data.accessToken);
         return true;
       } catch {
-        tokenStore.clear();
+        endSession();
         return false;
       } finally {
         refreshInFlight = null;
