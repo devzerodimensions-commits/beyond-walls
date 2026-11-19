@@ -477,11 +477,15 @@ export default function AdminProductEdit() {
                   }}
                 />
                 <Input
-                  label="URL slug" value={form.slug} error={errors.slug}
+                  label="Web address" value={form.slug} error={errors.slug}
                   hint={`/product/${form.slug || 'your-slug'}`}
                   onChange={(e) => { setSlugTouched(true); set('slug', slugify(e.target.value)); }}
                 />
-                <Input label="SKU" value={form.sku} error={errors.sku} onChange={(e) => set('sku', e.target.value)} />
+                <Input
+                  label="Your own code" value={form.sku} error={errors.sku}
+                  hint="Optional. Only you see this — it never appears on the website."
+                  onChange={(e) => set('sku', e.target.value)}
+                />
                 <Textarea
                   label="Short description" value={form.shortDescription} rows={2}
                   wrapClassName="sm:col-span-2"

@@ -372,7 +372,7 @@ function CategoryForm({
           }}
         />
         <Input
-          label="URL slug" value={form.slug} error={errors.slug}
+          label="Web address" value={form.slug} error={errors.slug}
           hint={`/shop/${form.slug || 'slug'}`}
           onChange={(e) => { setSlugTouched(true); setForm({ ...form, slug: slugify(e.target.value) }); }}
         />

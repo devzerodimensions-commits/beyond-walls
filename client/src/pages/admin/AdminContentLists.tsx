@@ -35,10 +35,29 @@ interface ResourceConfig {
   note?: string;
 }
 
+/** Short, for the filter above a list, where the bare word is enough. */
 const STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' },
   { value: 'PUBLISHED', label: 'Published' },
   { value: 'ARCHIVED', label: 'Archived' },
+];
+
+/**
+ * The same three spelled out, for the form where the choice is made.
+ *
+ * Draft, Published and Archived name the state a developer sees, not what it
+ * does to the website -- and the part that matters, whether customers can see
+ * the thing at all, is what none of the three words mentions. A shopkeeper who
+ * saves a banner as Draft and then goes looking for it on the site has nothing
+ * in the word to tell them they have just hidden it.
+ *
+ * The filter keeps the short words: there, the list beside it already shows
+ * what each one means.
+ */
+const STATUS_CHOICES = [
+  { value: 'DRAFT', label: 'Draft — hidden from the website' },
+  { value: 'PUBLISHED', label: 'Published — live on the website' },
+  { value: 'ARCHIVED', label: 'Archived — hidden and kept out of the way' },
 ];
 
 const RESOURCES: Record<ResourceKey, ResourceConfig> = {
@@ -70,7 +89,7 @@ const RESOURCES: Record<ResourceKey, ResourceConfig> = {
           { value: 'ANNOUNCEMENT', label: 'Announcement' },
         ],
       },
-      { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS },
+      { key: 'status', label: 'Status', type: 'select', options: STATUS_CHOICES },
       { key: 'startsAt', label: 'Show from', type: 'date' },
       { key: 'endsAt', label: 'Show until', type: 'date' },
     ],
@@ -123,7 +142,7 @@ const RESOURCES: Record<ResourceKey, ResourceConfig> = {
       { key: 'tag', label: 'Tag', type: 'text', hint: 'Used as a filter chip, e.g. Nameplates' },
       { key: 'caption', label: 'Caption', type: 'textarea', colSpan: 2 },
       { key: 'link', label: 'Link (optional)', type: 'text' },
-      { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS },
+      { key: 'status', label: 'Status', type: 'select', options: STATUS_CHOICES },
     ],
     columns: [
       {
@@ -160,7 +179,7 @@ const RESOURCES: Record<ResourceKey, ResourceConfig> = {
       { key: 'rating', label: 'Rating (1–5)', type: 'number' },
       { key: 'content', label: 'What they said', type: 'textarea', colSpan: 2, required: true },
       { key: 'image', label: 'Photo (optional)', type: 'image', folder: 'testimonials', colSpan: 2 },
-      { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS },
+      { key: 'status', label: 'Status', type: 'select', options: STATUS_CHOICES },
     ],
     columns: [
       {
@@ -198,7 +217,7 @@ const RESOURCES: Record<ResourceKey, ResourceConfig> = {
       { key: 'question', label: 'Question', type: 'text', colSpan: 2, required: true },
       { key: 'answer', label: 'Answer', type: 'textarea', colSpan: 2, required: true },
       { key: 'group', label: 'Group', type: 'text', hint: 'e.g. General, Orders, Delivery' },
-      { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS },
+      { key: 'status', label: 'Status', type: 'select', options: STATUS_CHOICES },
     ],
     columns: [
       {
@@ -242,7 +261,7 @@ const RESOURCES: Record<ResourceKey, ResourceConfig> = {
       { key: 'startsAt', label: 'Valid from', type: 'date' },
       { key: 'endsAt', label: 'Valid until', type: 'date' },
       { key: 'description', label: 'Internal note', type: 'textarea', colSpan: 2 },
-      { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS },
+      { key: 'status', label: 'Status', type: 'select', options: STATUS_CHOICES },
     ],
     columns: [
       {
@@ -299,7 +318,7 @@ const RESOURCES: Record<ResourceKey, ResourceConfig> = {
       { key: 'title', label: 'Title', type: 'text', colSpan: 2 },
       { key: 'content', label: 'Review', type: 'textarea', colSpan: 2, required: true },
       { key: 'productId', label: 'Product', type: 'product', colSpan: 2, hint: 'Search for the product this review is about.' },
-      { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS },
+      { key: 'status', label: 'Status', type: 'select', options: STATUS_CHOICES },
     ],
     columns: [
       {
@@ -345,7 +364,7 @@ const RESOURCES: Record<ResourceKey, ResourceConfig> = {
         ],
       },
       { key: 'openInNewTab', label: 'Open in a new tab', type: 'checkbox' },
-      { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS },
+      { key: 'status', label: 'Status', type: 'select', options: STATUS_CHOICES },
     ],
     columns: [
       {
