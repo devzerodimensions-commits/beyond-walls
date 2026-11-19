@@ -63,12 +63,24 @@ export function SavePreview({
         }
       }
 
+      /*
+       * In the page, and released later.
+       *
+       * A link that is never added to the document does nothing at all in
+       * some browsers, and releasing the url in the next statement pulls the
+       * file out from under a download that has only just been asked for.
+       * Both work in Chrome and neither is safe to rely on, so the link goes
+       * in properly and the url is let go once the save has certainly begun.
+       */
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = file.name;
+      link.style.display = 'none';
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       push('Preview saved to your downloads', 'success');
     } catch {
       push('That preview could not be saved', 'error');
