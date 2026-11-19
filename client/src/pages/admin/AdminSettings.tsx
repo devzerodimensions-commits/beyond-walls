@@ -103,6 +103,11 @@ export default function AdminSettings() {
     else delete next[id];
     set('preview.templateNames', next);
   };
+  /** Read defensively: this is a free-form list a bad import could flatten. */
+  const savedDesigns = (Array.isArray(values['preview.savedDesigns'])
+    ? values['preview.savedDesigns']
+    : []) as { id: string; name: string; template: string; config: Record<string, unknown> }[];
+
   const bool = (key: string) => Boolean(values[key]);
   const num = (key: string) => (values[key] === null || values[key] === undefined ? '' : String(values[key]));
 
@@ -655,6 +660,66 @@ export default function AdminSettings() {
                       }
                       onChange={(e) => setTemplateName(design.value, e.target.value)}
                     />
+                  </div>
+                ))}
+              </div>
+            </AdminCard>
+          ) : null}
+
+          {/*
+            * The studio's own designs, as against the drawings that shipped.
+            *
+            * They are built on a product -- set one up the way it should look,
+            * then save it under a name -- because that is where the preview
+            * and every setting already are. This is where they are kept,
+            * renamed and thrown away, and each is shown drawn rather than
+            * listed by name because the drawing is how you tell them apart.
+            */}
+          {group === 'preview' && savedDesigns.length ? (
+            <AdminCard
+              title="Your saved designs"
+              description="Designs you built on a product and kept. Apply one to any product from its Live preview section."
+            >
+              <div className="space-y-6">
+                {savedDesigns.map((design) => (
+                  <div
+                    key={design.id}
+                    className="grid items-center gap-5 border border-stone-line p-4 sm:grid-cols-[200px_minmax(0,1fr)]"
+                  >
+                    <LivePreview
+                      template={design.template}
+                      config={design.config}
+                      slots={{}}
+                      hideLabel
+                      hideCaption
+                      className="!bg-paper-off !p-2"
+                    />
+                    <div className="space-y-2">
+                      <Input
+                        label="Name"
+                        value={design.name}
+                        onChange={(e) => set(
+                          'preview.savedDesigns',
+                          savedDesigns.map((item) => (
+                            item.id === design.id ? { ...item, name: e.target.value } : item
+                          )),
+                        )}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => set(
+                          'preview.savedDesigns',
+                          savedDesigns.filter((item) => item.id !== design.id),
+                        )}
+                        className="text-2xs uppercase tracking-architect text-ink-500 hover:text-state-danger"
+                      >
+                        Delete this design
+                      </button>
+                      <p className="text-2xs text-ink-400">
+                        Products already set up from this design keep their own copy, and neither
+                        renaming nor deleting it touches them.
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>

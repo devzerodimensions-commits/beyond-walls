@@ -230,6 +230,29 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: 'Live preview design names',
     value: {},
   },
+  /**
+   * Designs the studio has built and kept, as against the ones that shipped.
+   *
+   * A shipped design is a drawing in code. This is a saved set of answers
+   * about one -- which drawing, what shape, which colours, where the
+   * lettering sits -- under a name the workshop actually uses. It exists
+   * because the same piece is sold in several sizes and finishes, and setting
+   * each one up by hand produced a slightly different answer every time.
+   *
+   * Applying one copies its settings onto the product, so the product owns
+   * them from that point. That is deliberate: a design edited next month must
+   * not quietly change what a customer already approved and ordered against a
+   * product set up with it.
+   *
+   * A setting rather than a table because it needs no migration to exist, and
+   * because this is a studio's shortlist rather than a catalogue.
+   */
+  {
+    key: 'preview.savedDesigns',
+    group: 'preview',
+    label: 'Saved live preview designs',
+    value: [],
+  },
 ];
 
 const PUBLIC_GROUPS = new Set([

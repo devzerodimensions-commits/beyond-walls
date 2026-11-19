@@ -1451,6 +1451,33 @@ export function previewTemplateOptions(
   });
 }
 
+/**
+ * A design the studio built and kept, as against one that shipped in code.
+ *
+ * `template` says which drawing it is based on; `config` is everything the
+ * studio settled about it -- shape, colours, lettering placement. Applying it
+ * to a product copies both onto that product, which then owns them.
+ */
+export interface SavedDesign {
+  id: string;
+  name: string;
+  template: string;
+  config: Record<string, unknown>;
+}
+
+/** Never shared: a fresh [] each render would re-run the memo on every render. */
+const NO_DESIGNS: SavedDesign[] = [];
+
+/** The studio's own saved designs, newest last. */
+export function useSavedDesigns(): SavedDesign[] {
+  const { get } = useSettings();
+  const raw = get<SavedDesign[]>('preview.savedDesigns', NO_DESIGNS);
+  return useMemo(
+    () => (Array.isArray(raw) ? raw.filter((item) => item && item.id && item.name) : NO_DESIGNS),
+    [raw],
+  );
+}
+
 /** A fresh {} each render would re-run the memo below on every render. */
 const EMPTY_NAMES: Record<string, string> = {};
 

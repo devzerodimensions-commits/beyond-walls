@@ -15,6 +15,7 @@ import {
   AdminCard, AdminPageHeader, MediaPicker, MultiImageUpload, SortableList, StringListEditor,
 } from '../../components/admin/AdminKit';
 import { CustomerPreview } from '../../components/admin/CustomerPreview';
+import { DesignLibrary } from '../../components/admin/DesignLibrary';
 import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
 import {
   LivePreview, PLATE_FONTS, PREVIEW_SLOTS, buildPreviewSlots, resolvePreviewConfig,
@@ -193,6 +194,31 @@ export default function AdminProductEdit() {
       setSlugTouched(true);
     }
   }, [productQuery.data]);
+
+  /*
+   * A design built from a picture takes the product's picture, once there is
+   * one.
+   *
+   * The design carries the boxes, the shape and the colours; the photograph
+   * belongs to the product, so it is filled in here rather than travelling
+   * with the design. Only ever filled in when it is EMPTY -- a studio that
+   * has pointed the design at a blank plate of their own, which is usually
+   * not a catalogue photograph at all, must not have that quietly replaced
+   * the next time they add a picture to the gallery.
+   */
+  const primaryImage = productQuery.data?.images?.[0]?.url ?? null;
+  useEffect(() => {
+    if (form.livePreviewTemplate !== 'photo' || !primaryImage) return;
+    const photo = (form.livePreviewConfig as { photo?: { image?: string; boxes?: unknown[] } }).photo;
+    if (photo?.image) return;
+    setForm((prev) => ({
+      ...prev,
+      livePreviewConfig: {
+        ...prev.livePreviewConfig,
+        photo: { image: primaryImage, boxes: photo?.boxes ?? [] },
+      },
+    }));
+  }, [primaryImage, form.livePreviewTemplate, form.livePreviewConfig]);
 
   const set = <K extends keyof ProductForm>(key: K, value: ProductForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -479,12 +505,16 @@ export default function AdminProductEdit() {
               />
               {form.livePreviewEnabled ? (
                 <div className="mt-4">
-                  <Select
-                    label="Preview template"
-                    value={form.livePreviewTemplate}
-                    onChange={(e) => set('livePreviewTemplate', e.target.value)}
-                    options={previewTemplates}
-                    hint="The template is the starting point. Everything below overrides it for this product only. Bind each personalisation field to a preview slot on the Personalisation tab."
+                  <DesignLibrary
+                    template={form.livePreviewTemplate}
+                    config={form.livePreviewConfig}
+                    productImage={product?.images?.[0]?.url ?? null}
+                    onApply={(nextTemplate, nextConfig) => {
+                      // Two calls are safe here: set() updates from the
+                      // previous state, not from the render it was made in.
+                      set('livePreviewTemplate', nextTemplate);
+                      set('livePreviewConfig', nextConfig);
+                    }}
                   />
 
                   <CopyPreviewSetup
