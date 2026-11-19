@@ -14,6 +14,7 @@ import { useToast } from '../../context/StoreProvider';
 import {
   AdminCard, AdminPageHeader, MediaPicker, MultiImageUpload, SortableList, StringListEditor,
 } from '../../components/admin/AdminKit';
+import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
 import {
   LivePreview, PLATE_FONTS, PREVIEW_SLOTS, buildPreviewSlots, resolvePreviewConfig,
   usePreviewTemplates, type PreviewConfig,
@@ -460,9 +461,18 @@ export default function AdminProductEdit() {
                     hint="The template is the starting point. Everything below overrides it for this product only. Bind each personalisation field to a preview slot on the Personalisation tab."
                   />
 
+                  <CopyPreviewSetup
+                    exceptId={id!}
+                    onCopy={(from) => {
+                      set('livePreviewTemplate', from.livePreviewTemplate ?? '');
+                      set('livePreviewConfig', from.livePreviewConfig ?? {});
+                    }}
+                  />
+
                   <PreviewConfigEditor
                     template={form.livePreviewTemplate}
                     config={form.livePreviewConfig}
+                    images={product?.images ?? []}
                     onChange={(next) => set('livePreviewConfig', next)}
                   />
                 </div>
@@ -1140,6 +1150,76 @@ function ImagesTab({
 }
 
 /**
+ * Starting a product's preview from one that is already set up.
+ *
+ * A studio that cuts the same plate in four sizes was otherwise setting the
+ * same design up four times and getting four slightly different answers. This
+ * copies the design and all of its settings across in one go; the copy is
+ * then this product's own, so changing it afterwards cannot disturb the
+ * product it came from.
+ *
+ * Nothing is written until the product is saved, so picking the wrong one is
+ * undone by leaving the page.
+ */
+function CopyPreviewSetup({
+  exceptId, onCopy,
+}: {
+  exceptId: string;
+  onCopy: (from: { livePreviewTemplate: string | null; livePreviewConfig: Record<string, unknown> }) => void;
+}) {
+  const { data } = useQuery({
+    queryKey: ['admin', 'products', 'with-preview'],
+    queryFn: () => api.get<AdminProductRow[]>('/admin/products?limit=100'),
+    staleTime: 60_000,
+  });
+
+  const sources = (data ?? []).filter(
+    (row) => row.id !== exceptId && row.livePreviewEnabled && row.livePreviewTemplate,
+  );
+  if (!sources.length) return null;
+
+  return (
+    <div className="mt-4">
+      <Select
+        label="Copy the setup from another product"
+        value=""
+        options={[
+          { value: '', label: 'Start from the template above' },
+          ...sources.map((row) => ({ value: row.id, label: row.name })),
+        ]}
+        hint="Brings over the design and every setting below. They become this product's own."
+        onChange={(e) => {
+          const from = sources.find((row) => row.id === e.target.value);
+          if (from) {
+            onCopy({
+              livePreviewTemplate: from.livePreviewTemplate,
+              livePreviewConfig: (from.livePreviewConfig ?? {}) as Record<string, unknown>,
+            });
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+interface AdminProductRow {
+  id: string;
+  name: string;
+  livePreviewEnabled: boolean;
+  livePreviewTemplate: string | null;
+  livePreviewConfig: unknown;
+}
+
+/** The shapes plates are usually cut in, as a shortcut past typing two numbers. */
+const ASPECT_PRESETS = [
+  { label: '2:1', width: 600, height: 300 },
+  { label: '3:1', width: 900, height: 300 },
+  { label: '4:3', width: 800, height: 600 },
+  { label: 'Square', width: 600, height: 600 },
+  { label: 'Portrait', width: 450, height: 600 },
+];
+
+/**
  * Per-product live-preview configuration.
  *
  * The selected template supplies every default; this editor writes only the
@@ -1148,11 +1228,13 @@ function ImagesTab({
  * hands it back to the template.
  */
 function PreviewConfigEditor({
-  template, config, onChange,
+  template, config, onChange, images = [],
 }: {
   template: string;
   config: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  /** The product's own pictures, so a blank plate already uploaded can be used. */
+  images?: { url: string; alt?: string | null }[];
 }) {
   const resolved = resolvePreviewConfig(template || 'nameplate-minimal', config);
   const stored = config as Partial<PreviewConfig>;
@@ -1174,6 +1256,22 @@ function PreviewConfigEditor({
     if (value === undefined || value === null || value === '') delete current[field];
     else current[field] = value;
     patch(group, Object.keys(current).length ? current : undefined);
+  };
+
+  /**
+   * One side of the plate's proportions.
+   *
+   * Either side can be left to the template on its own, because the two are
+   * merged over the template's pair rather than replacing it -- so typing a
+   * width alone gives that width against the template's height, which is what
+   * someone reading a measurement off a drawing expects.
+   */
+  const patchAspect = (field: 'width' | 'height', value: string) => {
+    const current = { ...(stored.aspect ?? {}) } as Record<string, unknown>;
+    const n = Number(value);
+    if (value === '' || !Number.isFinite(n) || n <= 0) delete current[field];
+    else current[field] = Math.round(n);
+    patch('aspect', Object.keys(current).length ? current : undefined);
   };
 
   const overrideCount = Object.keys(config ?? {}).length;
@@ -1236,6 +1334,54 @@ function PreviewConfigEditor({
           hint="0 for square corners."
           onChange={(e) => patchGroup('plate', 'radius', e.target.value === '' ? '' : Number(e.target.value))}
         />
+
+        {/*
+          * The proportions of the real piece.
+          *
+          * Only the ratio between the two is used, so the millimetres off a
+          * drawing can be typed straight in. Setting this is what makes a
+          * preview the shape of the product rather than the shape the design
+          * happened to be drawn at.
+          */}
+        <div className="sm:col-span-2">
+          <p className="field-label">Plate proportions</p>
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <Input
+              type="number"
+              label="Width"
+              value={stored.aspect?.width ?? ''}
+              placeholder={String(resolved.aspect.width)}
+              wrapClassName="w-28"
+              onChange={(e) => patchAspect('width', e.target.value)}
+            />
+            <span className="pt-5 text-ink-400">×</span>
+            <Input
+              type="number"
+              label="Height"
+              value={stored.aspect?.height ?? ''}
+              placeholder={String(resolved.aspect.height)}
+              wrapClassName="w-28"
+              onChange={(e) => patchAspect('height', e.target.value)}
+            />
+            <div className="flex flex-wrap gap-1.5 pt-5">
+              {ASPECT_PRESETS.map((shape) => (
+                <button
+                  key={shape.label}
+                  type="button"
+                  onClick={() => patch('aspect', { width: shape.width, height: shape.height })}
+                  className="border border-stone-line px-2 py-1 text-2xs uppercase tracking-architect text-ink-500 hover:border-ink hover:text-ink"
+                >
+                  {shape.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <span className="mt-1 block text-2xs text-ink-400">
+            The shape of the real piece — only the ratio matters, so the size off the drawing works.
+            Currently {resolved.aspect.width} × {resolved.aspect.height}
+            {' '}({(resolved.aspect.width / resolved.aspect.height).toFixed(2)}:1).
+          </span>
+        </div>
 
         <div className="sm:col-span-2">
           <Checkbox
@@ -1302,6 +1448,19 @@ function PreviewConfigEditor({
           </button>
         ) : null}
       </div>
+
+      {/*
+        * Only for the design that is built from a picture. Every other design
+        * is drawn in code, so there is no artwork to swap and no measured box
+        * to put right.
+        */}
+      {template === 'photo' ? (
+        <PhotoArtworkEditor
+          photo={stored.photo}
+          images={images}
+          onChange={(next) => patch('photo', next)}
+        />
+      ) : null}
 
       <LivePreview
         template={template || 'nameplate-minimal'}

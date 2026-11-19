@@ -222,26 +222,36 @@ export interface PreviewConfig {
   /** The line under the preview. Keep it honest — it is a promise to a customer. */
   caption: string;
   /**
-   * Set only on a plate built from the product's own photograph.
+   * Set only on a plate built from a photograph of the piece.
    *
    * The image is the piece with its sample name painted out, and each box is
    * where one of those names sat, as a fraction of the picture so it survives
-   * any resize. Written by the server when the photograph is read; there is
-   * nothing here for a studio to fill in by hand.
+   * any resize. Normally written by the server when it reads a photograph,
+   * but every value is the studio's to correct afterwards: reading a picture
+   * is a judgement, and the one place that judgement cannot be checked is on
+   * the server that made it.
    */
-  photo?: {
-    image: string;
-    boxes: {
-      slot: keyof PreviewSlots;
-      y: number;
-      h: number;
-      align: 'left' | 'center' | 'right';
-      /** The point the line is set from: its left edge, centre or right edge. */
-      anchor: number;
-      /** Clear plate available from that anchor. A limit, not a target. */
-      room: number;
-    }[];
-  };
+  photo?: PreviewPhoto;
+}
+
+/** Where one line of writing sits on a photographed plate. */
+export interface PreviewPhotoBox {
+  slot: keyof PreviewSlots;
+  /** Top of the lettering, as a fraction of the picture's height. */
+  y: number;
+  /** Height of the lettering — the design's own type size for this line. */
+  h: number;
+  align: 'left' | 'center' | 'right';
+  /** The point the line is set from: its left edge, centre or right edge. */
+  anchor: number;
+  /** Clear plate available from that anchor. A limit, not a target. */
+  room: number;
+}
+
+export interface PreviewPhoto {
+  /** The plate with its sample lettering removed. */
+  image: string;
+  boxes: PreviewPhotoBox[];
 }
 
 const BASE_CONFIG: PreviewConfig = {
@@ -646,50 +656,82 @@ function NameplateMinimal({ slots, plate, text, font, config, isLight, uid }: Te
   );
 }
 
+/*
+ * The framed plate fills the shape it is given, rather than being fitted into
+ * it. A plate is the product, so when a product is set to a long, shallow
+ * shape the plate has to be long and shallow -- leaving it at its drawn 2:1
+ * and centring it would show the customer the wrong piece. Only the lettering
+ * is scaled as a block, so the type never stretches.
+ */
 function NameplateClassic({ slots, plate, text, font, config, uid }: TemplateProps) {
+  const { width: vw, height: vh } = config.aspect;
+  const padX = vw * 0.05;
+  const padY = vh * 0.1333;
+  const pw = vw - padX * 2;
+  const ph = vh - padY * 2;
+  const rule = Math.min(pw, ph) * 0.0818;
+
+  // The lettering keeps the proportions it was drawn in and is centred on the
+  // plate; 540x220 is the plate it was drawn against.
+  const scale = Math.min(pw / 540, ph / 220);
+  const block = `translate(${(padX + pw / 2).toFixed(2)} ${(padY + ph / 2).toFixed(2)})`
+    + ` scale(${scale.toFixed(5)}) translate(-270 -110)`;
+
   return (
-    <svg viewBox="0 0 600 300" className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
+    <svg viewBox={`0 0 ${vw} ${vh}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
       <defs>
         <filter id={`shadow-${uid}`} x="-10%" y="-10%" width="120%" height="130%">
           <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#111111" floodOpacity="0.18" />
         </filter>
       </defs>
-      <rect x="30" y="40" width="540" height="220" rx={config.plate.radius} fill={plate} filter={`url(#shadow-${uid})`} />
-      <rect x="48" y="58" width="504" height="184" rx="2" fill="none" stroke={text} strokeWidth="1.5" opacity="0.5" />
+      <rect x={padX} y={padY} width={pw} height={ph} rx={config.plate.radius} fill={plate} filter={`url(#shadow-${uid})`} />
+      <rect
+        x={padX + rule} y={padY + rule} width={pw - rule * 2} height={ph - rule * 2}
+        rx="2" fill="none" stroke={text} strokeWidth="1.5" opacity="0.5"
+      />
 
-      {slots.number ? (
-        <text x="300" y="112" textAnchor="middle" fill={text} fontFamily={font} fontSize="26" letterSpacing="6">
-          {slots.number.toUpperCase()}
-        </text>
-      ) : null}
+      <g transform={block}>
+        {slots.number ? (
+          <text x="270" y="72" textAnchor="middle" fill={text} fontFamily={font} fontSize="26" letterSpacing="6">
+            {slots.number.toUpperCase()}
+          </text>
+        ) : null}
 
-      <text
-        x="300" y={slots.number ? 166 : 150} textAnchor="middle"
-        fill={text} fontFamily={font} fontSize={(slots.line1 ?? '').length > 18 ? 30 : 38} letterSpacing="2"
-      >
-        {(slots.line1 ?? '').toUpperCase()}
-      </text>
-
-      {slots.line2 ? (
         <text
-          x="300" y={slots.number ? 208 : 194} textAnchor="middle"
-          fill={text} fontFamily={font} fontSize="24" letterSpacing="4" opacity="0.85"
+          x="270" y={slots.number ? 126 : 110} textAnchor="middle"
+          fill={text} fontFamily={font} fontSize={(slots.line1 ?? '').length > 18 ? 30 : 38} letterSpacing="2"
         >
-          {slots.line2.toUpperCase()}
+          {(slots.line1 ?? '').toUpperCase()}
         </text>
-      ) : null}
+
+        {slots.line2 ? (
+          <text
+            x="270" y={slots.number ? 168 : 154} textAnchor="middle"
+            fill={text} fontFamily={font} fontSize="24" letterSpacing="4" opacity="0.85"
+          >
+            {slots.line2.toUpperCase()}
+          </text>
+        ) : null}
+      </g>
     </svg>
   );
 }
 
+/*
+ * A desk plate is fitted rather than filled: the wedge it stands on is part of
+ * the design, so the whole composition keeps its proportions and sits centred
+ * in whatever shape the product is set to.
+ */
 function DeskPlate({ slots, plate, text, font, config, uid }: TemplateProps) {
+  const { viewBox, transform } = fitDesign(config, 600, 300);
   return (
-    <svg viewBox="0 0 600 300" className="mx-auto block w-full max-w-lg" role="img" aria-label="Desk plate preview">
+    <svg viewBox={viewBox} className="mx-auto block w-full max-w-lg" role="img" aria-label="Desk plate preview">
       <defs>
         <filter id={`shadow-${uid}`} x="-10%" y="-10%" width="120%" height="140%">
           <feDropShadow dx="0" dy="8" stdDeviation="12" floodColor="#111111" floodOpacity="0.2" />
         </filter>
       </defs>
+      <g transform={transform}>
       {/* Wedge base */}
       <path d="M60 240 L540 240 L560 268 L40 268 Z" fill="#8A8A8A" />
       <rect x="70" y="80" width="460" height="160" rx={config.plate.radius} fill={plate} filter={`url(#shadow-${uid})`} />
@@ -710,18 +752,26 @@ function DeskPlate({ slots, plate, text, font, config, uid }: TemplateProps) {
           {slots.line3}
         </text>
       ) : null}
+      </g>
     </svg>
   );
 }
 
+/*
+ * The square sign is fitted rather than filled: the board and the caption
+ * panel beneath it are one piece, and a square sign stays square whatever
+ * shape the frame around it is set to.
+ */
 function SignSquare({ slots, plate, text, font, config, uid }: TemplateProps) {
+  const { viewBox, transform } = fitDesign(config, 400, 420);
   return (
-    <svg viewBox="0 0 400 420" className="mx-auto block w-full max-w-xs" role="img" aria-label="Sign preview">
+    <svg viewBox={viewBox} className="mx-auto block w-full max-w-xs" role="img" aria-label="Sign preview">
       <defs>
         <filter id={`shadow-${uid}`} x="-10%" y="-10%" width="120%" height="125%">
           <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#111111" floodOpacity="0.18" />
         </filter>
       </defs>
+      <g transform={transform}>
       <rect x="30" y="20" width="340" height="380" rx={config.plate.radius} fill="#FFFFFF" filter={`url(#shadow-${uid})`} />
       <path d="M30 28a8 8 0 0 1 8-8h324a8 8 0 0 1 8 8v272H30Z" fill={plate} />
 
@@ -739,6 +789,7 @@ function SignSquare({ slots, plate, text, font, config, uid }: TemplateProps) {
       >
         {(slots.line1 ?? '').toUpperCase()}
       </text>
+      </g>
     </svg>
   );
 }
@@ -821,6 +872,35 @@ function useTextMetrics(): (value: string, stack: string) => TextMetrics {
   }, [ready]);
 }
 
+/**
+ * Puts a template's own drawing inside the shape the product is set to.
+ *
+ * Three of these designs were drawn against a fixed box -- 600x300 for the
+ * plates, 400x420 for the square sign -- with every coordinate written out by
+ * hand against it. They took no notice of the shape the product was set to, so
+ * a piece cut three times as wide as it is tall still previewed as the same
+ * 2:1 rectangle, and the proportions measured off a photograph were worked out
+ * and then thrown away.
+ *
+ * Re-laying out each of them proportionally would have changed how all three
+ * look. So the drawing is kept exactly as it is and fitted into the configured
+ * box instead: scaled by the same factor on both axes, so nothing is ever
+ * stretched out of proportion, and centred in whatever is left over. At the
+ * shape a design was drawn for the factor is 1 and the result is identical to
+ * what it was before.
+ */
+function fitDesign(config: PreviewConfig, designW: number, designH: number) {
+  const vw = config.aspect.width;
+  const vh = config.aspect.height;
+  const scale = Math.min(vw / designW, vh / designH);
+  return {
+    viewBox: `0 0 ${vw} ${vh}`,
+    transform:
+      `translate(${((vw - designW * scale) / 2).toFixed(2)} ${((vh - designH * scale) / 2).toFixed(2)})`
+      + ` scale(${scale.toFixed(5)})`,
+  };
+}
+
 function fitSize(text: string, room: number, max: number, spacing = 0, capWidth = 0.6): number {
   const n = text.length;
   if (!n) return max;
@@ -853,9 +933,10 @@ function squeeze<T extends { size: number; gap: number }>(rows: T[], room: numbe
  * means nothing, and the customer would be looking at a plate they cannot buy.
  */
 function PlateBotanical({ slots, plate, text, font, config, uid }: TemplateProps) {
-  const VW = 860;
-  const VH = 645;
-  const BAND = 148;
+  const { width: VW, height: VH } = config.aspect;
+  // A proportion of the plate, not a fixed number of units: the border has to
+  // stay the same share of a plate whatever shape the product is cut to.
+  const BAND = Math.round(Math.min(VW, VH) * 0.229);
 
   const number = (slots.number ?? '').toUpperCase();
   const first = (slots.line1 ?? '').toUpperCase();
@@ -935,14 +1016,15 @@ function PlateBotanical({ slots, plate, text, font, config, uid }: TemplateProps
  * Latin line is a flat number -- running toUpperCase over the lot would do
  * nothing visible and would quietly mangle any script that does have case.
  */
-function PlateVine({ slots, text, font, uid }: TemplateProps) {
-  const VW = 1020;
-  const VH = 685;
+function PlateVine({ slots, text, font, config, uid }: TemplateProps) {
+  const { width: VW, height: VH } = config.aspect;
 
-  const bandX = 48;
-  const bandW = 292;
-  const textX = bandX + bandW + 46;
-  const room = VW - textX - 48;
+  // Proportions of the plate, so the band keeps its share of a plate cut to
+  // any shape rather than swamping a small one and stranding a wide one.
+  const bandX = Math.round(VW * 0.047);
+  const bandW = Math.round(VW * 0.286);
+  const textX = bandX + bandW + Math.round(VW * 0.045);
+  const room = VW - textX - bandX;
 
   const name = slots.line1 ?? '';
   const second = slots.line2 ?? '';
@@ -1027,13 +1109,14 @@ function PlateVine({ slots, text, font, uid }: TemplateProps) {
  * script face in all capitals is the one way to make it look like a mistake.
  */
 function PlateCubes({ slots, plate, text, font, config, uid }: TemplateProps) {
-  const VW = 860;
-  const VH = 641;
+  const { width: VW, height: VH } = config.aspect;
 
-  const bandX = 44;
-  const bandW = 286;
-  const textX = bandX + bandW + 56;
-  const room = VW - textX - 44;
+  // Proportions of the plate, so the cut band keeps its share of the face
+  // whatever shape the product is made in.
+  const bandX = Math.round(VW * 0.051);
+  const bandW = Math.round(VW * 0.333);
+  const textX = bandX + bandW + Math.round(VW * 0.065);
+  const room = VW - textX - bandX;
 
   const number = slots.number ?? '';
   const first = slots.line1 ?? '';
@@ -1104,13 +1187,52 @@ function PlateCubes({ slots, plate, text, font, config, uid }: TemplateProps) {
  * So the preview cannot drift from the product, because it IS the product --
  * and a new design needs no code, only an upload.
  */
-function PlatePhoto({ slots, text, font, config }: TemplateProps) {
+function PlatePhoto({ slots, plate, text, font, config, uid }: TemplateProps) {
   const photo = config.photo;
   const measure = useTextMetrics();
   const VW = config.aspect.width;
   const VH = config.aspect.height;
 
-  if (!photo?.image) return null;
+  /*
+   * Nothing to stand on yet.
+   *
+   * This design carries measurements taken off one particular picture, so
+   * until a photograph has been read there is no artwork to draw. Returning
+   * nothing left an empty frame wherever the design was listed -- in the
+   * settings page beside its name, and in the editor if it was selected
+   * before a photograph had been read -- which reads as a broken preview
+   * rather than as one waiting for its artwork. A plain plate with the
+   * lettering on it says what the design is for and what is missing.
+   */
+  if (!photo?.image) {
+    const lines = [slots.number, slots.line1, slots.line2, slots.line3]
+      .map((line) => (line ?? '').trim())
+      .filter(Boolean);
+    const step = VH / (lines.length + 1);
+    return (
+      <svg viewBox={`0 0 ${VW} ${VH}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
+        <rect x="0" y="0" width={VW} height={VH} rx={config.plate.radius} fill={plate} />
+        <rect
+          x={VW * 0.03} y={VH * 0.05} width={VW * 0.94} height={VH * 0.9}
+          rx={config.plate.radius} fill="none" stroke={text} strokeWidth={Math.max(1, VW * 0.004)}
+          strokeDasharray={`${VW * 0.02} ${VW * 0.015}`} opacity="0.45"
+        />
+        {lines.map((line, index) => (
+          <text
+            key={`${line}-${uid}-${index}`}
+            x={VW / 2}
+            y={step * (index + 1) + VH * 0.02}
+            textAnchor="middle"
+            fill={text}
+            fontFamily={font}
+            fontSize={Math.min(VH * 0.16, (VW * 0.82) / Math.max(6, line.length) / 0.62)}
+          >
+            {line}
+          </text>
+        ))}
+      </svg>
+    );
+  }
 
   return (
     <svg viewBox={`0 0 ${VW} ${VH}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Nameplate preview">
