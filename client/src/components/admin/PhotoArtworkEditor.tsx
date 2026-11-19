@@ -50,14 +50,42 @@ export function PhotoArtworkEditor({
   photo: PreviewPhoto | undefined;
   /** The product's own pictures, so a blank plate already uploaded can be used. */
   images: { url: string; alt?: string | null }[];
-  onChange: (next: PreviewPhoto | undefined) => void;
+  /**
+   * The second argument is the artwork's own proportions, sent only when a
+   * picture has just been chosen and could be measured.
+   */
+  onChange: (next: PreviewPhoto | undefined, artworkSize?: { width: number; height: number }) => void;
 }) {
   const current: PreviewPhoto = photo ?? { image: '', boxes: [] };
   const [picking, setPicking] = useState(false);
 
+  /**
+   * Choosing artwork also sets the plate to the shape of that artwork.
+   *
+   * The picture is drawn across the whole plate without keeping its own
+   * proportions, which is right when the plate was measured from that same
+   * picture. Choosing one by hand has no such measurement behind it, so a
+   * square plate was being squashed into whatever shape the design happened
+   * to default to, and the artwork arrived visibly distorted -- the one thing
+   * a preview of a product must never be.
+   *
+   * Measured before anything is sent, and sent with the picture as a single
+   * change: two changes in a row would each be worked out from the same
+   * starting point, and the second would undo the first.
+   */
   const setImage = (url: string) => {
-    if (!url && !current.boxes.length) return onChange(undefined);
-    onChange({ ...current, image: url });
+    if (!url) {
+      return onChange(current.boxes.length ? { ...current, image: '' } : undefined);
+    }
+    const probe = new Image();
+    probe.onload = () => onChange(
+      { ...current, image: url },
+      probe.naturalWidth && probe.naturalHeight
+        ? { width: probe.naturalWidth, height: probe.naturalHeight }
+        : undefined,
+    );
+    probe.onerror = () => onChange({ ...current, image: url });
+    probe.src = assetUrl(url);
   };
 
   const setBox = (index: number, patch: Partial<PreviewPhotoBox>) => {

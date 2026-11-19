@@ -1458,7 +1458,17 @@ function PreviewConfigEditor({
         <PhotoArtworkEditor
           photo={stored.photo}
           images={images}
-          onChange={(next) => patch('photo', next)}
+          onChange={(next, artworkSize) => {
+            /*
+             * Written as one change, so the artwork cannot be undone by the
+             * shape that arrives with it, or the shape by the artwork.
+             */
+            const merged = { ...config };
+            if (next) merged.photo = next;
+            else delete merged.photo;
+            if (artworkSize) merged.aspect = artworkSize;
+            onChange(merged);
+          }}
         />
       ) : null}
 
