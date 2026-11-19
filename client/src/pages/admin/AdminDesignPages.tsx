@@ -10,6 +10,7 @@ import { AdminCard, AdminPageHeader } from '../../components/admin/AdminKit';
 import {
   Badge, Button, ConfirmDialog, EditIcon, Input, Modal, PageLoader, Select, TrashIcon,
 } from '../../components/ui';
+import { fixedLayoutNote } from '../../lib/fixedPages';
 
 /**
  * Design Pages.
@@ -125,12 +126,23 @@ export default function AdminDesignPages() {
                       {page.isSystem ? 'Part of the site structure' : 'Website page'}
                       {page.showInFooter ? ' · in the footer' : ''}
                     </p>
+                    {/*
+                      * Marked here as well as inside the editor, so it is known
+                      * before the trip rather than after it.
+                      */}
+                    {fixedLayoutNote(page.slug) ? (
+                      <p className="mt-1 text-xs text-state-warning">
+                        Has its own design — blocks here are not shown on the website
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-4">
                     <code className="font-mono text-xs text-ink-500">{page.path}</code>
                   </td>
                   <td className="px-3 py-4">
-                    {page.sectionCount ? (
+                    {fixedLayoutNote(page.slug) ? (
+                      <span className="text-xs a-faint">Not used</span>
+                    ) : page.sectionCount ? (
                       <span className="text-xs text-ink-500">{page.sectionCount}</span>
                     ) : (
                       <span className="text-xs text-state-warning">Empty</span>

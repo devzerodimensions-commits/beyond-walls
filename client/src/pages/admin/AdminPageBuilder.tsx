@@ -12,6 +12,7 @@ import {
   ArrowRight, Badge, Button, ChevronDown, CloseIcon, ConfirmDialog, CopyIcon, DragIcon, EyeIcon,
   Input, PageLoader, PlusIcon, SearchIcon, Select, Textarea, TrashIcon,
 } from '../../components/ui';
+import { fixedLayoutNote } from '../../lib/fixedPages';
 
 /*
  * Three shapes the shared kit has no use for. They are outlines of a screen, a
@@ -345,6 +346,14 @@ export default function AdminPageBuilder() {
 
   const frameWidth = DEVICES[device].width;
 
+  /*
+   * Some pages are drawn in the design and cannot be built from these blocks.
+   * Saying so here, above the editor, is the whole point: the editor is
+   * otherwise completely convincing, and a studio only finds out by saving and
+   * then going to look at a page that has not changed.
+   */
+  const fixedNote = fixedLayoutNote(page.slug);
+
   return (
     <div className="admin-ui flex h-screen flex-col overflow-hidden" data-admin-theme={adminTheme}>
       {/* ---------------- Top bar ---------------- */}
@@ -419,6 +428,18 @@ export default function AdminPageBuilder() {
           {page.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
         </Button>
       </header>
+
+      {fixedNote ? (
+        <div
+          className="shrink-0 border-b px-4 py-3"
+          style={{ background: 'var(--a-sunken)', borderColor: 'var(--a-line)' }}
+        >
+          <p className="text-sm font-medium text-state-warning">
+            This page is not built from these blocks
+          </p>
+          <p className="mt-1 max-w-4xl text-xs leading-relaxed a-muted">{fixedNote}</p>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         {/* ---------------- The page itself ---------------- */}
