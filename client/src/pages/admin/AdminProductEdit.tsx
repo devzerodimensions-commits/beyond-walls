@@ -16,6 +16,7 @@ import {
 } from '../../components/admin/AdminKit';
 import { CustomerPreview } from '../../components/admin/CustomerPreview';
 import { DesignLibrary } from '../../components/admin/DesignLibrary';
+import { ReadPhotograph } from '../../components/admin/ReadPhotograph';
 import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
 import {
   LivePreview, PLATE_FONTS, PREVIEW_SLOTS, buildPreviewSlots, resolvePreviewConfig,
@@ -505,6 +506,21 @@ export default function AdminProductEdit() {
               />
               {form.livePreviewEnabled ? (
                 <div className="mt-4">
+                  {/*
+                    * First, because it is what most products want and the one
+                    * thing that was impossible to reach from here: a preview
+                    * made out of the product's own artwork rather than a
+                    * drawing that has nothing to do with it.
+                    */}
+                  <ReadPhotograph
+                    productId={id!}
+                    hasImage={Boolean(product?.images?.length)}
+                    onRead={(nextTemplate, nextConfig) => {
+                      set('livePreviewTemplate', nextTemplate);
+                      set('livePreviewConfig', nextConfig);
+                    }}
+                  />
+
                   <DesignLibrary
                     template={form.livePreviewTemplate}
                     config={form.livePreviewConfig}

@@ -754,19 +754,27 @@ router.post(
       slot: SLOTS[index],
     }));
 
+    /*
+     * Built once and both stored and returned. The editor needs the settings
+     * that were just written so it can show them without reloading the whole
+     * product and discarding whatever else is being edited, and working them
+     * out a second time on the client is how the two drift apart.
+     */
+    const livePreviewConfig = {
+      aspect: read.aspect ?? undefined,
+      defaults: {
+        ...(read.plateColor ? { plateColor: read.plateColor } : {}),
+        ...(read.textColor ? { textColor: read.textColor } : {}),
+      },
+      photo: { image: read.image, boxes },
+    };
+
     await prisma.product.update({
       where: { id: product.id },
       data: {
         livePreviewEnabled: true,
         livePreviewTemplate: 'photo',
-        livePreviewConfig: {
-          aspect: read.aspect ?? undefined,
-          defaults: {
-            ...(read.plateColor ? { plateColor: read.plateColor } : {}),
-            ...(read.textColor ? { textColor: read.textColor } : {}),
-          },
-          photo: { image: read.image, boxes },
-        },
+        livePreviewConfig,
       },
     });
 
@@ -795,7 +803,7 @@ router.post(
       fields = boxes.length;
     }
 
-    return res.json({ success: true, data: { ...read, boxes, fields } });
+    return res.json({ success: true, data: { ...read, boxes, fields, livePreviewConfig } });
   }),
 );
 router.post(
