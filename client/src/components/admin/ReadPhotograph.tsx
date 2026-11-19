@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError, api } from '../../lib/api';
+import { ApiError, api, assetUrl } from '../../lib/api';
 import { useToast } from '../../context/StoreProvider';
 import { Badge, Button } from '../ui';
+import { LivePreview, resolvePreviewConfig } from '../product/LivePreview';
 
 /**
  * Making the preview out of the product's own artwork, from the editor.
@@ -31,14 +33,17 @@ interface ReadResult {
 }
 
 export function ReadPhotograph({
-  productId, hasImage, onRead,
+  productId, hasImage, photoUrl, onRead,
 }: {
   productId: string;
   hasImage: boolean;
+  /** The photograph being read, shown beside the result so the two can be compared. */
+  photoUrl?: string | null;
   onRead: (template: string, config: Record<string, unknown>) => void;
 }) {
   const { push } = useToast();
   const queryClient = useQueryClient();
+  const [made, setMade] = useState<Record<string, unknown> | null>(null);
 
   const read = useMutation({
     mutationFn: () => api.post<ReadResult>(`/admin/products/${productId}/preview-from-photo`, {}),
@@ -47,6 +52,7 @@ export function ReadPhotograph({
         push(result.reason || 'That picture could not be read', 'error');
         return;
       }
+      setMade(result.livePreviewConfig);
       onRead('photo', result.livePreviewConfig);
       await queryClient.invalidateQueries({ queryKey: ['admin-product', productId] });
       push(`Read ${result.boxes.length} line${result.boxes.length === 1 ? '' : 's'} from the artwork`, 'success');
@@ -71,6 +77,56 @@ export function ReadPhotograph({
         <p className="mt-2 border-l-2 border-state-warning pl-3 text-2xs leading-relaxed text-ink-600">
           {read.data.reason}
         </p>
+      ) : null}
+
+      {/*
+        * The photograph and what was made from it, side by side.
+        *
+        * A preview that does not look like the product is the one fault that
+        * hides: every line gets drawn, nothing errors, and the plate simply
+        * comes out in the wrong lettering or with the wrong words in the wrong
+        * places. Nobody goes looking for it, because nothing suggests there is
+        * anything to look for.
+        *
+        * Reading a photograph cannot tell which typeface a piece was cut in --
+        * no picture carries that -- so instead of guessing, the two are put
+        * next to each other at the moment the preview is made, with sample
+        * words in the boxes it found. A studio that can see both in one glance
+        * does not need to be told what to check.
+        */}
+      {made && photoUrl ? (
+        <div className="mt-4 border-t border-stone-line pt-4">
+          <p className="text-2xs uppercase tracking-architect text-ink">
+            Does this match your product?
+          </p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <figure className="m-0">
+              <img
+                src={assetUrl(photoUrl)}
+                alt="The photograph this was made from"
+                className="w-full border border-stone-line object-contain"
+              />
+              <figcaption className="mt-1 text-2xs text-ink-400">Your photograph</figcaption>
+            </figure>
+            <figure className="m-0">
+              <LivePreview
+                template="photo"
+                config={made}
+                slots={resolvePreviewConfig('photo', made).placeholders}
+                hideLabel
+                hideCaption
+                className="border border-stone-line"
+              />
+              <figcaption className="mt-1 text-2xs text-ink-400">What customers will see</figcaption>
+            </figure>
+          </div>
+          <p className="mt-2 text-2xs leading-relaxed text-ink-500">
+            The words differ — those are samples. What should match is where the lines sit and the
+            style of the lettering. A photograph cannot say which typeface a piece was cut in, so if
+            the lettering looks wrong, pick the right face under Lettering below. The lines can be
+            nudged under “Where the words go”.
+          </p>
+        </div>
       ) : null}
     </div>
   );

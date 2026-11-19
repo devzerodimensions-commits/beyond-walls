@@ -516,6 +516,7 @@ export default function AdminProductEdit() {
                   <ReadPhotograph
                     productId={id!}
                     hasImage={Boolean(product?.images?.length)}
+                    photoUrl={(product?.images?.find((i) => i.isPrimary) ?? product?.images?.[0])?.url}
                     onRead={(nextTemplate, nextConfig) => {
                       set('livePreviewTemplate', nextTemplate);
                       set('livePreviewConfig', nextConfig);

@@ -106,16 +106,28 @@ const MAX_LINES = 6;
 /**
  * Where a Devanagari headline is looked for, and how solid it must be.
  *
- * Both measured off the studio's own plates rather than taken from the
- * alphabet's rules: the headline ran at 0.99 and 0.84 of its line's width,
- * between a fifth and a third of the way down, while the Latin flat number
- * beneath it never got past 0.44 anywhere on its line. The threshold sits in
- * the gap between those two. The band starts below the top of the line
- * because a word's matras sit ABOVE its headline, and a band measured from
- * the very top missed the bar completely.
+ * The band starts below the top of the line because a word's matras sit ABOVE
+ * its headline, and a band measured from the very top missed the bar.
+ *
+ * The ink threshold was first set from two plates, where the headline ran at
+ * 0.99 and 0.84 of its line's width against a Latin number that never passed
+ * 0.44. Measured across every plate on the shop it turned out not to separate
+ * anything: the studio's English NO SMOKING sign reaches 0.82 and 0.93 in the
+ * same band, because a row crossing ten bold capitals is nearly as solid as a
+ * rule. On that evidence alone an English sign was being called Devanagari,
+ * which since the name fields began converting would have asked a customer
+ * for English and cut them Hindi on an English sign.
+ *
+ * A bar on its own is therefore not enough, and the second test is what the
+ * bar is FOR: it joins a word into one piece. Measured over the same plates,
+ * Devanagari words run 2.02 and 2.85 times their line's height, while every
+ * Latin line on the shop sits between 0.57 and 0.98. The threshold sits in
+ * that gap with room on both sides. Both tests must pass.
  */
 const HEADLINE_BAND: [number, number] = [0.1, 0.45];
 const HEADLINE_INK = 0.7;
+/** How wide a line's typical piece runs, relative to the line's height. */
+const HEADLINE_JOIN = 1.5;
 /**
  * A mark taller than this share of the picture is not a letter.
  *
@@ -766,17 +778,27 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
    * in the wrong alphabet's font -- the one thing on the plate a studio would
    * never think to go and change, because everything else came out right.
    *
-   * Devanagari announces itself: nearly every word hangs from a shirorekha, a
-   * headline running unbroken along the top of it. No Latin face puts a
-   * continuous rule across the top of a line, so a row of ink spanning most
-   * of a line's width in the top fifth of its height is that headline and
-   * almost nothing else. Counted across the lines rather than taken from one,
-   * because a plate usually carries its flat number in Latin whatever the
-   * name above it is written in.
+   * Devanagari announces itself twice over, and it takes both to be sure.
+   *
+   * Nearly every word hangs from a shirorekha, a headline running unbroken
+   * along the top of it -- but a row crossing ten bold Latin capitals is
+   * nearly as solid as a rule, so the bar alone called the studio's English
+   * signs Devanagari. What the bar is FOR is the second test: it joins a
+   * whole word into one connected piece, several times wider than the line is
+   * tall, which no Latin face does.
+   *
+   * Counted across the lines rather than taken from one, because a plate
+   * usually carries its flat number in Latin whatever the name above it is
+   * written in.
    */
   const headlined = chosen.filter((line) => {
     const tall = line.bottom - line.top + 1;
     const width = line.right - line.left + 1;
+
+    // Joined into words, not standing as separate letters.
+    const widths = line.parts.map((part) => part.w / tall).sort((a, b) => a - b);
+    const typical = widths[Math.floor(widths.length / 2)] ?? 0;
+    if (typical < HEADLINE_JOIN) return false;
     /*
      * Looked for below the top of the line, not at it. The matras of a
      * Devanagari word sit ABOVE its headline, so on the studio's own plate
