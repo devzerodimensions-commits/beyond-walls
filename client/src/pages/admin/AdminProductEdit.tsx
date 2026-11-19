@@ -328,6 +328,37 @@ export default function AdminProductEdit() {
 
   if (!isNew && productQuery.isLoading) return <PageLoader label="Loading product" />;
 
+  /*
+   * A product that is not there any more says so.
+   *
+   * Without this the editor fell through to its blank new-product form and
+   * drew it under the heading "Edit product": an empty name, "Draft", "No
+   * base price", and Save and Publish sitting there ready to press. A
+   * bookmark to a deleted product, or a link from an old order, therefore
+   * looked like a product that had lost everything rather than one that no
+   * longer exists -- and anything typed into it would have been thrown away
+   * by a save that could only ever fail.
+   */
+  if (!isNew && !productQuery.isLoading && !productQuery.data) {
+    return (
+      <>
+        <AdminPageHeader
+          breadcrumb={{ label: 'Products', to: '/admin/products' }}
+          title="That product is not here"
+        />
+        <AdminCard title="Nothing to edit">
+          <p className="text-sm leading-relaxed text-ink-600">
+            It has been deleted, or this address is wrong. Nothing has been lost from the products
+            you still have.
+          </p>
+          <Button className="mt-5" onClick={() => navigate('/admin/products')}>
+            Back to all products
+          </Button>
+        </AdminCard>
+      </>
+    );
+  }
+
   const product = productQuery.data;
   const parentCategories = categoriesQuery.data ?? [];
   const subcategories = parentCategories.find((c) => c.id === form.categoryId)?.children ?? [];
