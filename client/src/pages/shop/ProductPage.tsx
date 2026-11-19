@@ -119,6 +119,22 @@ export default function ProductPage() {
     setVariantId(preselected?.id ?? null);
   }, [product, fields]);
 
+  /*
+   * Above the early returns, because hooks are counted and not named.
+   *
+   * Declared further down -- next to the preview they belong to -- they were
+   * skipped entirely on the first render, which returns the loading screen
+   * before reaching them, and then ran on the second. React counts the hooks
+   * a component calls and matches them up by order, so two appearing out of
+   * nowhere on the second render took the whole product page down.
+   *
+   * Two references rather than one: both previews are mounted at once on a
+   * tablet, and sharing a reference would mean whichever mounted last is the
+   * one that gets saved -- on a phone, the sheet the customer cannot see.
+   */
+  const previewRef = useRef<HTMLDivElement>(null);
+  const sheetPreviewRef = useRef<HTMLDivElement>(null);
+
   if (isLoading) return <PageLoader label="Loading product" />;
   if (isError || !product) {
     return (
@@ -172,15 +188,6 @@ export default function ProductPage() {
    * buying one has a keyboard for it.
    */
   const script = previewScript(previewSettings);
-
-  /*
-   * The two previews on this page are saved separately rather than sharing
-   * one reference: both are mounted at once on a tablet, and whichever
-   * mounted last would otherwise be the one that got saved, which on a phone
-   * is the sheet the customer cannot see.
-   */
-  const previewRef = useRef<HTMLDivElement>(null);
-  const sheetPreviewRef = useRef<HTMLDivElement>(null);
 
   const shareProduct = async () => {
     const url = `${window.location.origin}/product/${product.slug}`;
