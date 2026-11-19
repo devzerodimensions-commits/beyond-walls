@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { PersonalizationField } from '../../lib/types';
-import { LivePreview, buildPreviewSlots, resolvePreviewConfig } from '../product/LivePreview';
+import {
+  LivePreview, buildPreviewSlots, previewScript, resolvePreviewConfig,
+} from '../product/LivePreview';
 import { PersonalizationForm } from '../product/PersonalizationForm';
 
 /**
@@ -27,6 +29,7 @@ export function CustomerPreview({
   const [values, setValues] = useState<Record<string, string>>({});
   const published = fields.filter((field) => field.status === 'PUBLISHED');
   const slots = buildPreviewSlots(published, values);
+  const settings = resolvePreviewConfig(template, config);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -48,7 +51,8 @@ export function CustomerPreview({
             <PersonalizationForm
               fields={published}
               values={values}
-              palette={resolvePreviewConfig(template, config).palette}
+              palette={settings.palette}
+              script={previewScript(settings)}
               onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
             />
           </div>

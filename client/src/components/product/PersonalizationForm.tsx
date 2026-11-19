@@ -5,6 +5,7 @@ import { api, assetUrl } from '../../lib/api';
 import { formatPrice, toNumber } from '../../lib/format';
 import { FieldWrap, Input, Select, Spinner, Textarea, UploadIcon, CloseIcon } from '../ui';
 import { fontStack } from './LivePreview';
+import { ScriptInput } from './ScriptInput';
 
 /** One colour a product offers: the stored value, its name and its swatch. */
 export interface PaletteChoice {
@@ -31,6 +32,14 @@ interface Props {
    * either one works.
    */
   palette?: { plate: PaletteChoice[]; text: PaletteChoice[] };
+  /**
+   * The script this product is lettered in, read from its preview.
+   *
+   * A plate cut in Devanagari has to be ordered in Devanagari, and most
+   * customers have no keyboard for it -- so on those products the name fields
+   * take English and convert. Everywhere else the field is left alone.
+   */
+  script?: 'latin' | 'devanagari';
 }
 
 /** Renders the admin-defined personalization fields for a product. */
@@ -120,7 +129,9 @@ function groupOf(field: PersonalizationField): (typeof GROUPS)[number]['key'] {
   return field.previewSlot ? 'says' : 'extra';
 }
 
-export function PersonalizationForm({ fields, values, errors = {}, onChange, palette }: Props) {
+export function PersonalizationForm({
+  fields, values, errors = {}, onChange, palette, script,
+}: Props) {
   const active = fields.filter((f) => f.status === 'PUBLISHED').sort((a, b) => a.sortOrder - b.sortOrder);
   if (!active.length) return null;
 
@@ -131,6 +142,7 @@ export function PersonalizationForm({ fields, values, errors = {}, onChange, pal
       value={values[field.key] ?? ''}
       error={errors[field.key]}
       palette={palette}
+      script={script}
       onChange={(value) => onChange(field.key, value)}
     />
   );
@@ -167,13 +179,14 @@ function priceSuffix(delta: number | string | undefined): string {
 }
 
 function PersonalizationInput({
-  field, value, error, onChange, palette,
+  field, value, error, onChange, palette, script,
 }: {
   field: PersonalizationField;
   value: string;
   error?: string;
   onChange: (value: string) => void;
   palette?: { plate: PaletteChoice[]; text: PaletteChoice[] };
+  script?: 'latin' | 'devanagari';
 }) {
   const label = `${field.label}${priceSuffix(field.priceDelta)}`;
   // Whether an answer is compulsory is the admin's call, field by field, and
@@ -184,6 +197,28 @@ function PersonalizationInput({
   // studio had deliberately marked optional, like the family name and the
   // free-text instructions.
   const required = field.required;
+
+  /*
+   * On a product lettered in Devanagari, the lines drawn onto the plate take
+   * English and convert it. Only those lines: the house number is numerals,
+   * and a note to the studio is a note to the studio.
+   */
+  const LINES = ['line1', 'line2', 'line3'];
+  if (script === 'devanagari' && field.previewSlot && LINES.includes(field.previewSlot)
+    && (field.type === 'TEXT' || field.type === 'TEXTAREA')) {
+    return (
+      <ScriptInput
+        label={label}
+        required={required}
+        error={error}
+        hint={field.helpText ?? undefined}
+        placeholder={field.placeholder ?? ''}
+        maxLength={field.maxLength ?? undefined}
+        value={value}
+        onChange={onChange}
+      />
+    );
+  }
 
   switch (field.type) {
     case 'TEXTAREA':

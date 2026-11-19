@@ -400,6 +400,26 @@ export function resolvePreviewConfig(
   };
 }
 
+/**
+ * The script this product is lettered in.
+ *
+ * Two things can say so, and either is enough: the design was given the
+ * Devanagari face, or the sample name read off the artwork is in Devanagari.
+ * The second matters because the photograph reader fills the placeholders
+ * from the piece itself, so a Marathi nameplate announces its own script
+ * before anyone has chosen a font for it.
+ *
+ * What it decides is whether the customer is asked to type Devanagari with no
+ * keyboard for it -- see ScriptInput.
+ */
+export function previewScript(config: PreviewConfig): 'latin' | 'devanagari' {
+  if (config.defaults.fontFamily === 'devanagari') return 'devanagari';
+  const sample = [
+    config.placeholders.line1, config.placeholders.line2, config.placeholders.line3,
+  ].filter(Boolean).join('');
+  return /[ऀ-ॿ]/.test(sample) ? 'devanagari' : 'latin';
+}
+
 interface LivePreviewProps {
   template?: string | null;
   slots: PreviewSlots;

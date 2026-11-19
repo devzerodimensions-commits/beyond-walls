@@ -11,7 +11,9 @@ import { useCart, useSettings, useToast, useWishlist } from '../../context/Store
 import { useRecentlyViewed } from '../../hooks/useRecentlyViewed';
 import { ProductCard, ProductGrid } from '../../components/product/ProductCard';
 import { GalleryBadges, ProductGallery } from '../../components/product/ProductGallery';
-import { LivePreview, buildPreviewSlots, resolvePreviewConfig } from '../../components/product/LivePreview';
+import {
+  LivePreview, buildPreviewSlots, previewScript, resolvePreviewConfig,
+} from '../../components/product/LivePreview';
 import { ReviewForm } from '../../components/product/ReviewForm';
 import {
   PersonalizationForm,
@@ -158,10 +160,17 @@ export default function ProductPage() {
    * swatches a customer picks from and the colours the plate is drawn in can
    * never be two different lists.
    */
-  const previewPalette = resolvePreviewConfig(
+  const previewSettings = resolvePreviewConfig(
     product?.livePreviewTemplate ?? null,
     (product?.livePreviewConfig ?? null) as Record<string, unknown> | null,
-  ).palette;
+  );
+  const previewPalette = previewSettings.palette;
+  /*
+   * A Devanagari product asks for the name in English and converts it: the
+   * plate has to be ordered in the script it is cut in, and almost nobody
+   * buying one has a keyboard for it.
+   */
+  const script = previewScript(previewSettings);
 
   const shareProduct = async () => {
     const url = `${window.location.origin}/product/${product.slug}`;
@@ -486,6 +495,7 @@ export default function ProductPage() {
                     </p>
                     <PersonalizationForm
                       palette={previewPalette}
+                      script={script}
                       fields={fields}
                       values={values}
                       errors={errors}
@@ -874,6 +884,7 @@ export default function ProductPage() {
 
             <PersonalizationForm
               palette={previewPalette}
+              script={script}
               fields={fields}
               values={values}
               errors={errors}
