@@ -604,6 +604,7 @@ export default function AdminProductEdit() {
             fields={product?.personalization ?? []}
             previewTemplate={form.livePreviewTemplate}
             previewEnabled={form.livePreviewEnabled}
+            previewConfig={form.livePreviewConfig}
           />
         )
       ) : null}
@@ -1955,12 +1956,22 @@ const EMPTY_FIELD: FieldDraft = {
 };
 
 function PersonalizationTab({
-  productId, fields, previewTemplate, previewEnabled,
+  productId, fields, previewTemplate, previewEnabled, previewConfig,
 }: {
   productId: string;
   fields: PersonalizationField[];
   previewTemplate: string;
   previewEnabled: boolean;
+  /**
+   * The product's own preview settings.
+   *
+   * Without them this panel drew the bare template, so the one place an admin
+   * goes to check that a field is wired to the right part of the plate showed
+   * a plate of the wrong shape, in the wrong colours, offering colour choices
+   * the product does not sell. Checking a binding against something that is
+   * not the product is not checking it.
+   */
+  previewConfig: Record<string, unknown>;
 }) {
   const queryClient = useQueryClient();
   const { push } = useToast();
@@ -2157,6 +2168,7 @@ function PersonalizationTab({
               {previewEnabled ? (
                 <LivePreview
                   template={previewTemplate || 'nameplate-minimal'}
+                  config={previewConfig}
                   slots={previewSlots}
                   className="mt-5 border border-stone-line"
                 />
