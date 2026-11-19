@@ -737,21 +737,47 @@ router.post(
     /*
      * Which question each line asks.
      *
-     * Taken from the order the lines sit in, because nothing in a picture says
-     * that the short line at the top is a flat number rather than a surname.
-     * The studio renames the fields in the editor; what matters here is that
-     * every line found gets one, so no part of the plate is left unanswerable.
+     * Nothing in a picture says the short line at the top is a flat number
+     * rather than a surname -- but the product usually already says so. A
+     * product that has been set up asks its questions in the order they are
+     * answered, top of the plate downwards, so its own questions are matched
+     * to the lines found, in order.
+     *
+     * Numbering the lines line1, line2, line3 regardless was how a plate came
+     * back wrong in the way that is hardest to spot: a product asking for a
+     * flat number, a name and a family name got its name painted on the line
+     * the flat number came off, its family name on the name's line, and the
+     * flat number nowhere at all, because no box was ever bound to it. Every
+     * line was drawn, so nothing looked broken -- it just said the wrong
+     * things in the wrong places.
+     *
+     * A product with no questions yet falls back to the plain numbering,
+     * which is what the fields created below are then made to match.
      */
-    const SLOTS = ['line1', 'line2', 'line3', 'number'] as const;
+    const DEFAULT_SLOTS = ['line1', 'line2', 'line3', 'number'];
     const LABELS: Record<string, string> = {
       line1: 'First line',
       line2: 'Second line',
       line3: 'Third line',
       number: 'House / flat number',
     };
-    const boxes = read.boxes.slice(0, SLOTS.length).map((box, index) => ({
+
+    const asked = product.personalization
+      .filter((field) => field.previewSlot && field.status === 'PUBLISHED')
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((field) => field.previewSlot as string);
+
+    /*
+     * Any line the product has no question for still gets a slot, so the
+     * studio can bind something to it later rather than finding a line of the
+     * artwork that cannot be reached at all.
+     */
+    const spare = DEFAULT_SLOTS.filter((slot) => !asked.includes(slot));
+    const order = [...asked, ...spare];
+
+    const boxes = read.boxes.slice(0, order.length).map((box, index) => ({
       ...box,
-      slot: SLOTS[index],
+      slot: order[index],
     }));
 
     /*

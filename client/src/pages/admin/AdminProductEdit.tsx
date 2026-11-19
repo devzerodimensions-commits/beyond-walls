@@ -18,6 +18,7 @@ import { CustomerPreview } from '../../components/admin/CustomerPreview';
 import { DesignLibrary } from '../../components/admin/DesignLibrary';
 import { ReadPhotograph } from '../../components/admin/ReadPhotograph';
 import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
+import { FontChoice } from '../../components/admin/FontChoice';
 import {
   LivePreview, PLATE_FONTS, PREVIEW_SLOTS, buildPreviewSlots, resolvePreviewConfig,
   usePreviewTemplates, type PreviewConfig,
@@ -1383,22 +1384,11 @@ function PreviewConfigEditor({
           palette={resolved.palette.text}
           onChange={(value) => patchGroup('defaults', 'textColor', value)}
         />
-        <label className="block">
-          <span className="field-label">Default typography</span>
-          <input
-            list="preview-font-families"
-            value={String(stored.defaults?.fontFamily ?? '')}
-            placeholder={`From template (${resolved.defaults.fontFamily})`}
-            className="field w-full"
-            onChange={(event) => patchGroup('defaults', 'fontFamily', event.target.value)}
-          />
-          <datalist id="preview-font-families">
-            {PLATE_FONTS.map((face) => <option key={face.id} value={face.id}>{face.label}</option>)}
-          </datalist>
-          <span className="mt-1 block text-2xs text-ink-400">
-            Choose a built-in face or enter a CSS font family/stack.
-          </span>
-        </label>
+        <FontChoice
+          value={String(stored.defaults?.fontFamily ?? '')}
+          fallback={resolved.defaults.fontFamily}
+          onChange={(value) => patchGroup('defaults', 'fontFamily', value)}
+        />
         <Input
           type="number"
           label="Corner radius"
