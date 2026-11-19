@@ -239,6 +239,25 @@
    class, which is already more specific than the utility it replaces.
    --------------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------------
+   A ticked box has to look ticked.
+   ---------------------------------------------------------------------------
+   The rule below retints .bg-paper, and a checkbox carries bg-paper for its
+   unticked state. Both selectors weigh the same, and this file is loaded last,
+   so inside the admin it also won when the box WAS ticked: the fill stayed
+   white, and .tickbox:checked then drew its white tick on white. Every
+   checkbox in the admin -- track inventory, show this choice to customers,
+   show product reviews -- looked switched off whatever it was actually set
+   to, and a shopkeeper correcting what they saw turned the setting off.
+
+   So the ticked state is stated here too, in the admin's own colours, where it
+   outweighs the retint rather than racing it.
+   --------------------------------------------------------------------------- */
+.admin-ui .tickbox:checked {
+  background-color: var(--a-accent);
+  border-color: var(--a-accent);
+}
+
 .admin-ui .bg-paper       { background-color: var(--a-surface); }
 .admin-ui .bg-paper-off,
 .admin-ui .bg-paper-warm,
