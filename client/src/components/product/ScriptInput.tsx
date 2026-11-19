@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Input } from '../ui';
 import { fontStack } from './LivePreview';
 import { hasLatin, toDevanagari } from '../../lib/devanagari';
@@ -41,7 +41,24 @@ export function ScriptInput({
    * there is no Roman draft left to re-derive it from.
    */
   const [direct, setDirect] = useState(() => value.trim() !== '' && !hasLatin(value));
-  const [roman, setRoman] = useState('');
+  const [roman, setRoman] = useState(() => (hasLatin(value) ? value : ''));
+
+  /*
+   * A field can arrive already filled -- the admin sets a default answer, and
+   * duplicating a product carries it across. If that default is in Roman it
+   * would sit in the box untouched and be cut as Roman, which is the single
+   * thing this component exists to stop. So it is converted once on arrival,
+   * exactly as if the customer had typed it, and shown for approval like any
+   * other guess.
+   */
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    if (!direct && hasLatin(value)) onChange(toDevanagari(value));
+    // Arrival only: afterwards the customer owns the field.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const typeRoman = (next: string) => {
     const converted = toDevanagari(next);
