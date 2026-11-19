@@ -46,10 +46,23 @@ export default function AdminDesignPages() {
   const [addOpen, setAddOpen] = useState(false);
   const [deleting, setDeleting] = useState<PageRow | null>(null);
 
+  /*
+   * Pages this editor can actually change.
+   *
+   * A page laid out in the design is not built from blocks, so listing it here
+   * offered an editor that could not change it: a studio rewrote its About
+   * text, saved, went to look, and found the page exactly as it was. The
+   * warning that used to sit on the row was the smaller half of the fix --
+   * the row itself was the thing making the promise. Its words are edited in
+   * Settings, and the signpost under the table says so.
+   */
   const { data: pages, isLoading } = useQuery({
     queryKey: ['builder-pages'],
     queryFn: () => api.get<PageRow[]>('/admin/builder/pages'),
   });
+
+  const listed = (pages ?? []).filter((page) => !fixedLayoutNote(page.slug));
+  const hidden = (pages ?? []).filter((page) => fixedLayoutNote(page.slug));
 
   const { data: catalogue } = useQuery({
     queryKey: ['builder-widgets'],
@@ -94,7 +107,7 @@ export default function AdminDesignPages() {
       <AdminCard
         title="All website pages"
         description="Choose a page and open the visual editor."
-        actions={<span className="text-2xs text-ink-400">{pages?.length ?? 0} pages</span>}
+        actions={<span className="text-2xs text-ink-400">{listed.length} pages</span>}
       >
         <div className="-mx-5 overflow-x-auto sm:mx-0">
           <table className="w-full min-w-[46rem] border-collapse text-sm">
@@ -118,7 +131,7 @@ export default function AdminDesignPages() {
               </tr>
             </thead>
             <tbody>
-              {(pages ?? []).map((page) => (
+              {listed.map((page) => (
                 <tr key={page.id} className="border-b border-stone-line last:border-0">
                   <td className="py-4 pl-5 pr-3 sm:pl-0">
                     <p className="font-medium text-ink">{page.title}</p>
@@ -126,23 +139,13 @@ export default function AdminDesignPages() {
                       {page.isSystem ? 'Part of the site structure' : 'Website page'}
                       {page.showInFooter ? ' · in the footer' : ''}
                     </p>
-                    {/*
-                      * Marked here as well as inside the editor, so it is known
-                      * before the trip rather than after it.
-                      */}
-                    {fixedLayoutNote(page.slug) ? (
-                      <p className="mt-1 text-xs text-state-warning">
-                        Has its own design — blocks here are not shown on the website
-                      </p>
-                    ) : null}
+
                   </td>
                   <td className="px-3 py-4">
                     <code className="font-mono text-xs text-ink-500">{page.path}</code>
                   </td>
                   <td className="px-3 py-4">
-                    {fixedLayoutNote(page.slug) ? (
-                      <span className="text-xs a-faint">Not used</span>
-                    ) : page.sectionCount ? (
+                    {page.sectionCount ? (
                       <span className="text-xs text-ink-500">{page.sectionCount}</span>
                     ) : (
                       <span className="text-xs text-state-warning">Empty</span>
@@ -199,6 +202,21 @@ export default function AdminDesignPages() {
             </tbody>
           </table>
         </div>
+
+        {hidden.length ? (
+          <div className="mt-5 border-t border-stone-line pt-4">
+            {hidden.map((page) => (
+              <p key={page.id} className="text-2xs leading-relaxed text-ink-500">
+                <strong className="text-ink">{page.title}</strong> has its own design, so it is not
+                built from blocks. Its words are edited in{' '}
+                <Link to="/admin/settings?group=about" className="underline underline-offset-2">
+                  Settings → About page
+                </Link>
+                .
+              </p>
+            ))}
+          </div>
+        ) : null}
       </AdminCard>
 
       <AddPageDialog
