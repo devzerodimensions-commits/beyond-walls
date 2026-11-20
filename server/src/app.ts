@@ -68,7 +68,37 @@ export function createApp() {
     helmet({
       // Uploaded images are served from this origin and embedded by the SPA.
       crossOriginResourcePolicy: { policy: 'cross-origin' },
-      contentSecurityPolicy: false,
+      /*
+       * The part of a content policy that cannot break the site.
+       *
+       * A full policy is the real defence against injected script, but it has
+       * to name every host the page is allowed to load from -- the two font
+       * services, and whatever the payment provider's checkout reaches for
+       * while it is open. Get one of those wrong and the shop stops taking
+       * money, which is a worse outcome than the one being defended against,
+       * and it cannot be verified without putting a real card through.
+       *
+       * These three need no such list and are worth having on their own:
+       *
+       *  - base-uri stops injected markup repointing every relative URL on the
+       *    page, which is how a single stray tag turns into every script and
+       *    form on the site being fetched from somewhere else.
+       *  - object-src 'none' removes plugin embedding, a scripting route that
+       *    nothing here uses.
+       *  - frame-ancestors is the modern form of the X-Frame-Options header
+       *    already being sent, and covers browsers that ignore the old one.
+       *
+       * The rest is written up for the studio to turn on once a payment has
+       * been put through with it in place.
+       */
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          'base-uri': ["'self'"],
+          'object-src': ["'none'"],
+          'frame-ancestors': ["'self'"],
+        },
+      },
     }),
   );
 
