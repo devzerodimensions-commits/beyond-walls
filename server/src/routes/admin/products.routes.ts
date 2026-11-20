@@ -781,6 +781,8 @@ async function buildPreviewFromPhoto(productId: string, force = false) {
         ...(chosenFont
           ? { fontFamily: chosenFont }
           : read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
+        /* How heavy the real lettering is, measured off the artwork. */
+        fontWeight: read.weight,
       },
       photo: { image: read.image, boxes },
     };

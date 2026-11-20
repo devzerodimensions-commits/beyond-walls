@@ -45,6 +45,8 @@ import { getStorage } from './storage.service';
  * plate is drawn in, and the fonts are grouped the same way.
  */
 export type PlateScript = 'latin' | 'devanagari';
+/** How heavy the lettering on a piece is, as a CSS font weight. */
+export type PlateWeight = 400 | 700;
 
 /** Everything is a fraction of the image, so it survives any resize. */
 export interface PlateBox {
@@ -68,6 +70,8 @@ export interface PlatePreview {
   aspect: { width: number; height: number } | null;
   plateColor: string | null;
   textColor: string | null;
+  /** Measured from the artwork; see BOLD_FILL. */
+  weight: PlateWeight;
   /** Top to bottom. Each one is a line of writing the customer replaces. */
   boxes: PlateBox[];
   /** Read off the lettering, so the preview can be set in the same alphabet. */
@@ -124,6 +128,21 @@ const MAX_LINES = 6;
  * Latin line on the shop sits between 0.57 and 0.98. The threshold sits in
  * that gap with room on both sides. Both tests must pass.
  */
+/**
+ * How solid a letter has to be before the preview sets it bold.
+ *
+ * A picture cannot say which typeface a piece was cut in, but it can say how
+ * heavy the lettering is: a bold face fills more of each letter's own box than
+ * a light one. That is measurable, unlike the typeface, so it is measured.
+ *
+ * Taken off the studio's own plates. The round gold plate fills 0.58 and 0.71
+ * of its glyph boxes and is unmistakably bold; the acrylic nameplate 0.55. The
+ * light ones sit well below -- 0.34 and 0.36 on the botanical frame, 0.32 to
+ * 0.36 on the cut script, 0.44 on the Devanagari floral. The threshold is in
+ * the gap, and every one of those five comes out right.
+ */
+const BOLD_FILL = 0.45;
+
 const HEADLINE_BAND: [number, number] = [0.1, 0.45];
 const HEADLINE_INK = 0.7;
 /** How wide a line's typical piece runs, relative to the line's height. */
@@ -295,7 +314,7 @@ interface Line {
 
 export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
   const no = (reason: string): PlateAnalysis => ({
-    ok: false, reason, blank: null, aspect: null, plateColor: null, textColor: null, boxes: [], script: 'latin',
+    ok: false, reason, blank: null, aspect: null, plateColor: null, textColor: null, boxes: [], script: 'latin', weight: 400,
   });
 
   let meta;
@@ -842,6 +861,19 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
   }).length;
   const script: PlateScript = headlined * 2 >= chosen.length ? 'devanagari' : 'latin';
 
+  /*
+   * The median line rather than the average, so one heavy flat number on an
+   * otherwise light plate cannot make the whole thing bold.
+   */
+  const fills = chosen.map((line) => {
+    let ink = 0;
+    let area = 0;
+    for (const part of line.parts) { area += part.w * part.h; ink += part.n; }
+    return area ? ink / area : 0;
+  }).sort((a, b) => a - b);
+  const medianFill = fills[Math.floor(fills.length / 2)] ?? 0;
+  const weight: PlateWeight = medianFill >= BOLD_FILL ? 700 : 400;
+
   const boxes: PlateBox[] = [];
   for (const line of chosen) {
     const { clearL, clearR } = roomOf.get(line)!;
@@ -1001,6 +1033,7 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
     script,
     plateColor: hex(plate.r, plate.g, plate.b),
     textColor: hex(ink.r, ink.g, ink.b),
+    weight,
     boxes,
   };
 }
@@ -1014,7 +1047,7 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
  */
 export async function readPlate(url: string): Promise<PlatePreview> {
   const fail = (reason: string): PlatePreview => ({
-    ok: false, reason, image: null, aspect: null, plateColor: null, textColor: null, boxes: [], script: 'latin',
+    ok: false, reason, image: null, aspect: null, plateColor: null, textColor: null, boxes: [], script: 'latin', weight: 400,
   });
 
   /*

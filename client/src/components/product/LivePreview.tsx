@@ -227,6 +227,15 @@ export interface PreviewConfig {
     plateColor: string;
     textColor: string;
     fontFamily: string;
+    /**
+     * How heavy the lettering is, measured from the artwork.
+     *
+     * A picture cannot say which typeface a piece was cut in, but it can say
+     * how solid its strokes are -- so the weight is read even though the face
+     * has to be chosen by eye. It is the difference between a preview that
+     * looks like the plate and one that looks like a lighter plate.
+     */
+    fontWeight?: number;
   };
   /** Shown before the customer has typed anything. Never sent to production. */
   placeholders: PreviewSlots;
@@ -1391,6 +1400,7 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
             y={box.y * VH + m.ascent * size}
             fill={text}
             fontFamily={font}
+            fontWeight={config.defaults.fontWeight ?? 400}
             fontSize={size}
             textAnchor={anchor}
           >
