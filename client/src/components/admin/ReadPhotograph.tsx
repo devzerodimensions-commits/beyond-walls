@@ -110,8 +110,26 @@ export function ReadPhotograph({
     };
     setMade(next);
     onRead('photo', next);
-    void api.put(`/admin/products/${productId}`, { livePreviewConfig: next });
+    /*
+     * PATCH, and the failure is reported.
+     *
+     * This first went out as a PUT, which this API does not have, so every
+     * change 404'd -- and because the call was fired and forgotten, the
+     * dropdown moved, the preview beside it moved, and nothing was saved. A
+     * write that can fail silently is worse than one that does not exist.
+     */
+    saveSlot.mutate(next);
   };
+
+  const saveSlot = useMutation({
+    mutationFn: (config: Record<string, unknown>) =>
+      api.patch(`/admin/products/${productId}`, { livePreviewConfig: config }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-product', productId] }),
+    onError: (err) => push(
+      err instanceof ApiError ? err.message : 'That line could not be saved',
+      'error',
+    ),
+  });
 
   const read = useMutation({
     mutationFn: () => api.post<ReadResult>(`/admin/products/${productId}/preview-from-photo`, {}),
