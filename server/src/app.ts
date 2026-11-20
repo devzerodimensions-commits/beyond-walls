@@ -94,6 +94,15 @@ export function createApp() {
       contentSecurityPolicy: {
         useDefaults: false,
         directives: {
+          /*
+           * Sending these three without a default-src is the whole point, and
+           * helmet refuses to do it by accident: without this it throws at
+           * startup rather than quietly shipping a policy nobody meant. Named
+           * as alarmingly as it deserves, and deliberate here -- a default-src
+           * is exactly the directive that cannot be set without naming every
+           * host the checkout talks to.
+           */
+          defaultSrc: helmet.contentSecurityPolicy.dangerouslyDisableDefaultSrc,
           'base-uri': ["'self'"],
           'object-src': ["'none'"],
           'frame-ancestors': ["'self'"],
