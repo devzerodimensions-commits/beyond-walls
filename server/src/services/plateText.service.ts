@@ -310,6 +310,8 @@ interface Line {
   fg: Rgb;
   roughness: number;
   contrast: number;
+  /** Clear plate above or below, as a fraction of the line's own height. */
+  openness: number;
 }
 
 export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
@@ -524,7 +526,19 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
 
       // A line of writing runs along. A clump of ornament roughly as tall as
       // it is wide is not a line however neatly its pieces happen to sit.
-      if (right - left + 1 < tall * 1.8) continue;
+      /*
+       * How long a run has to be before it counts as a line.
+       *
+       * One or two marks tell you almost nothing -- a leaf lying on its side
+       * is wider than it is tall too -- so those must be clearly elongated.
+       * Three or more separate marks that have already come through the
+       * baseline test and the one-size test are a row of letters by then, and
+       * holding them to the same length was losing short lines: "A 01" on the
+       * studio's own acrylic plate measures 1.73 and was being thrown away
+       * one hundredth short, taking the flat number off that preview.
+       */
+      const MIN_RUN = r.length >= 3 ? 1.4 : 1.8;
+      if (right - left + 1 < tall * MIN_RUN) continue;
 
       /*
        * The plate beside this line: its colour, and how even it is. Taken
@@ -541,36 +555,80 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
        * patch has to disappear into is the plate directly over and under the
        * writing, so that is what is measured.
        */
-      const reach = Math.round(tall * 0.6);
-      let bgR = 0, bgG = 0, bgB = 0, bgN = 0, sum = 0, sumSq = 0;
-      const strip = (from: number, to: number) => {
-        let clear = 0;
-        let area = 0;
-        let r2 = 0, g2 = 0, b2 = 0, n2 = 0;
-        for (let y = Math.max(0, from); y <= Math.min(h - 1, to); y += 1) {
-          for (let x = left; x <= right; x += 1) {
-            area += 1;
-            const i = y * w + x;
-            if (anyInk(i)) continue;
-            const p = i * ch;
-            bgR += data[p]; bgG += data[p + 1]; bgB += data[p + 2];
-            r2 += data[p]; g2 += data[p + 1]; b2 += data[p + 2]; n2 += 1;
-            const v = lum[i] / 255;
-            sum += v; sumSq += v * v; bgN += 1; clear += 1;
+      /*
+       * Read at two distances.
+       *
+       * The band has to be wide enough to describe the surface and narrow
+       * enough to stay on the plate, and a line set close to the plate's own
+       * edge cannot have both. The band above it runs off the piece and onto
+       * whatever it was photographed against, and the two sides then disagree
+       * wildly: the flat number on the studio's acrylic plate measured a step
+       * of 170 against a limit of 16 -- not because that plate is uneven, but
+       * because the band had left it. The number was dropped, the two lines
+       * below it shifted up a slot, and a customer's house number would have
+       * been painted across the middle of their own name.
+       *
+       * So the wide reading is tried first and a line it rejects is read
+       * again close in. That is honest: the fill runs the plate from the rows
+       * just above a line to the rows just below it, so the near band is the
+       * surface it actually has to disappear into -- the wide one is only the
+       * better description of it when the plate is big enough to give it.
+       */
+      const measure = (reach: number) => {
+        let bgR = 0, bgG = 0, bgB = 0, bgN = 0, sum = 0, sumSq = 0;
+        const strip = (from: number, to: number) => {
+          let clear = 0;
+          let area = 0;
+          let r2 = 0, g2 = 0, b2 = 0, n2 = 0;
+          for (let y = Math.max(0, from); y <= Math.min(h - 1, to); y += 1) {
+            for (let x = left; x <= right; x += 1) {
+              area += 1;
+              const i = y * w + x;
+              if (anyInk(i)) continue;
+              const p = i * ch;
+              bgR += data[p]; bgG += data[p + 1]; bgB += data[p + 2];
+              r2 += data[p]; g2 += data[p + 1]; b2 += data[p + 2]; n2 += 1;
+              const v = lum[i] / 255;
+              sum += v; sumSq += v * v; bgN += 1; clear += 1;
+            }
           }
-        }
+          return {
+            open: area ? clear / area : 0,
+            colour: n2 ? { r: r2 / n2, g: g2 / n2, b: b2 / n2 } : null,
+          };
+        };
+        const over = strip(top - reach, top - 1);
+        const under = strip(bottom + 1, bottom + reach);
+        const step = over.colour && under.colour
+          ? (Math.abs(over.colour.r - under.colour.r)
+            + Math.abs(over.colour.g - under.colour.g)
+            + Math.abs(over.colour.b - under.colour.b)) / 3
+          : null;
         return {
-          open: area ? clear / area : 0,
-          colour: n2 ? { r: r2 / n2, g: g2 / n2, b: b2 / n2 } : null,
+          over, under, step, bgN,
+          bg: bgN ? { r: bgR / bgN, g: bgG / bgN, b: bgB / bgN } : null,
+          roughness: bgN ? Math.sqrt(Math.max(0, sumSq / bgN - (sum / bgN) ** 2)) : 1,
         };
       };
-      const over = strip(top - reach, top - 1);
-      const under = strip(bottom + 1, bottom + reach);
-      const openAbove = over.open;
-      const openBelow = under.open;
-      if (bgN < 40) continue;
-      const bg = { r: bgR / bgN, g: bgG / bgN, b: bgB / bgN };
-      const roughness = Math.sqrt(Math.max(0, sumSq / bgN - (sum / bgN) ** 2));
+
+      const wide = measure(Math.round(tall * 0.6));
+      /*
+       * Openness is always the wide reading. It is what separates a line of
+       * writing from a field of ornament, and close in every row of leaves
+       * has clear plate beside it too.
+       */
+      const openAbove = wide.over.open;
+      const openBelow = wide.under.open;
+
+      let surface = wide;
+      if (wide.step !== null && wide.step > MAX_STEP) {
+        const near = measure(Math.max(2, Math.round(tall * 0.25)));
+        if (near.step !== null && near.step <= MAX_STEP) surface = near;
+      }
+      if (surface.bgN < 40 || !surface.bg) continue;
+      if (surface.step !== null && surface.step > MAX_STEP) continue;
+      const bg = surface.bg;
+      const roughness = surface.roughness;
 
       /*
        * The plate above the writing and the plate below it must match.
@@ -584,14 +642,6 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
        * invent the difference and lands as a visible streak, which is how a
        * photographed billboard came back with its top half wiped.
        */
-      if (over.colour && under.colour) {
-        const step =
-          (Math.abs(over.colour.r - under.colour.r)
-            + Math.abs(over.colour.g - under.colour.g)
-            + Math.abs(over.colour.b - under.colour.b)) / 3;
-        if (step > MAX_STEP) continue;
-      }
-
       /*
        * Writing sits on open plate; ornament does not.
        *
@@ -613,7 +663,6 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
        * because it is a field rather than a line.
        */
       const openness = Math.max(openAbove, openBelow);
-      if (openness < MIN_OPENNESS) continue;
 
       /*
        * The colour of the stroke, not of its edges.
@@ -661,7 +710,7 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
         polarity: group.polarity,
         left, right, top, bottom,
         ink: r.reduce((a, p) => a + p.n, 0),
-        parts: r, bg, fg, roughness, contrast,
+        parts: r, bg, fg, roughness, contrast, openness,
       });
     }
   }
@@ -686,7 +735,37 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
     if (!covered) deduped.push(line);
   }
 
-  const usable = deduped.filter(
+  /*
+   * Writing directly under writing is still writing.
+   *
+   * The openness test asks for clear plate above a line or below it, which is
+   * what separates a line of letters from a field of ornament. A name set on
+   * three stacked lines breaks it: the middle line has writing over it and
+   * writing under it, and a last line close to the plate's edge has writing
+   * over it and nothing much under it. On the studio's acrylic plate that cost
+   * the whole surname -- "SHAH" scored 0.34 against the 0.62 it needed, and a
+   * customer typing their family name would have watched it go nowhere.
+   *
+   * So a line that fails on its own is kept if it sits immediately above or
+   * below a line that passed on its own merit and runs along the same part of
+   * the plate. Only one step out from a line that passed, never a chain, so
+   * this cannot walk down a column of ornament: the first rung still has to
+   * earn its place the hard way.
+   */
+  const standalone = deduped.filter((l) => l.openness >= MIN_OPENNESS);
+  const stacked = deduped.filter((l) => {
+    if (l.openness >= MIN_OPENNESS) return true;
+    const tall = l.bottom - l.top + 1;
+    const wide = l.right - l.left + 1;
+    return standalone.some((k) => {
+      const gap = l.top > k.bottom ? l.top - k.bottom : k.top - l.bottom;
+      if (gap < 0 || gap > tall * 1.2) return false;
+      const overlap = Math.min(k.right, l.right) - Math.max(k.left, l.left) + 1;
+      return overlap > 0 && overlap / Math.min(wide, k.right - k.left + 1) > 0.5;
+    });
+  });
+
+  const usable = stacked.filter(
     (l) => l.roughness <= MAX_ROUGHNESS && l.contrast >= MIN_CONTRAST,
   );
   if (!usable.length) {
