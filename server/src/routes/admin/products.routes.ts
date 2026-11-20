@@ -6,7 +6,7 @@ import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../ut
 import { toBool, uniqueSlug } from '../../utils/helpers';
 import { persistUploads, upload } from '../../middleware/upload';
 import { suggestPreviewFromImage } from '../../services/previewSuggest.service';
-import { plateShape, readPlate } from '../../services/plateText.service';
+import { readPlate } from '../../services/plateText.service';
 import { deleteFileIfUnreferenced } from '../../services/media.service';
 import { isSellable } from '../../services/pricing.service';
 
@@ -707,19 +707,22 @@ router.get(
  * positions: once a studio has placed the lines, by hand or by reading, that
  * is theirs.
  *
- * Two outcomes, and the difference matters.
+ * Every picture is tried, not only the first.
  *
- * The lettering is read off the artwork: the sample name is painted out, the
- * piece itself becomes the preview, and the customer's words go exactly where
- * the real ones were. This is what a flat design file gives.
+ * A studio uploads several: the piece on a wall, the piece in somebody's
+ * hands, a close-up of the finish. Which one happens to be first is a
+ * merchandising decision, not a statement about which one a machine can read
+ * -- and on the round gold plate it was the photograph of two hands holding
+ * it, where the only thing legible turned out to be the watermark in the
+ * corner. The one mounted on the wall read perfectly. So each is tried in
+ * turn and the first that can be read is used.
  *
- * Or it cannot be: a plate in somebody's hand, or on a textured wall, has no
- * plain surface behind the letters to reconstruct, so the old name cannot be
- * removed. Drawing over it would put the customer's name on top of a
- * stranger's. So the photograph is left alone and a clean plate is drawn
- * instead -- at the real piece's proportions, taken from the picture, so the
- * shape on the screen is still the shape of the thing being sold. The studio
- * can then drop in a blank artwork file and the lettering lands on it.
+ * When none of them can be, nothing is drawn. A preview invented from the
+ * proportions alone was worse than none: a round white plate with a gold ring
+ * came out as a black rectangle, which is not that product, and showing a
+ * customer the wrong shape is a worse failure than showing them no preview
+ * and saying why. The reason goes back to the studio so they can add the flat
+ * design file the piece is cut from.
  */
 async function buildPreviewFromPhoto(productId: string) {
   const product = await prisma.product.findUnique({
@@ -735,10 +738,20 @@ async function buildPreviewFromPhoto(productId: string) {
   // Already placed, by hand or by an earlier read. Leave it alone.
   if (Array.isArray(existing.photo?.boxes) && existing.photo.boxes.length) return null;
 
-  const image = product.images.find((i) => i.isPrimary) ?? product.images[0];
-  if (!image) return null;
+  /* The primary first, because it is usually the best picture of the piece. */
+  const ordered = [
+    ...product.images.filter((i) => i.isPrimary),
+    ...product.images.filter((i) => !i.isPrimary),
+  ];
+  if (!ordered.length) return null;
 
-  const read = await readPlate(image.url);
+  let read = null as Awaited<ReturnType<typeof readPlate>> | null;
+  let firstReason = '';
+  for (const candidate of ordered) {
+    const attempt = await readPlate(candidate.url);
+    if (attempt.ok && attempt.image) { read = attempt; break; }
+    if (!firstReason) firstReason = attempt.reason;
+  }
 
   const DEFAULT_SLOTS = ['line1', 'line2', 'line3', 'number'];
   const asked = product.personalization
@@ -750,7 +763,7 @@ async function buildPreviewFromPhoto(productId: string) {
   const chosenFont = (product.livePreviewConfig as { defaults?: { fontFamily?: string } } | null)
     ?.defaults?.fontFamily;
 
-  if (read.ok && read.image) {
+  if (read && read.image) {
     const boxes = read.boxes.slice(0, order.length).map((box, index) => ({
       ...box,
       slot: order[index],
@@ -774,26 +787,10 @@ async function buildPreviewFromPhoto(productId: string) {
   }
 
   /*
-   * The picture cannot be used, but its shape can. Anything already set by the
-   * studio -- a font, a colour -- is kept; only the proportions are filled in.
+   * None of the pictures could be read, so nothing is drawn and nothing is
+   * changed. The studio is told which it was and why.
    */
-  const shape = await plateShape(image.url);
-  if (!shape) return null;
-
-  const config = {
-    ...(product.livePreviewConfig as Record<string, unknown> | null ?? {}),
-    aspect: shape,
-    // No usable artwork, so nothing is drawn behind the lettering.
-    photo: undefined,
-  };
-  await prisma.product.update({
-    where: { id: product.id },
-    data: {
-      livePreviewTemplate: 'nameplate-minimal',
-      livePreviewConfig: config as object,
-    },
-  });
-  return { from: 'shape' as const, reason: read.reason, boxes: 0, config };
+  return { from: 'none' as const, reason: firstReason, boxes: 0, config: null };
 }
 
 /*
@@ -838,13 +835,24 @@ router.post(
        * rather than nothing at all. The reason goes back either way: the
        * studio is told what happened and can supply a flat artwork file.
        */
-      const fallback = await buildPreviewFromPhoto(product.id);
-      return res.json({
-        success: true,
-        data: fallback
-          ? { ...read, livePreviewConfig: fallback.config, shapeOnly: true }
-          : read,
-      });
+      /*
+       * The first picture failed, but another of the product's own pictures
+       * may still read -- which is the whole point of trying them all.
+       */
+      const another = await buildPreviewFromPhoto(product.id);
+      if (another && another.config) {
+        return res.json({
+          success: true,
+          data: {
+            ok: true,
+            reason: 'Read from another of this product\'s pictures.',
+            image: null,
+            boxes: new Array(another.boxes).fill(null),
+            livePreviewConfig: another.config,
+          },
+        });
+      }
+      return res.json({ success: true, data: read });
     }
 
     /*
