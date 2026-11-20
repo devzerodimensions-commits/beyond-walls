@@ -297,7 +297,7 @@ router.get(
     res.setHeader('Content-Disposition', 'attachment; filename="beyond-walls-products.csv"');
     // A BOM, so Excel opens rupee amounts and accented names as UTF-8 rather
     // than as the local code page.
-    res.send(`﻿${[CSV_COLUMNS.join(','), ...rows].join('\n')}`);
+    res.send(`\uFEFF${[CSV_COLUMNS.join(','), ...rows].join('\n')}`);
   }),
 );
 

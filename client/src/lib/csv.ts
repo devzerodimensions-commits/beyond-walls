@@ -13,7 +13,7 @@
 export function parseCsv(text: string): string[][] {
   // A BOM is what Excel writes, and left in place it becomes part of the first
   // header, so "SKU" silently stops matching.
-  const input = text.replace(/^﻿/, '');
+  const input = text.replace(/^\uFEFF/, '');
 
   const rows: string[][] = [];
   let row: string[] = [];

@@ -355,7 +355,7 @@ export function createApp() {
       setHeaders(res, filePath) {
         // Vite filenames contain a content hash. They can be cached forever:
         // a changed file receives a different URL on the next deployment.
-        if (/\-[A-Za-z0-9_-]{8,}\.(?:js|css)$/i.test(path.basename(filePath))) {
+        if (/-[A-Za-z0-9_-]{8,}\.(?:js|css)$/i.test(path.basename(filePath))) {
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
       },
