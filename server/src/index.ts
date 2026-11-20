@@ -58,8 +58,19 @@ async function main() {
    * exactly the path a customer takes, cache and all, without any part of the
    * route having to be pulled out to be reused. Failures are ignored: this is
    * an optimisation and nothing about serving the site depends on it.
+   *
+   * The list is the whole of what the shop page asks for, not the one endpoint
+   * that happened to be measured. Warming only that one did not remove the
+   * second of waiting -- it moved it to the product listing, which was then
+   * the first query to touch cold tables. The cost belongs to being first, not
+   * to any particular query, so every request that page makes is made here.
    */
-  const warm = ['/api/settings', '/api/catalog/categories', '/api/catalog/filters'];
+  const warm = [
+    '/api/settings',
+    '/api/catalog/categories',
+    '/api/catalog/filters',
+    '/api/catalog/products?page=1&perPage=12&sort=featured',
+  ];
   for (const path of warm) {
     void fetch(`http://127.0.0.1:${env.port}${path}`).catch(() => undefined);
   }
