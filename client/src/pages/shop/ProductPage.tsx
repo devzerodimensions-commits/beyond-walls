@@ -427,6 +427,7 @@ export default function ProductPage() {
               frame and the same size as the product photograph, and the
               gallery turns to it the moment they write a word.
             */}
+            <div className="gallery-sticky">
             <ProductGallery
               images={product.images}
               productName={product.name}
@@ -463,6 +464,7 @@ export default function ProductPage() {
                 <GalleryBadges badge={product.badge} isNew={product.isNew} discount={discount} />
               }
             />
+            </div>
           </div>
 
           {/* Sticky purchase panel */}

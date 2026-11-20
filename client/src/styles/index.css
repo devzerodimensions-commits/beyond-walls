@@ -61,6 +61,32 @@
     @apply mx-auto w-full max-w-site px-5 sm:px-8 lg:px-12;
   }
 
+  /*
+   * The product photograph travels with the form beside it.
+   *
+   * A personalised product asks a lot of questions, so the buying column runs
+   * to about 1770px while the gallery is 649 -- which left 1121px of bare
+   * paper under the picture, the full height of a laptop screen and more. It
+   * read as a page that had failed to load something.
+   *
+   * Pinning the gallery fills it in the only way worth filling it: with the
+   * thing being bought. The customer is typing their own name three questions
+   * down the form and their plate is still there beside it, changing as they
+   * type, instead of having scrolled away above them.
+   *
+   * Written here rather than as utility classes because of the second
+   * condition. Sticky positioning does not shrink what it pins, so on a short
+   * window the bottom of the picture would sit below the fold for as long as
+   * it stayed pinned. Below 720px of height it simply does not apply, and the
+   * page behaves exactly as it did before.
+   */
+  @media (min-width: 1024px) and (min-height: 720px) {
+    .gallery-sticky {
+      position: sticky;
+      top: calc(var(--header-h, 92px) + 1rem);
+    }
+  }
+
   /* The small uppercase label used throughout the architectural layout. */
   .eyebrow {
     @apply text-2xs font-medium uppercase tracking-architect text-ink-400;
