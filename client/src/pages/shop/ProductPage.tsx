@@ -260,6 +260,23 @@ export default function ProductPage() {
   const answered = fields.filter((f) => (values[f.key] ?? '').trim() !== '');
   const personalisationDone =
     fields.length > 0 && Object.keys(validatePersonalizationValues(fields, values)).length === 0;
+
+  /*
+   * What is actually still missing, by its own name.
+   *
+   * "Complete every personalisation field" was true and useless. On a phone
+   * the questions collapse into one row that echoes back the words the
+   * customer typed -- so somebody who had filled in every question they could
+   * see read "A 01 · AYUSH & TWINKLE · SHAH", then read that something was
+   * incomplete, and had nothing to go on. What was missing was the WhatsApp
+   * number, which lives inside the sheet and is the one field that row never
+   * shows. A customer who cannot find the thing blocking their order does not
+   * hunt for it; they leave.
+   */
+  const missing = (() => {
+    const bad = validatePersonalizationValues(fields, values);
+    return fields.filter((f) => bad[f.key]).map((f) => f.label);
+  })();
   const personalisationSummary = (() => {
     const spoken = answered
       .filter((f) => ['TEXT', 'TEXTAREA', 'NUMBER'].includes(f.type))
@@ -592,10 +609,19 @@ export default function ProductPage() {
                       <span className="block text-xs font-semibold uppercase tracking-architect">
                         Personalise
                       </span>
+                      {/*
+                        * The row used to echo back the words the customer had
+                        * typed and stop there, so a half-finished order looked
+                        * like a finished one: the only thing missing was the
+                        * field this row never shows. What is still needed now
+                        * wins over what is already done.
+                        */}
                       <span className="mt-0.5 block truncate text-2xs text-ink-400">
                         {personalisationErrors
                           ? 'Something still needs filling in'
-                          : personalisationSummary || 'Add your name and choose a finish'}
+                          : missing.length
+                            ? `Still needed: ${missing.join(', ')}`
+                            : personalisationSummary || 'Add your name and choose a finish'}
                       </span>
                     </span>
                     <span className="shrink-0 text-2xs uppercase tracking-architect text-ink-500">
@@ -662,7 +688,28 @@ export default function ProductPage() {
 
                   {fields.length && !personalisationDone ? (
                     <p className="text-center text-2xs text-state-warning">
-                      Complete every personalisation field before adding this item to your cart.
+                      {missing.length ? (
+                        <>
+                          Still needed: {missing.join(', ')}.
+                          {' '}
+                          {/*
+                            * On a phone the questions are behind the sheet, so
+                            * saying what is missing is only half of it -- this
+                            * opens the sheet at it. On a wider screen the form
+                            * is already on the page and there is nothing to
+                            * open, so the offer is not made.
+                            */}
+                          <button
+                            type="button"
+                            onClick={() => setSheetOpen(true)}
+                            className="underline underline-offset-2 lg:hidden"
+                          >
+                            Open personalisation
+                          </button>
+                        </>
+                      ) : (
+                        'Complete every personalisation field before adding this item to your cart.'
+                      )}
                     </p>
                   ) : null}
 
