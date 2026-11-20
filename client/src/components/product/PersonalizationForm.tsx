@@ -4,7 +4,7 @@ import type { PersonalizationField } from '../../lib/types';
 import { api, assetUrl } from '../../lib/api';
 import { formatPrice, toNumber } from '../../lib/format';
 import { FieldWrap, Input, Select, Spinner, Textarea, UploadIcon, CloseIcon } from '../ui';
-import { fontStack } from './LivePreview';
+import { DEFAULT_TEXT_SIZE, SIZEABLE_SLOTS, TEXT_SIZES, fontStack } from './LivePreview';
 import { ScriptInput } from './ScriptInput';
 
 /** One colour a product offers: the stored value, its name and its swatch. */
@@ -32,6 +32,10 @@ interface Props {
    * either one works.
    */
   palette?: { plate: PaletteChoice[]; text: PaletteChoice[] };
+  /** The size each line is set at, as a percentage of the artwork's own. */
+  sizes?: Record<string, number>;
+  /** Called when a customer makes a line bigger or smaller. */
+  onSize?: (slot: string, size: number) => void;
   /**
    * The script this product is lettered in, read from its preview.
    *
@@ -130,7 +134,7 @@ function groupOf(field: PersonalizationField): (typeof GROUPS)[number]['key'] {
 }
 
 export function PersonalizationForm({
-  fields, values, errors = {}, onChange, palette, script,
+  fields, values, errors = {}, onChange, palette, script, sizes, onSize,
 }: Props) {
   const active = fields.filter((f) => f.status === 'PUBLISHED').sort((a, b) => a.sortOrder - b.sortOrder);
   if (!active.length) return null;
@@ -143,6 +147,8 @@ export function PersonalizationForm({
       error={errors[field.key]}
       palette={palette}
       script={script}
+      sizes={sizes}
+      onSize={onSize}
       onChange={(value) => onChange(field.key, value)}
     />
   );
@@ -179,8 +185,10 @@ function priceSuffix(delta: number | string | undefined): string {
 }
 
 function PersonalizationInput({
-  field, value, error, onChange, palette, script,
+  field, value, error, onChange, palette, script, sizes, onSize,
 }: {
+  sizes?: Record<string, number>;
+  onSize?: (slot: string, size: number) => void;
   field: PersonalizationField;
   value: string;
   error?: string;
@@ -203,6 +211,20 @@ function PersonalizationInput({
    * English and convert it. Only those lines: the house number is numerals,
    * and a note to the studio is a note to the studio.
    */
+  /*
+   * Bigger or smaller, under the line it changes.
+   *
+   * Offered only on lines that are actually drawn on the plate, and only when
+   * the product has a preview to show the result in -- a stepper whose effect
+   * nobody can see is a decision taken blind.
+   */
+  const sizer = onSize && field.previewSlot && SIZEABLE_SLOTS.includes(field.previewSlot) ? (
+    <TextSizer
+      value={sizes?.[field.previewSlot] ?? DEFAULT_TEXT_SIZE}
+      onChange={(next) => onSize(field.previewSlot as string, next)}
+    />
+  ) : null;
+
   const LINES = ['line1', 'line2', 'line3'];
   if (script === 'devanagari' && field.previewSlot && LINES.includes(field.previewSlot)
     && (field.type === 'TEXT' || field.type === 'TEXTAREA')) {
@@ -217,6 +239,29 @@ function PersonalizationInput({
         value={value}
         onChange={onChange}
       />
+    );
+  }
+
+  if (sizer && field.type !== 'TEXTAREA' && !['COLOR', 'FONT', 'SELECT', 'RADIO', 'CHECKBOX'].includes(field.type)) {
+    return (
+      <div>
+        <Input
+          label={label}
+          required={required}
+          error={error}
+          hint={field.helpText ?? undefined}
+          placeholder={field.placeholder ?? ''}
+          maxLength={field.maxLength ?? undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <div className="mt-1 flex items-center justify-between gap-3">
+          {sizer}
+          {field.maxLength ? (
+            <span className="text-2xs text-ink-300">{value.length}/{field.maxLength}</span>
+          ) : null}
+        </div>
+      </div>
     );
   }
 
@@ -644,4 +689,47 @@ export function personalizationCost(
     }
   }
   return total;
+}
+
+/**
+ * Bigger or smaller, in steps the piece can actually carry.
+ *
+ * Steps rather than a slider: the lettering is sized from the artwork, so the
+ * useful question is "a little bigger than the piece has it", not a precise
+ * number nobody can judge on a screen. The reading stays visible, because a
+ * customer who has changed it should be able to see that they did, and put it
+ * back.
+ */
+function TextSizer({ value, onChange }: { value: number; onChange: (size: number) => void }) {
+  const index = Math.max(0, TEXT_SIZES.indexOf(value as (typeof TEXT_SIZES)[number]));
+  const step = (delta: number) => {
+    const next = TEXT_SIZES[Math.min(TEXT_SIZES.length - 1, Math.max(0, index + delta))];
+    if (next !== value) onChange(next);
+  };
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        aria-label="Smaller text"
+        disabled={index <= 0}
+        onClick={() => step(-1)}
+        className="border border-stone-line px-2 py-0.5 text-2xs leading-none text-ink-600 transition-colors hover:border-ink disabled:opacity-40"
+      >
+        −
+      </button>
+      <span className="text-2xs tabular-nums text-ink-400">
+        {value === DEFAULT_TEXT_SIZE ? 'Size as the piece' : `${value}%`}
+      </span>
+      <button
+        type="button"
+        aria-label="Larger text"
+        disabled={index >= TEXT_SIZES.length - 1}
+        onClick={() => step(1)}
+        className="border border-stone-line px-2 py-0.5 text-2xs leading-none text-ink-600 transition-colors hover:border-ink disabled:opacity-40"
+      >
+        +
+      </button>
+    </span>
+  );
 }

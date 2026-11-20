@@ -420,6 +420,23 @@ export function previewScript(config: PreviewConfig): 'latin' | 'devanagari' {
   return /[ऀ-ॿ]/.test(sample) ? 'devanagari' : 'latin';
 }
 
+/**
+ * How much bigger or smaller a customer may set a line.
+ *
+ * Bounded, and bounded tightly. The lettering is already sized from the real
+ * artwork, so every step away from 100% is a step away from the piece as the
+ * studio drew it -- this exists because a long surname can come out smaller
+ * than somebody wants, not so a plate can be redesigned on the product page.
+ *
+ * Whatever is chosen travels with the order, so the studio cuts the size that
+ * was approved rather than guessing which one the customer meant.
+ */
+export const TEXT_SIZES = [80, 90, 100, 110, 125] as const;
+export const DEFAULT_TEXT_SIZE = 100;
+
+/** The slots a customer can resize: the lines, never the colours or the face. */
+export const SIZEABLE_SLOTS = ['number', 'line1', 'line2', 'line3'];
+
 interface LivePreviewProps {
   template?: string | null;
   slots: PreviewSlots;
@@ -440,12 +457,17 @@ interface LivePreviewProps {
    * the placeholders that come from the product's configuration.
    */
   placeholders?: PreviewSlots;
+  /**
+   * Per-line size, as a percentage, where 100 is the artwork's own size.
+   * Missing or 100 means the line is drawn exactly as the piece has it.
+   */
+  scales?: Record<string, number>;
   /** The product's stored `livePreviewConfig`. */
   config?: Record<string, unknown> | null;
 }
 
 export function LivePreview({
-  template, slots, className, placeholders, config, hideLabel, hideCaption,
+  template, slots, className, placeholders, config, hideLabel, hideCaption, scales,
 }: LivePreviewProps) {
   usePlateFonts();
   // Namespaces this instance's SVG defs so two previews on one page cannot
@@ -474,7 +496,7 @@ export function LivePreview({
   // A light plate needs a visible edge against the light backdrop.
   const isLightPlate = resolved.plate.borderOnLight && isLight(plate);
 
-  const shared = { slots: merged, plate, text, font, config: resolved, uid };
+  const shared = { slots: merged, plate, text, font, config: resolved, uid, scales };
 
   const body = (() => {
     switch (template) {
@@ -553,6 +575,8 @@ interface TemplateProps {
    * the plate disappeared and only the unfiltered screws were left showing.
    */
   uid: string;
+  /** Per-line size as a percentage; see TEXT_SIZES. */
+  scales?: Record<string, number>;
 }
 
 /**
@@ -1253,7 +1277,7 @@ function PlateCubes({ slots, plate, text, font, config, uid }: TemplateProps) {
  * So the preview cannot drift from the product, because it IS the product --
  * and a new design needs no code, only an upload.
  */
-function PlatePhoto({ slots, plate, text, font, config, uid }: TemplateProps) {
+function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateProps) {
   const photo = config.photo;
   const measure = useTextMetrics();
   const VW = config.aspect.width;
@@ -1321,10 +1345,14 @@ function PlatePhoto({ slots, plate, text, font, config, uid }: TemplateProps) {
          * Devanagari, which carries marks above and below, overflowing a box
          * that Latin capitals sat inside comfortably.
          */
-        const size = Math.max(
-          6,
-          Math.min(roomH / Math.max(0.01, m.ink), roomW / Math.max(0.01, m.width)),
-        );
+        /*
+         * The size the artwork itself has, then whatever the customer asked
+         * for. Applied after the fit rather than inside it, so 100% is always
+         * exactly the piece's own lettering and the steps read as steps.
+         */
+        const fitted = Math.min(roomH / Math.max(0.01, m.ink), roomW / Math.max(0.01, m.width));
+        const scale = (scales?.[box.slot] ?? 100) / 100;
+        const size = Math.max(6, fitted * scale);
 
         const anchor = box.align === 'center' ? 'middle' : box.align === 'right' ? 'end' : 'start';
 

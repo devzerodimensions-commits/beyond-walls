@@ -135,6 +135,20 @@ export default function ProductPage() {
   const previewRef = useRef<HTMLDivElement>(null);
   const sheetPreviewRef = useRef<HTMLDivElement>(null);
 
+  /*
+   * How big the customer has asked each line to be, as a percentage of the
+   * size the artwork itself uses. Only what differs from the piece is kept,
+   * so an order that says nothing about size is an order cut exactly as the
+   * design has it.
+   */
+  const [textSizes, setTextSizes] = useState<Record<string, number>>({});
+  const setTextSize = (slot: string, size: number) => setTextSizes((prev) => {
+    const next = { ...prev };
+    if (size === 100) delete next[slot];
+    else next[slot] = size;
+    return next;
+  });
+
   if (isLoading) return <PageLoader label="Loading product" />;
   if (isError || !product) {
     return (
@@ -277,7 +291,27 @@ export default function ProductPage() {
     setErrors({});
     setBusy(mode);
     try {
-      await addItem({ productId: product.id, variantId, quantity, personalization: values });
+      /*
+       * A size the customer changed goes with the order, written the way the
+       * studio reads it rather than the way the preview stores it: "Name
+       * 110%", not "line1:110". A plate cut at the size on the screen is the
+       * whole promise of showing them the screen, and a size nobody recorded
+       * is a size somebody has to guess at the bench.
+       */
+      const resized = Object.entries(textSizes)
+        .map(([slot, size]) => {
+          const field = fields.find((f) => f.previewSlot === slot);
+          return field ? `${field.label} ${size}%` : null;
+        })
+        .filter(Boolean)
+        .join(', ');
+
+      await addItem({
+        productId: product.id,
+        variantId,
+        quantity,
+        personalization: resized ? { ...values, textSize: resized } : values,
+      });
       if (mode === 'buy') navigate('/checkout');
     } finally {
       setBusy(null);
@@ -374,6 +408,7 @@ export default function ProductPage() {
                       template={product.livePreviewTemplate}
                       config={product.livePreviewConfig}
                       slots={previewSlots}
+                      scales={textSizes}
                       // The strip above already says what this is.
                       hideLabel
                     />
@@ -532,6 +567,8 @@ export default function ProductPage() {
                     <PersonalizationForm
                       palette={previewPalette}
                       script={script}
+                      sizes={textSizes}
+                      onSize={product.livePreviewEnabled ? setTextSize : undefined}
                       fields={fields}
                       values={values}
                       errors={errors}
@@ -915,6 +952,7 @@ export default function ProductPage() {
                   template={product.livePreviewTemplate}
                   config={product.livePreviewConfig}
                   slots={previewSlots}
+                  scales={textSizes}
                   className="border border-stone-line"
                 />
                 <SavePreview target={sheetPreviewRef} name={product.name} />
@@ -924,6 +962,8 @@ export default function ProductPage() {
             <PersonalizationForm
               palette={previewPalette}
               script={script}
+              sizes={textSizes}
+              onSize={product.livePreviewEnabled ? setTextSize : undefined}
               fields={fields}
               values={values}
               errors={errors}

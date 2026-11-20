@@ -47,6 +47,9 @@ interface FieldOption {
 const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^[0-9+\-\s()]{6,20}$/;
+const TEXT_SIZE_KEY = 'textSize';
+const TEXT_SIZE_LABEL = 'Text size';
+
 const WHATSAPP_CONTACT_KEY = 'whatsappContact';
 const WHATSAPP_CONTACT_LABEL = 'WhatsApp contact number';
 
@@ -222,6 +225,30 @@ export function validatePersonalization(
       label: WHATSAPP_CONTACT_LABEL,
       type: 'PHONE',
       value,
+      priceDelta: money(0),
+      previewSlot: null,
+    });
+  }
+
+  /*
+   * A line the customer made bigger or smaller.
+   *
+   * Recorded, never priced, and only when they actually changed something:
+   * most orders are cut at the size the artwork has, and an entry saying "as
+   * the piece" on every order is noise on the bench. It is written by the
+   * product page in the studio's own words -- "Name 110%" -- so what reaches
+   * production is a readable instruction rather than a slot name.
+   *
+   * Kept short and stripped of anything strange, because it is free text
+   * arriving from a browser that could have sent anything.
+   */
+  const resized = String(answers[TEXT_SIZE_KEY] ?? '').trim();
+  if (resized && entries.some((entry) => entry.previewSlot)) {
+    entries.push({
+      key: TEXT_SIZE_KEY,
+      label: TEXT_SIZE_LABEL,
+      type: 'TEXT',
+      value: resized.replace(/[^\w\s%,.-]/g, '').slice(0, 160),
       priceDelta: money(0),
       previewSlot: null,
     });
