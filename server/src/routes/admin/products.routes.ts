@@ -6,7 +6,7 @@ import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../ut
 import { toBool, uniqueSlug } from '../../utils/helpers';
 import { persistUploads, upload } from '../../middleware/upload';
 import { suggestPreviewFromImage } from '../../services/previewSuggest.service';
-import { readPlate } from '../../services/plateText.service';
+import { plateShape, readPlate } from '../../services/plateText.service';
 import { deleteFileIfUnreferenced } from '../../services/media.service';
 import { isSellable } from '../../services/pricing.service';
 
@@ -697,6 +697,105 @@ router.get(
   }),
 );
 
+/**
+ * Builds a product's preview from its own first photograph, and says whether
+ * anything was drawn from it.
+ *
+ * Called when a picture is added as well as from the button, because a studio
+ * adding twenty products should not have to find and press the same button
+ * twenty times. It never overwrites a preview that already has lettering
+ * positions: once a studio has placed the lines, by hand or by reading, that
+ * is theirs.
+ *
+ * Two outcomes, and the difference matters.
+ *
+ * The lettering is read off the artwork: the sample name is painted out, the
+ * piece itself becomes the preview, and the customer's words go exactly where
+ * the real ones were. This is what a flat design file gives.
+ *
+ * Or it cannot be: a plate in somebody's hand, or on a textured wall, has no
+ * plain surface behind the letters to reconstruct, so the old name cannot be
+ * removed. Drawing over it would put the customer's name on top of a
+ * stranger's. So the photograph is left alone and a clean plate is drawn
+ * instead -- at the real piece's proportions, taken from the picture, so the
+ * shape on the screen is still the shape of the thing being sold. The studio
+ * can then drop in a blank artwork file and the lettering lands on it.
+ */
+async function buildPreviewFromPhoto(productId: string) {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    include: { images: { orderBy: { sortOrder: 'asc' } }, personalization: true },
+  });
+  if (!product) return null;
+
+  const existing = (product.livePreviewConfig ?? {}) as {
+    photo?: { boxes?: unknown[] };
+    aspect?: unknown;
+  };
+  // Already placed, by hand or by an earlier read. Leave it alone.
+  if (Array.isArray(existing.photo?.boxes) && existing.photo.boxes.length) return null;
+
+  const image = product.images.find((i) => i.isPrimary) ?? product.images[0];
+  if (!image) return null;
+
+  const read = await readPlate(image.url);
+
+  const DEFAULT_SLOTS = ['line1', 'line2', 'line3', 'number'];
+  const asked = product.personalization
+    .filter((f) => f.previewSlot && f.status === 'PUBLISHED')
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((f) => f.previewSlot as string);
+  const order = [...asked, ...DEFAULT_SLOTS.filter((s) => !asked.includes(s))];
+
+  const chosenFont = (product.livePreviewConfig as { defaults?: { fontFamily?: string } } | null)
+    ?.defaults?.fontFamily;
+
+  if (read.ok && read.image) {
+    const boxes = read.boxes.slice(0, order.length).map((box, index) => ({
+      ...box,
+      slot: order[index],
+    }));
+    const config = {
+      aspect: read.aspect ?? undefined,
+      defaults: {
+        ...(read.plateColor ? { plateColor: read.plateColor } : {}),
+        ...(read.textColor ? { textColor: read.textColor } : {}),
+        ...(chosenFont
+          ? { fontFamily: chosenFont }
+          : read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
+      },
+      photo: { image: read.image, boxes },
+    };
+    await prisma.product.update({
+      where: { id: product.id },
+      data: { livePreviewEnabled: true, livePreviewTemplate: 'photo', livePreviewConfig: config },
+    });
+    return { from: 'artwork' as const, reason: read.reason, boxes: boxes.length, config };
+  }
+
+  /*
+   * The picture cannot be used, but its shape can. Anything already set by the
+   * studio -- a font, a colour -- is kept; only the proportions are filled in.
+   */
+  const shape = await plateShape(image.url);
+  if (!shape) return null;
+
+  const config = {
+    ...(product.livePreviewConfig as Record<string, unknown> | null ?? {}),
+    aspect: shape,
+    // No usable artwork, so nothing is drawn behind the lettering.
+    photo: undefined,
+  };
+  await prisma.product.update({
+    where: { id: product.id },
+    data: {
+      livePreviewTemplate: 'nameplate-minimal',
+      livePreviewConfig: config as object,
+    },
+  });
+  return { from: 'shape' as const, reason: read.reason, boxes: 0, config };
+}
+
 /*
  * Build the live preview out of the product's own photograph.
  *
@@ -732,7 +831,21 @@ router.post(
     }
 
     const read = await readPlate(image.url);
-    if (!read.ok || !read.image) return res.json({ success: true, data: read });
+    if (!read.ok || !read.image) {
+      /*
+       * The lettering could not be lifted off, but the shape still can be, so
+       * the preview becomes a clean plate at the real piece's proportions
+       * rather than nothing at all. The reason goes back either way: the
+       * studio is told what happened and can supply a flat artwork file.
+       */
+      const fallback = await buildPreviewFromPhoto(product.id);
+      return res.json({
+        success: true,
+        data: fallback
+          ? { ...read, livePreviewConfig: fallback.config, shapeOnly: true }
+          : read,
+      });
+    }
 
     /*
      * Which question each line asks.
@@ -901,6 +1014,22 @@ router.post(
       );
     }
 
+    /*
+     * The preview is made here, not left for a button.
+     *
+     * A studio adding twenty products should not have to go back into each
+     * one and press the same thing twenty times, and the picture that makes
+     * the preview possible has just arrived. It never touches a product whose
+     * lettering positions are already placed, and a failure is silent: making
+     * a preview is a convenience, and it cannot turn a successful upload into
+     * a failed one.
+     */
+    try {
+      await buildPreviewFromPhoto(product.id);
+    } catch {
+      /* The images are saved; the preview can be made by hand. */
+    }
+
     res.status(201).json({ success: true, data: created });
   }),
 );
@@ -933,6 +1062,13 @@ router.post(
         height: asset?.height ?? null,
       },
     });
+    /* A picture chosen from the library is still a picture arriving. */
+    try {
+      await buildPreviewFromPhoto(req.params.id);
+    } catch {
+      /* The image is attached; the preview can be made by hand. */
+    }
+
     res.status(201).json({ success: true, data: image });
   }),
 );

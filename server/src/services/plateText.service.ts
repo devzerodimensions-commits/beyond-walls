@@ -986,6 +986,30 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
  * the catalogue still needs the picture with the sample name on it, which is
  * what shows the customer what they are buying.
  */
+/**
+ * Just the proportions of a picture, for when its lettering cannot be read.
+ *
+ * A photograph of a plate held in a hand, or hanging on a textured wall,
+ * cannot have its sample name painted out: the surface behind the letters is
+ * not plain enough to reconstruct. Drawing the customer's name over it would
+ * put their name on top of somebody else's, which is worse than no preview.
+ *
+ * The shape is still worth having. A preview drawn at the real piece's
+ * proportions is the real piece's shape even when the picture itself cannot
+ * be used, which is the part a studio notices first.
+ */
+export async function plateShape(url: string): Promise<{ width: number; height: number } | null> {
+  try {
+    const stored = await readStored(url);
+    if (!stored) return null;
+    const meta = await sharp(stored.buffer).metadata();
+    if (!meta.width || !meta.height) return null;
+    return { width: meta.width, height: meta.height };
+  } catch {
+    return null;
+  }
+}
+
 export async function readPlate(url: string): Promise<PlatePreview> {
   const fail = (reason: string): PlatePreview => ({
     ok: false, reason, image: null, aspect: null, plateColor: null, textColor: null, boxes: [], script: 'latin',
