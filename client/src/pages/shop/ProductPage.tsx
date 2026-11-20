@@ -404,7 +404,19 @@ export default function ProductPage() {
           cramped. It only earns the extra image width on a wide screen.
         */}
         <div className="grid gap-5 sm:gap-8 lg:grid-cols-12 lg:gap-10 xl:gap-12">
-          <div className="lg:col-span-6 xl:col-span-7">
+          {/*
+            * min-w-0, because a grid item will not shrink below its contents.
+            *
+            * A grid column defaults to min-width:auto, so one line of text
+            * that cannot wrap sets the floor for the whole column -- and the
+            * personalisation row is deliberately one line with an ellipsis.
+            * On a product missing two answers it read "Still needed:
+            * Instructions for us, WhatsApp contact number", which was wider
+            * than a phone and pushed the entire page sideways: every section,
+            * the header with it, 34px of horizontal scroll on a page where
+            * nothing had looked wrong in the markup itself.
+            */}
+          <div className="min-w-0 lg:col-span-6 xl:col-span-7">
             {/*
               The customer's own plate is a slide in the gallery, not a panel
               under it.
@@ -454,7 +466,7 @@ export default function ProductPage() {
           </div>
 
           {/* Sticky purchase panel */}
-          <div className="lg:col-span-6 xl:col-span-5">
+          <div className="min-w-0 lg:col-span-6 xl:col-span-5">
             {/*
               Sticks clear of the header, whatever height the header is. It
               used to say 92px, which was true of a one-row header and is not
