@@ -1615,7 +1615,7 @@ function PreviewConfigEditor({
       </Fold>
       ) : null}
 
-      <Fold title="Sample words" note="shown before a customer types">
+      <Fold title="Sample words" note="on the plate before a customer types">
         <div className="grid gap-5 sm:grid-cols-2">
           <Input
             label="Placeholder — number"

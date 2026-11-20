@@ -6,7 +6,7 @@ import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../ut
 import { toBool, uniqueSlug } from '../../utils/helpers';
 import { persistUploads, upload } from '../../middleware/upload';
 import { suggestPreviewFromImage } from '../../services/previewSuggest.service';
-import { bindPreviewBoxes, slotOrder } from '../../services/previewBinding.service';
+import { alignLettering, bindPreviewBoxes, slotOrder } from '../../services/previewBinding.service';
 import { readPlate } from '../../services/plateText.service';
 import { deleteFileIfUnreferenced } from '../../services/media.service';
 import { isSellable } from '../../services/pricing.service';
@@ -440,6 +440,7 @@ router.get(
       data: {
         ...product,
         livePreviewConfig: bindPreviewBoxes(product.livePreviewConfig, product.personalization),
+        personalization: alignLettering(product.personalization, product.livePreviewConfig),
       },
     });
   }),
@@ -732,6 +733,78 @@ router.get(
  * and saying why. The reason goes back to the studio so they can add the flat
  * design file the piece is cut from.
  */
+/**
+ * The faces a customer may choose between.
+ *
+ * A photograph carries the words on a plate and where they sit. It does not
+ * carry the typeface -- nothing in a picture says whether a name was cut in a
+ * script or a serif, and it cannot be measured either: across the studio's own
+ * plates the joined-up script and the upright faces overlap on every figure
+ * worth counting, so any rule would be a guess dressed up as a reading.
+ *
+ * Guessing is the wrong answer to it anyway. The customer is the one who cares
+ * what their own name looks like, so the customer chooses, and watches it
+ * change on the plate as they do. The studio sets which one it starts on.
+ */
+const CUSTOMER_FACES = [
+  { value: 'grotesque', label: 'Grotesque' },
+  { value: 'display', label: 'Display' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'condensed', label: 'Condensed' },
+  { value: 'script', label: 'Script' },
+  { value: 'formal-script', label: 'Formal script' },
+];
+
+/**
+ * Gives a product its lettering question, once.
+ *
+ * Only for a plate read from a photograph, because that is the case where
+ * nobody can know the face. A Devanagari plate is left alone: one face draws
+ * that alphabet, so the choice would be a choice of one.
+ */
+async function ensureLetteringQuestion(
+  productId: string,
+  script: 'latin' | 'devanagari',
+  startsOn: string | undefined,
+) {
+  if (script === 'devanagari') return;
+
+  const existing = await prisma.personalizationField.findFirst({
+    where: { productId, previewSlot: 'fontFamily' },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  const last = await prisma.personalizationField.findFirst({
+    where: { productId },
+    orderBy: { sortOrder: 'desc' },
+    select: { sortOrder: true },
+  });
+
+  const start = CUSTOMER_FACES.some((f) => f.value === startsOn) ? startsOn : 'grotesque';
+
+  await prisma.personalizationField.create({
+    data: {
+      productId,
+      key: 'lettering',
+      label: 'Lettering',
+      type: 'FONT',
+      helpText: 'The plate above changes as you choose.',
+      required: false,
+      options: CUSTOMER_FACES,
+      defaultValue: start,
+      /*
+       * Last, and never required. The words come first: somebody who has not
+       * thought about a typeface has still ordered a nameplate, and the face
+       * it starts on is the one the studio set.
+       */
+      sortOrder: (last?.sortOrder ?? 0) + 1,
+      status: 'PUBLISHED',
+      previewSlot: 'fontFamily',
+    },
+  });
+}
+
 async function buildPreviewFromPhoto(productId: string, force = false) {
   const product = await prisma.product.findUnique({
     where: { id: productId },
@@ -793,6 +866,7 @@ async function buildPreviewFromPhoto(productId: string, force = false) {
       where: { id: product.id },
       data: { livePreviewEnabled: true, livePreviewTemplate: 'photo', livePreviewConfig: config },
     });
+    await ensureLetteringQuestion(product.id, read.script, config.defaults.fontFamily);
     return { from: 'artwork' as const, reason: read.reason, boxes: boxes.length, config };
   }
 
@@ -953,6 +1027,8 @@ router.post(
         livePreviewConfig,
       },
     });
+
+    await ensureLetteringQuestion(product.id, read.script, livePreviewConfig.defaults.fontFamily);
 
     /*
      * Fields are only created for a product that has none. Re-reading a

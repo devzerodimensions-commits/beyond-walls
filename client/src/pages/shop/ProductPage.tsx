@@ -376,7 +376,19 @@ export default function ProductPage() {
                 {i === crumbs.length - 1 ? (
                   <span className="text-ink">{crumb.name}</span>
                 ) : (
-                  <Link to={crumb.href} className="transition-colors hover:text-ink">
+                  /*
+                   * Padded to a thumb, not to the eye.
+                   *
+                   * These sit at 16px tall, which is fine to read and poor to
+                   * hit: a finger covers about 44px and lands somewhere near
+                   * its middle. The padding is cancelled by equal negative
+                   * margin, so the target grows to the full height of the row
+                   * while the breadcrumbs stay exactly where they were.
+                   */
+                  <Link
+                    to={crumb.href}
+                    className="-my-3 py-3 transition-colors hover:text-ink"
+                  >
                     {crumb.name}
                   </Link>
                 )}

@@ -64,7 +64,16 @@ function FooterColumn({
   );
 }
 
-const linkClass = 'text-sm text-paper/60 transition-colors duration-200 hover:text-paper';
+/*
+ * Sized for a thumb, not for the eye.
+ *
+ * These read at 20px tall, which is fine to look at and poor to hit: a
+ * finger covers roughly 44px and lands somewhere near its middle. The
+ * padding grows the target to 32px and the negative margin takes the space
+ * back, so nothing in the footer moves; the rows are given a little more air
+ * on a phone so two neighbouring links can never share a pixel.
+ */
+const linkClass = 'inline-block -my-1.5 py-1.5 text-sm text-paper/60 transition-colors duration-200 hover:text-paper';
 
 export function Footer() {
   const { get, navLinks, footerPages } = useSettings();
@@ -209,7 +218,7 @@ export function Footer() {
                   <MailIcon size={15} className="mt-[3px] shrink-0 text-paper/40" />
                   <span className="flex flex-col gap-1">
                     {emails.map((address) => (
-                      <a key={address} href={`mailto:${address}`}>
+                      <a key={address} href={`mailto:${address}`} className="-my-1 inline-block py-1">
                         {address}
                       </a>
                     ))}
@@ -226,7 +235,7 @@ export function Footer() {
           */}
           {collections.length ? (
             <FooterColumn title="Shop" className="lg:col-span-2">
-              <ul className="space-y-2.5">
+              <ul className="space-y-3 sm:space-y-2.5">
                 {collections.map((category) => (
                   <li key={category.id}>
                     <Link to={`/shop/${category.slug}`} className={linkClass}>
@@ -245,7 +254,7 @@ export function Footer() {
 
           {footerLinks.length ? (
             <FooterColumn title="Studio" className="lg:col-span-2">
-              <ul className="space-y-2.5">
+              <ul className="space-y-3 sm:space-y-2.5">
                 {footerLinks.map((link) => (
                   <li key={link.id}>
                     <Link to={link.href} className={linkClass}>
@@ -258,7 +267,7 @@ export function Footer() {
           ) : null}
 
           <FooterColumn title="Information" className="lg:col-span-2">
-            <ul className="space-y-2.5">
+            <ul className="space-y-3 sm:space-y-2.5">
               {informationPages.map((page) => (
                 <li key={page.slug}>
                   <Link to={`/${page.slug}`} className={linkClass}>
@@ -300,7 +309,7 @@ export function Footer() {
               {phone ? (
                 <div className="flex items-center gap-2.5 text-sm">
                   <PhoneIcon size={15} className="shrink-0 text-paper/40" />
-                  <a href={`tel:${phone.replace(/\s/g, '')}`} className="link-underline text-paper/60">
+                  <a href={`tel:${phone.replace(/\s/g, '')}`} className="link-underline -my-1.5 inline-block py-1.5 text-paper/60">
                     {phone}
                   </a>
                 </div>

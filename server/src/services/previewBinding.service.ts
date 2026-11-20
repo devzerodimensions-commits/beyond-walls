@@ -40,6 +40,41 @@ export interface PreviewField {
   sortOrder: number;
 }
 
+interface LetteringField {
+  previewSlot: string | null;
+  defaultValue: string | null;
+  options: unknown;
+}
+
+/**
+ * Starts the customer's lettering choice on the face the studio set.
+ *
+ * Two places hold a typeface now: the preview's own default, which the studio
+ * picks in the editor, and the lettering question a customer answers. They
+ * have to agree, or a product whose face was changed after the question was
+ * made would open on the old one -- the customer's untouched answer quietly
+ * overriding the studio's choice.
+ *
+ * So the question is started on the product's current face every time the
+ * product is served, exactly as the lines are bound. Nothing is stored, and a
+ * face the question does not offer is left alone rather than forced.
+ */
+export function alignLettering<T extends LetteringField>(
+  fields: T[],
+  config: unknown,
+): T[] {
+  const face = (config as { defaults?: { fontFamily?: string } } | null)?.defaults?.fontFamily;
+  if (!face) return fields;
+
+  return fields.map((field) => {
+    if (field.previewSlot !== 'fontFamily') return field;
+    if (field.defaultValue === face) return field;
+    const options = Array.isArray(field.options) ? field.options as { value?: unknown }[] : [];
+    if (!options.some((o) => o?.value === face)) return field;
+    return { ...field, defaultValue: face };
+  });
+}
+
 interface PhotoBox {
   slot: string;
   y: number;

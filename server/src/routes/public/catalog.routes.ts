@@ -6,7 +6,7 @@ import { getSetting } from '../../services/settings.service';
 import { cachedPublic } from '../../lib/publicCache';
 import { optionalAuth, requireAuth } from '../../middleware/auth';
 import { reviewEligibility, submitReview } from '../../services/review.service';
-import { bindPreviewBoxes } from '../../services/previewBinding.service';
+import { alignLettering, bindPreviewBoxes } from '../../services/previewBinding.service';
 
 const router = Router();
 
@@ -87,6 +87,80 @@ function splitCsv(value: unknown): string[] {
 // Categories
 // ---------------------------------------------------------------------------
 
+/**
+ * A picture for a category that has not been given one.
+ *
+ * The menu draws each collection as a tile, and a collection with no image of
+ * its own drew a grey box with its name in it -- which is what "For Business"
+ * and "Prints" were showing customers. Nothing is invented to fill it: the
+ * photograph comes from a published product inside that very collection, which
+ * is both true and the thing a customer is trying to look at. A category the
+ * studio has given its own image keeps it, and so does one with no products
+ * yet, which goes on showing its name rather than borrowing from elsewhere.
+ */
+type Pictured = { id: string; image: string | null; children?: Pictured[] };
+
+async function lendPictures<T extends Pictured>(categories: T[]): Promise<T[]> {
+  const flat: Pictured[] = [];
+  const walk = (list: Pictured[]) => {
+    for (const c of list) {
+      flat.push(c);
+      if (c.children?.length) walk(c.children);
+    }
+  };
+  walk(categories);
+
+  const bare = flat.filter((c) => !c.image);
+  if (!bare.length) return categories;
+
+  /*
+   * One query for the lot. A photograph is looked for in the category itself
+   * and in anything filed under it, because a parent such as "For Business" is
+   * often only a heading: its products live in the collections beneath it.
+   */
+  const ids = bare.map((c) => c.id);
+  const images = await prisma.productImage.findMany({
+    where: {
+      product: {
+        ...PUBLISHED,
+        OR: [
+          { categoryId: { in: ids } },
+          { subcategoryId: { in: ids } },
+          { category: { parentId: { in: ids } } },
+          { subcategory: { parentId: { in: ids } } },
+        ],
+      },
+    },
+    orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+    select: {
+      url: true,
+      product: {
+        select: {
+          categoryId: true,
+          subcategoryId: true,
+          category: { select: { parentId: true } },
+          subcategory: { select: { parentId: true } },
+        },
+      },
+    },
+  });
+
+  const found = new Map<string, string>();
+  for (const image of images) {
+    for (const key of [
+      image.product.categoryId,
+      image.product.subcategoryId,
+      image.product.category?.parentId,
+      image.product.subcategory?.parentId,
+    ]) {
+      if (key && !found.has(key)) found.set(key, image.url);
+    }
+  }
+
+  for (const category of bare) category.image = found.get(category.id) ?? null;
+  return categories;
+}
+
 // GET /api/catalog/categories  — full published tree
 router.get(
   '/categories',
@@ -104,7 +178,7 @@ router.get(
       },
     }));
     res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
-    res.json({ success: true, data: categories });
+    res.json({ success: true, data: await lendPictures(categories) });
   }),
 );
 
@@ -481,6 +555,7 @@ router.get(
       data: {
         ...product,
         livePreviewConfig: bindPreviewBoxes(product.livePreviewConfig, product.personalization),
+        personalization: alignLettering(product.personalization, product.livePreviewConfig),
         related,
       },
     });

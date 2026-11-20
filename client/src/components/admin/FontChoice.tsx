@@ -37,8 +37,19 @@ export function FontChoice({
   return (
     <div className="sm:col-span-2">
       <p className="field-label">Lettering</p>
-      <p className="mb-2 mt-1 text-2xs text-ink-400">
-        Pick the face closest to the real piece — a photograph cannot tell us which one it was cut in.
+      {/*
+        * What this setting now is.
+        *
+        * It used to be the answer to "which face was this cut in?", which a
+        * photograph cannot say and nobody could check. Customers choose their
+        * own lettering now, so this is the face their plate STARTS on -- the
+        * one closest to the piece in the photograph, and the one most of them
+        * will leave alone.
+        */}
+      <p className="mb-2 mt-1 text-2xs leading-relaxed text-ink-400">
+        The face this product’s preview starts on. Pick the one closest to the real piece — a
+        photograph cannot tell us which it was cut in. Customers can change it from the
+        “Lettering” question under Personalisation, and the plate follows as they do.
       </p>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
