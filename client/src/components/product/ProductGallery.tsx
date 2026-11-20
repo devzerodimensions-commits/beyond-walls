@@ -12,13 +12,31 @@ import { Badge, ChevronLeft, ChevronRight, CloseIcon } from '../ui';
  * Falls back cleanly to plain tap-through on touch devices.
  */
 export function ProductGallery({
-  images, productName, badges, videoUrl,
+  images, productName, badges, videoUrl, preview, previewFilled,
 }: {
   images: ProductImage[];
   productName: string;
   badges?: React.ReactNode;
   /** Optional, and usually absent: a YouTube or Vimeo link, or an mp4. */
   videoUrl?: string | null;
+  /**
+   * The customer's own plate, shown in the gallery rather than beside it.
+   *
+   * It used to sit in a panel of its own further down the page, which meant
+   * the thing being bought -- their name, on their plate -- was smaller than
+   * the photograph of somebody else's, and below it. Here it is the same size
+   * as the product photograph, in the same frame, and reached the same way.
+   */
+  preview?: React.ReactNode;
+  /**
+   * Whether the customer has typed anything yet.
+   *
+   * The gallery opens on the photograph, because that is what sells the piece
+   * and an empty plate is a poor first impression. The moment they type, it
+   * turns to their own -- once, on the first word, so that somebody who then
+   * goes back to look at a photograph is not dragged away from it again.
+   */
+  previewFilled?: boolean;
 }) {
   const [active, setActive] = useState(0);
   const [zooming, setZooming] = useState(false);
@@ -45,8 +63,12 @@ export function ProductGallery({
    */
   const video = resolveVideo(videoUrl);
   const count = images.length;
-  const slides = count + (video ? 1 : 0);
+  const hasPreview = Boolean(preview);
+  /* Photographs, then the video, then the customer's own plate. */
+  const previewIndex = count + (video ? 1 : 0);
+  const slides = previewIndex + (hasPreview ? 1 : 0);
   const onVideo = Boolean(video) && active === count;
+  const onPreview = hasPreview && active === previewIndex;
 
   const go = useCallback(
     (delta: number) => setActive((i) => (i + delta + slides) % Math.max(slides, 1)),
@@ -54,6 +76,21 @@ export function ProductGallery({
   );
 
   useEffect(() => setActive(0), [productName]);
+
+  /*
+   * Turn to their plate the first time they write something.
+   *
+   * Once, not on every keystroke: a customer who has gone back to the
+   * photograph of the finish is reading it on purpose, and snatching the
+   * frame away from them each time they correct a letter would be the page
+   * arguing with them.
+   */
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (!hasPreview || !previewFilled || jumped.current) return;
+    jumped.current = true;
+    setActive(previewIndex);
+  }, [hasPreview, previewFilled, previewIndex]);
 
   // Arrow keys move through the gallery while the lightbox is open.
   useEffect(() => {
@@ -135,6 +172,24 @@ export function ProductGallery({
               </button>
             ))}
 
+            {hasPreview ? (
+              <button
+                type="button"
+                onClick={() => setActive(previewIndex)}
+                aria-label="See your own plate"
+                aria-current={onPreview}
+                className={clsx(
+                  'flex aspect-square w-[68px] shrink-0 flex-col items-center justify-center gap-1 border bg-paper-warm px-1 text-center transition-colors duration-200 lg:w-full',
+                  onPreview ? 'border-ink' : 'border-stone-line hover:border-ink-300',
+                )}
+              >
+                <span className="text-[0.6rem] uppercase leading-tight tracking-architect text-ink">
+                  Yours
+                </span>
+                <span className="text-[0.55rem] leading-tight text-ink-400">as you type</span>
+              </button>
+            ) : null}
+
             {video ? (
               <button
                 type="button"
@@ -160,8 +215,11 @@ export function ProductGallery({
         {/* Main frame */}
         <div className="relative min-w-0 flex-1">
           {onVideo ? <VideoFrame video={video!} title={productName} /> : null}
+          {onPreview ? (
+            <div className="border border-stone-line bg-paper-warm">{preview}</div>
+          ) : null}
           <div
-            hidden={onVideo}
+            hidden={onVideo || onPreview}
             ref={frameRef}
             onMouseEnter={() => setZooming(true)}
             onMouseLeave={() => setZooming(false)}

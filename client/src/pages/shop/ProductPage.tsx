@@ -189,6 +189,19 @@ export default function ProductPage() {
    */
   const script = previewScript(previewSettings);
 
+  /*
+   * Whether the customer has written anything the plate would show.
+   *
+   * Taken from the drawn slots rather than from every answer, because a
+   * mounting choice or a note to the studio changes nothing on the plate, and
+   * turning the gallery to an empty plate because somebody picked a finish
+   * would be worse than leaving it on the photograph.
+   */
+  const hasTypedForPreview = Object.entries(previewSlots).some(
+    ([slot, value]) => slot !== 'fontFamily' && slot !== 'plateColor' && slot !== 'textColor'
+      && typeof value === 'string' && value.trim() !== '',
+  );
+
   const shareProduct = async () => {
     const url = `${window.location.origin}/product/${product.slug}`;
     const data = {
@@ -329,50 +342,51 @@ export default function ProductPage() {
         */}
         <div className="grid gap-5 sm:gap-8 lg:grid-cols-12 lg:gap-10 xl:gap-12">
           <div className="lg:col-span-6 xl:col-span-7">
+            {/*
+              The customer's own plate is a slide in the gallery, not a panel
+              under it.
+
+              It used to sit below the photographs, which put the thing being
+              bought -- their name, on their plate -- smaller than and beneath
+              a photograph of somebody else's. In the gallery it gets the same
+              frame and the same size as the product photograph, and the
+              gallery turns to it the moment they write a word.
+            */}
             <ProductGallery
               images={product.images}
               productName={product.name}
               videoUrl={product.videoUrl}
+              previewFilled={hasTypedForPreview}
+              preview={product.livePreviewEnabled ? (
+                <div>
+                  {/*
+                    Said out loud, because the two pictures in this gallery
+                    show different things: the photographs are somebody else's
+                    plate, finished and on a wall, and this is theirs as they
+                    type it.
+                  */}
+                  <div className="flex items-baseline justify-between gap-3 border-b border-stone-line px-4 py-2.5">
+                    <p className="eyebrow text-ink">Your plate</p>
+                    <p className="text-2xs text-ink-400">Updates as you type</p>
+                  </div>
+                  <div ref={previewRef}>
+                    <LivePreview
+                      template={product.livePreviewTemplate}
+                      config={product.livePreviewConfig}
+                      slots={previewSlots}
+                      // The strip above already says what this is.
+                      hideLabel
+                    />
+                  </div>
+                  <div className="px-4 pb-4">
+                    <SavePreview target={previewRef} name={product.name} />
+                  </div>
+                </div>
+              ) : undefined}
               badges={
                 <GalleryBadges badge={product.badge} isNew={product.isNew} discount={discount} />
               }
             />
-
-            {/*
-              Live preview sits under the gallery, at a generous size.
-              Laptop only: on a phone it would sit between the photograph and
-              the price, pushing the price and the buy button off the screen.
-              The phone gets it inside the personalisation sheet instead, where
-              it is actually being used.
-            */}
-            {product.livePreviewEnabled ? (
-              <div className="mt-4 hidden border border-stone-line lg:block">
-                {/*
-                  Said out loud, because the two pictures on this page show
-                  different things and nothing was saying which was which: the
-                  photograph above is somebody else's plate, finished and on a
-                  wall, and this one is theirs as they type it. Without the
-                  label a customer can reasonably read the photograph as what
-                  they are about to be sent.
-                */}
-                <div className="flex items-baseline justify-between gap-3 border-b border-stone-line px-4 py-2.5">
-                  <p className="eyebrow text-ink">Your plate</p>
-                  <p className="text-2xs text-ink-400">Updates as you type</p>
-                </div>
-                <div ref={previewRef}>
-                  <LivePreview
-                    template={product.livePreviewTemplate}
-                    config={product.livePreviewConfig}
-                    slots={previewSlots}
-                    // The strip above already says what this is.
-                    hideLabel
-                  />
-                </div>
-                <div className="px-4 pb-4">
-                  <SavePreview target={previewRef} name={product.name} />
-                </div>
-              </div>
-            ) : null}
           </div>
 
           {/* Sticky purchase panel */}
