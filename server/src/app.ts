@@ -12,6 +12,7 @@ import { env } from './config/env';
 import prisma from './lib/prisma';
 import routes from './routes';
 import seoRoutes from './routes/public/seo.routes';
+import { renderShell } from './services/htmlMeta.service';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { ensureUploadDirs } from './middleware/upload';
 import { getFavicon } from './services/favicon.service';
@@ -360,12 +361,20 @@ export function createApp() {
         }
       },
     }));
-    app.get(/^\/(?!api|uploads).*/, (_req, res, next) => {
+    app.get(/^\/(?!api|uploads).*/, (req, res, next) => {
       // The HTML points at the latest hashed assets and must be revalidated.
       res.setHeader('Cache-Control', 'no-cache');
-      res.sendFile(path.join(clientDist, 'index.html'), (err) => {
+      /*
+       * The shell, with this page's own title and share card written into
+       * it. Anything that cannot be resolved falls through to the file
+       * itself, so a page is never lost to a missing description.
+       */
+      const plain = () => res.sendFile(path.join(clientDist, 'index.html'), (err) => {
         if (err) next();
       });
+      renderShell(req.path, clientDist)
+        .then((html) => { if (html) res.type('html').send(html); else plain(); })
+        .catch(plain);
     });
   }
 

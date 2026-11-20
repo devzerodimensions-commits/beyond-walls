@@ -1474,8 +1474,13 @@ function PreviewConfigEditor({
         * picture and is right before anyone looks at it. The typeface is not
         * in the picture at all, so it is the single setting a new product
         * actually needs a person for -- and the one worth meeting first.
+        *
+        * Open only while no face has been chosen. The reader sets one when it
+        * can tell the alphabet, and a grid of twelve specimens held open on a
+        * product whose lettering is already right is just the old wall of
+        * settings again, one fold further in.
         */}
-      <Fold title="Lettering" note={faceName} defaultOpen={fromPhoto}>
+      <Fold title="Lettering" note={faceName} defaultOpen={fromPhoto && !stored.defaults?.fontFamily}>
         <FontChoice
           value={String(stored.defaults?.fontFamily ?? '')}
           fallback={resolved.defaults.fontFamily}
