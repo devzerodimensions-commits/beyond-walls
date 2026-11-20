@@ -724,7 +724,7 @@ router.get(
  * and saying why. The reason goes back to the studio so they can add the flat
  * design file the piece is cut from.
  */
-async function buildPreviewFromPhoto(productId: string) {
+async function buildPreviewFromPhoto(productId: string, force = false) {
   const product = await prisma.product.findUnique({
     where: { id: productId },
     include: { images: { orderBy: { sortOrder: 'asc' } }, personalization: true },
@@ -735,8 +735,13 @@ async function buildPreviewFromPhoto(productId: string) {
     photo?: { boxes?: unknown[] };
     aspect?: unknown;
   };
-  // Already placed, by hand or by an earlier read. Leave it alone.
-  if (Array.isArray(existing.photo?.boxes) && existing.photo.boxes.length) return null;
+  /*
+   * Already placed, by hand or by an earlier read -- so an arriving picture
+   * leaves it alone. Pressing the button is a different thing entirely: it is
+   * somebody asking for it to be done again, and answering that with silence
+   * made the button look broken on a product whose preview was already fine.
+   */
+  if (!force && Array.isArray(existing.photo?.boxes) && existing.photo.boxes.length) return null;
 
   /* The primary first, because it is usually the best picture of the piece. */
   const ordered = [
@@ -839,7 +844,7 @@ router.post(
        * The first picture failed, but another of the product's own pictures
        * may still read -- which is the whole point of trying them all.
        */
-      const another = await buildPreviewFromPhoto(product.id);
+      const another = await buildPreviewFromPhoto(product.id, true);
       if (another && another.config) {
         return res.json({
           success: true,
