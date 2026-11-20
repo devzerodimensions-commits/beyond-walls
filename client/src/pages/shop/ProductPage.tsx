@@ -462,7 +462,7 @@ export default function ProductPage() {
             */}
             <div className="lg:sticky" style={{ top: 'calc(var(--header-h, 92px) + 1rem)' }}>
               {product.category ? (
-                <Link to={`/shop/${product.category.slug}`} className="eyebrow link-underline">
+                <Link to={`/shop/${product.category.slug}`} className="eyebrow link-underline -my-2 inline-block py-2">
                   {product.category.name}
                 </Link>
               ) : null}
@@ -714,7 +714,7 @@ export default function ProductPage() {
                           <button
                             type="button"
                             onClick={() => setSheetOpen(true)}
-                            className="underline underline-offset-2 lg:hidden"
+                            className="-my-2 inline-block py-2 underline underline-offset-2 lg:hidden"
                           >
                             Open personalisation
                           </button>

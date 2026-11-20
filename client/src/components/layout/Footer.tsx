@@ -207,7 +207,7 @@ export function Footer() {
               {phone ? (
                 <a
                   href={`tel:${phone.replace(/\s/g, '')}`}
-                  className="inline-flex items-center gap-2 text-sm text-paper/80"
+                  className="-my-1.5 inline-flex items-center gap-2 py-1.5 text-sm text-paper/80"
                 >
                   <PhoneIcon size={15} className="shrink-0 text-paper/40" />
                   {phone}
