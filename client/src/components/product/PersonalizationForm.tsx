@@ -225,6 +225,43 @@ function PersonalizationInput({
     />
   ) : null;
 
+  /*
+   * A symbol is chosen by looking at it.
+   *
+   * Bound to the picture box on the plate, so its choices hold image
+   * addresses rather than words -- and a row of radio buttons reading
+   * "/uploads/symbols/om.svg" is no way to choose a thing whose whole point
+   * is how it looks. The studio supplies the artwork; this only shows it.
+   */
+  if (field.previewSlot === 'logo' && field.options.length) {
+    return (
+      <FieldWrap label={label} required={required} error={error} hint={field.helpText ?? undefined}>
+        <div className="mt-1 flex flex-wrap gap-2">
+          {field.options.map((option) => (
+            <button
+              key={option.value || option.label}
+              type="button"
+              title={option.label}
+              aria-label={option.label}
+              aria-pressed={value === option.value}
+              onClick={() => onChange(value === option.value ? '' : option.value)}
+              className={clsx(
+                'flex h-14 w-14 items-center justify-center border bg-paper p-1.5 transition-colors',
+                value === option.value ? 'border-ink' : 'border-stone-line hover:border-ink-300',
+              )}
+            >
+              {option.value ? (
+                <img src={assetUrl(option.value)} alt="" className="max-h-full max-w-full object-contain" />
+              ) : (
+                <span className="text-2xs leading-none text-ink-400">None</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </FieldWrap>
+    );
+  }
+
   const LINES = ['line1', 'line2', 'line3'];
   if (script === 'devanagari' && field.previewSlot && LINES.includes(field.previewSlot)
     && (field.type === 'TEXT' || field.type === 'TEXTAREA')) {

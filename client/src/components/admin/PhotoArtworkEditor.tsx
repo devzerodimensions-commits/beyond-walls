@@ -25,6 +25,7 @@ import { Button, Input, Select } from '../ui';
  */
 
 const SLOTS: { value: PreviewPhotoBox['slot']; label: string }[] = [
+  { value: 'logo', label: 'Symbol or logo (a picture, not typed)' },
   { value: 'number', label: 'House / flat number' },
   { value: 'line1', label: 'First line' },
   { value: 'line2', label: 'Second line' },

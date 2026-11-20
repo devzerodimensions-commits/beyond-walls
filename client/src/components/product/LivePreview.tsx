@@ -1332,6 +1332,34 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
         const value = (slots[box.slot] ?? '').trim();
         if (!value) return null;
 
+        /*
+         * A picture rather than words.
+         *
+         * The symbol a family puts on a nameplate -- an Om, a Ganesha, a cross
+         * -- is chosen, not typed, so this box carries an image. Fitted inside
+         * its box without cropping: a symbol squeezed out of shape is worse
+         * than one drawn slightly small, and these are not shapes anybody
+         * should be distorting to fill a rectangle.
+         */
+        if (box.slot === 'logo') {
+          const boxW = box.room * VW;
+          const boxH = box.h * VH;
+          const left = box.align === 'center' ? box.anchor * VW - boxW / 2
+            : box.align === 'right' ? box.anchor * VW - boxW
+              : box.anchor * VW;
+          return (
+            <image
+              key={index}
+              href={assetUrl(value)}
+              x={left}
+              y={box.y * VH}
+              width={boxW}
+              height={boxH}
+              preserveAspectRatio="xMidYMid meet"
+            />
+          );
+        }
+
         const roomW = box.room * VW;
         const roomH = box.h * VH;
         const m = measure(value, font);
