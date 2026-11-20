@@ -100,6 +100,12 @@ async function metaForPath(pathname: string): Promise<PageMeta | null> {
     };
   }
 
+  /*
+   * The front page keeps the studio's own wording, but still earns a
+   * canonical address and a share card: it is the link sent most often.
+   */
+  if (pathname === '/') return {};
+
   const known = STATIC_PAGES[pathname.replace(/\/+$/, '') || '/'];
   if (known) return { title: known };
 
@@ -163,9 +169,10 @@ export async function renderShell(
   }
   if (!meta) return null;
 
-  const [template, siteName, defaultDescription, configuredUrl, defaultImage, robots] =
+  const [template, defaultTitle, siteName, defaultDescription, configuredUrl, defaultImage, robots] =
     await Promise.all([
       getSetting<string>('seo.titleTemplate', '{page} | Beyond Walls'),
+      getSetting<string>('seo.defaultTitle', ''),
       getSetting<string>('brand.name', 'Beyond Walls'),
       getSetting<string>('seo.defaultDescription', ''),
       getSetting<string>('seo.siteUrl', ''),
@@ -177,7 +184,7 @@ export async function renderShell(
   const titleText = meta.title
     && !meta.title.toLowerCase().includes(siteName.toLowerCase())
     ? template.replace('{page}', meta.title)
-    : meta.title;
+    : meta.title || defaultTitle;
 
   const description = clamp(meta.description || defaultDescription || '');
   const picture = meta.image || defaultImage || null;
