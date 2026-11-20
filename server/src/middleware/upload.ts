@@ -148,14 +148,35 @@ export async function persistUploads(
   return out;
 }
 
-/** Removes a stored file. Handles both driver URLs and legacy /uploads paths. */
+/**
+ * Removes a stored file, wherever it is actually kept.
+ *
+ * A /uploads/ address does not say which store holds the bytes. Images
+ * committed to the repository sit on disk; everything uploaded since is a row
+ * in the database, because that is the driver this installation runs. Reading
+ * one has always tried both, in that order -- deleting one tried only the
+ * disk, so deleting a file from the media library removed its entry and left
+ * the bytes exactly where they were, still being served at the same public
+ * address to anyone who had the link.
+ *
+ * That is the part that matters. A studio deleting a photograph is often
+ * deleting it BECAUSE it should not be public -- the wrong file, a customer's
+ * picture, something they were sent in confidence -- and the library said it
+ * was gone while the URL went on serving it.
+ *
+ * So both are asked, and neither failing stops the other. A store that does
+ * not hold it treats the removal as already done, which is the right answer.
+ */
 export function deleteUploadedFile(url: string): void {
   if (!url) return;
-  if (url.startsWith('/uploads/')) {
-    void localStorage.remove(url);
-    return;
+
+  const configured = getStorage();
+  void configured.remove(url).catch(() => undefined);
+
+  // The disk as well, unless that is what the line above already cleared.
+  if (configured.name !== 'local' && url.startsWith('/uploads/')) {
+    void localStorage.remove(url).catch(() => undefined);
   }
-  void getStorage().remove(url).catch(() => undefined);
 }
 
 export function ensureUploadDirs(): void {
