@@ -12,7 +12,7 @@ import { PRESETS } from '../../lib/productPresets';
 import { VIDEO_HELP, resolveVideo } from '../../lib/video';
 import { useToast } from '../../context/StoreProvider';
 import {
-  AdminCard, AdminPageHeader, MediaPicker, MultiImageUpload, SortableList, StringListEditor,
+  AdminCard, AdminPageHeader, Fold, MediaPicker, MultiImageUpload, SortableList, StringListEditor,
 } from '../../components/admin/AdminKit';
 import { CustomerPreview } from '../../components/admin/CustomerPreview';
 import { DesignLibrary } from '../../components/admin/DesignLibrary';
@@ -585,25 +585,35 @@ export default function AdminProductEdit() {
                     }}
                   />
 
-                  <DesignLibrary
-                    template={form.livePreviewTemplate}
-                    config={form.livePreviewConfig}
-                    productImage={product?.images?.[0]?.url ?? null}
-                    onApply={(nextTemplate, nextConfig) => {
-                      // Two calls are safe here: set() updates from the
-                      // previous state, not from the render it was made in.
-                      set('livePreviewTemplate', nextTemplate);
-                      set('livePreviewConfig', nextConfig);
-                    }}
-                  />
+                  {/*
+                    * Folded away, because reading the product's own picture is
+                    * now what nearly every product does. Starting from a saved
+                    * design or borrowing another product's setup is for the
+                    * piece that has never been photographed with a name on it
+                    * -- real, but rare, and no reason to put two more panels
+                    * between the studio and the preview it just made.
+                    */}
+                  <Fold title="Start from a saved design instead" className="mt-3">
+                    <DesignLibrary
+                      template={form.livePreviewTemplate}
+                      config={form.livePreviewConfig}
+                      productImage={product?.images?.[0]?.url ?? null}
+                      onApply={(nextTemplate, nextConfig) => {
+                        // Two calls are safe here: set() updates from the
+                        // previous state, not from the render it was made in.
+                        set('livePreviewTemplate', nextTemplate);
+                        set('livePreviewConfig', nextConfig);
+                      }}
+                    />
 
-                  <CopyPreviewSetup
-                    exceptId={id!}
-                    onCopy={(from) => {
-                      set('livePreviewTemplate', from.livePreviewTemplate ?? '');
-                      set('livePreviewConfig', from.livePreviewConfig ?? {});
-                    }}
-                  />
+                    <CopyPreviewSetup
+                      exceptId={id!}
+                      onCopy={(from) => {
+                        set('livePreviewTemplate', from.livePreviewTemplate ?? '');
+                        set('livePreviewConfig', from.livePreviewConfig ?? {});
+                      }}
+                    />
+                  </Fold>
 
                   <PreviewConfigEditor
                     template={form.livePreviewTemplate}
@@ -1419,8 +1429,27 @@ function PreviewConfigEditor({
 
   const overrideCount = Object.keys(config ?? {}).length;
 
+  /*
+   * A preview made from the product's own photograph.
+   *
+   * Half of these settings describe a plate that is DRAWN -- its colour, its
+   * corner radius, its proportions, whether it has screws. None of them do
+   * anything once the plate is a picture of the real piece: the photograph is
+   * the plate. They were not merely clutter, they were a trap. The artwork is
+   * stretched to whatever proportions are set, so a studio tidying up the
+   * numbers on a product whose preview was already right would have squashed
+   * its own product out of shape and had no way of knowing why.
+   *
+   * So for a photographed plate they are not shown at all.
+   */
+  const fromPhoto = template === 'photo'
+    && Boolean((stored.photo as { image?: string } | undefined)?.image);
+
+  const faceName = PLATE_FONTS.find((f) => f.id === resolved.defaults.fontFamily)?.label
+    ?? resolved.defaults.fontFamily;
+
   return (
-    <div className="mt-5 space-y-5">
+    <div className="mt-5 space-y-3">
       <div className="flex items-center justify-between border-b border-stone-line pb-2">
         <p className="text-2xs uppercase tracking-architect text-ink-400">
           Preview settings for this product
@@ -1438,26 +1467,81 @@ function PreviewConfigEditor({
         )}
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <ColourOverrideField
-          label="Default plate colour"
-          value={String(stored.defaults?.plateColor ?? '')}
-          fallback={resolved.defaults.plateColor}
-          palette={resolved.palette.plate}
-          onChange={(value) => patchGroup('defaults', 'plateColor', value)}
-        />
-        <ColourOverrideField
-          label="Default text colour"
-          value={String(stored.defaults?.textColor ?? '')}
-          fallback={resolved.defaults.textColor}
-          palette={resolved.palette.text}
-          onChange={(value) => patchGroup('defaults', 'textColor', value)}
-        />
+      {/*
+        * Open, because it is the one thing a photograph cannot carry.
+        *
+        * Everything else about a photographed plate is measured off the
+        * picture and is right before anyone looks at it. The typeface is not
+        * in the picture at all, so it is the single setting a new product
+        * actually needs a person for -- and the one worth meeting first.
+        */}
+      <Fold title="Lettering" note={faceName} defaultOpen={fromPhoto}>
         <FontChoice
           value={String(stored.defaults?.fontFamily ?? '')}
           fallback={resolved.defaults.fontFamily}
           onChange={(value) => patchGroup('defaults', 'fontFamily', value)}
         />
+      </Fold>
+
+      <Fold
+        title="Colours"
+        note={(
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="inline-block h-3 w-3 border border-stone-line align-middle"
+              style={{ background: paletteHex(resolved.defaults.textColor, resolved.palette.text) }}
+            />
+            lettering
+          </span>
+        )}
+      >
+        <div className="grid gap-5 sm:grid-cols-2">
+          <ColourOverrideField
+            label="Default text colour"
+            value={String(stored.defaults?.textColor ?? '')}
+            fallback={resolved.defaults.textColor}
+            palette={resolved.palette.text}
+            onChange={(value) => patchGroup('defaults', 'textColor', value)}
+          />
+          {!fromPhoto ? (
+            <ColourOverrideField
+              label="Default plate colour"
+              value={String(stored.defaults?.plateColor ?? '')}
+              fallback={resolved.defaults.plateColor}
+              palette={resolved.palette.plate}
+              onChange={(value) => patchGroup('defaults', 'plateColor', value)}
+            />
+          ) : null}
+          <PaletteEditor
+            title="Text colour choices"
+            values={resolved.palette.text}
+            onChange={(values) => patch('palette', { ...resolved.palette, text: values })}
+          />
+          {!fromPhoto ? (
+            <PaletteEditor
+              title="Plate colour choices"
+              values={resolved.palette.plate}
+              onChange={(values) => patch('palette', { ...resolved.palette, plate: values })}
+            />
+          ) : null}
+          {stored.palette ? (
+            <button
+              type="button"
+              onClick={() => patch('palette', undefined)}
+              className="justify-self-start text-2xs uppercase tracking-architect text-ink-500 hover:text-state-danger sm:col-span-2"
+            >
+              Reset the colour lists to the template
+            </button>
+          ) : null}
+        </div>
+      </Fold>
+
+      {!fromPhoto ? (
+      <Fold
+        title="Plate shape"
+        note={`${resolved.aspect.width} × ${resolved.aspect.height}`}
+      >
+      <div className="grid gap-5 sm:grid-cols-2">
         <Input
           type="number"
           label="Corner radius"
@@ -1522,64 +1606,49 @@ function PreviewConfigEditor({
             onChange={(v) => patchGroup('plate', 'showScrews', v)}
           />
         </div>
+      </div>
+      </Fold>
+      ) : null}
 
-        <Input
-          label="Placeholder — number"
-          value={String(stored.placeholders?.number ?? '')}
-          placeholder={resolved.placeholders.number ?? '—'}
-          onChange={(e) => patchGroup('placeholders', 'number', e.target.value)}
-        />
-        <Input
-          label="Placeholder — line 1"
-          value={String(stored.placeholders?.line1 ?? '')}
-          placeholder={resolved.placeholders.line1 ?? '—'}
-          onChange={(e) => patchGroup('placeholders', 'line1', e.target.value)}
-        />
-        <Input
-          label="Placeholder — line 2"
-          value={String(stored.placeholders?.line2 ?? '')}
-          placeholder={resolved.placeholders.line2 ?? '—'}
-          onChange={(e) => patchGroup('placeholders', 'line2', e.target.value)}
-        />
-        <Input
-          label="Placeholder — line 3"
-          value={String(stored.placeholders?.line3 ?? '')}
-          placeholder={resolved.placeholders.line3 ?? '—'}
-          onChange={(e) => patchGroup('placeholders', 'line3', e.target.value)}
-        />
+      <Fold title="Sample words" note="shown before a customer types">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Input
+            label="Placeholder — number"
+            value={String(stored.placeholders?.number ?? '')}
+            placeholder={resolved.placeholders.number ?? '—'}
+            onChange={(e) => patchGroup('placeholders', 'number', e.target.value)}
+          />
+          <Input
+            label="Placeholder — line 1"
+            value={String(stored.placeholders?.line1 ?? '')}
+            placeholder={resolved.placeholders.line1 ?? '—'}
+            onChange={(e) => patchGroup('placeholders', 'line1', e.target.value)}
+          />
+          <Input
+            label="Placeholder — line 2"
+            value={String(stored.placeholders?.line2 ?? '')}
+            placeholder={resolved.placeholders.line2 ?? '—'}
+            onChange={(e) => patchGroup('placeholders', 'line2', e.target.value)}
+          />
+          <Input
+            label="Placeholder — line 3"
+            value={String(stored.placeholders?.line3 ?? '')}
+            placeholder={resolved.placeholders.line3 ?? '—'}
+            onChange={(e) => patchGroup('placeholders', 'line3', e.target.value)}
+          />
+        </div>
+      </Fold>
 
+      <Fold title="Caption under the preview" note={(stored.caption ? 'Your own wording' : 'Standard wording')}>
         <Textarea
           label="Caption under the preview"
           value={String(stored.caption ?? '')}
           placeholder={resolved.caption}
           rows={2}
-          wrapClassName="sm:col-span-2"
           hint="Customers read this as a promise about the finished piece. Leave it blank to keep the standard wording."
           onChange={(e) => patch('caption', e.target.value)}
         />
-      </div>
-
-      <div className="grid gap-5 border-t border-stone-line pt-5 sm:grid-cols-2">
-        <PaletteEditor
-          title="Plate colour choices"
-          values={resolved.palette.plate}
-          onChange={(values) => patch('palette', { ...resolved.palette, plate: values })}
-        />
-        <PaletteEditor
-          title="Text colour choices"
-          values={resolved.palette.text}
-          onChange={(values) => patch('palette', { ...resolved.palette, text: values })}
-        />
-        {stored.palette ? (
-          <button
-            type="button"
-            onClick={() => patch('palette', undefined)}
-            className="justify-self-start text-2xs uppercase tracking-architect text-ink-500 hover:text-state-danger sm:col-span-2"
-          >
-            Reset both colour lists to template
-          </button>
-        ) : null}
-      </div>
+      </Fold>
 
       {/*
         * Only for the design that is built from a picture. Every other design

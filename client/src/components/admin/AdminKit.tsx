@@ -72,6 +72,50 @@ export function AdminCard({
   );
 }
 
+/**
+ * A setting that is usually already right.
+ *
+ * Panels here grew by accretion -- every control a design could ever need,
+ * laid out one under another, so the live preview panel ran to a screen and a
+ * half of fields for a product whose preview had been made correctly and
+ * automatically from its own photograph. Adding a product meant scrolling past
+ * a dozen things nobody was going to touch to reach the two that mattered.
+ *
+ * So the rare ones fold away behind a line that says what is inside and what
+ * it is currently set to. Nothing is hidden -- a summary that states the
+ * current value is often all anyone needed to read -- and nothing moves, so
+ * the fields keep the place people have learned.
+ */
+export function Fold({
+  title, note, children, defaultOpen = false, className,
+}: {
+  title: string;
+  /** What it is set to now, read without opening it. */
+  note?: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+}) {
+  return (
+    <details open={defaultOpen} className={clsx('group border border-stone-line', className)}>
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-3 py-2.5 hover:bg-paper-warm">
+        <span className="text-2xs uppercase tracking-architect text-ink">{title}</span>
+        <span className="flex items-center gap-2">
+          {note ? <span className="text-2xs text-ink-400">{note}</span> : null}
+          <svg
+            viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+            className="shrink-0 text-ink-400 transition-transform group-open:rotate-180"
+          >
+            <path d="m5 9 7 7 7-7" />
+          </svg>
+        </span>
+      </summary>
+      <div className="border-t border-stone-line p-3">{children}</div>
+    </details>
+  );
+}
+
 export function StatusBadge({ status }: { status: ContentStatus | string }) {
   const meta = statusMeta(status);
   return <Badge tone={meta.tone}>{meta.label}</Badge>;

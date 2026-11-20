@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { PreviewPhoto, PreviewPhotoBox } from '../product/LivePreview';
 import { assetUrl } from '../../lib/api';
-import { MediaPicker } from './AdminKit';
+import { Fold, MediaPicker } from './AdminKit';
 import { Button, Input, Select } from '../ui';
 
 /**
@@ -101,15 +101,28 @@ export function PhotoArtworkEditor({
     setBox(index, { [field]: Math.min(100, Math.max(0, n)) / 100 } as Partial<PreviewPhotoBox>);
   };
 
+  /*
+   * Folded, and closed.
+   *
+   * Everything in here is measured off the product's own photograph and is
+   * already right when the panel opens -- the blank plate, where each line
+   * sits, how tall its lettering is, how much room it has. A studio adding
+   * products should meet a short panel that says what was found and let them
+   * get on with it, not twenty numbers to scroll past per product. The line
+   * count in the summary is the part worth reading without opening it: it is
+   * how you see at a glance that a three-line plate read as three lines.
+   */
+  const summary = current.boxes.length
+    ? `${current.boxes.length} line${current.boxes.length === 1 ? '' : 's'}${current.image ? ' · read from the photograph' : ''}`
+    : 'nothing placed yet';
+
   return (
-    <div className="space-y-5 border-t border-stone-line pt-5">
-      <div>
-        <p className="text-2xs uppercase tracking-architect text-ink-400">Artwork and text placement</p>
-        <p className="mt-1 text-2xs text-ink-400">
-          The picture below is the plate with its sample lettering removed. The customer's words are
-          drawn into the boxes listed under it — correct any that sit wrong.
-        </p>
-      </div>
+    <Fold title="Artwork and where the words go" note={summary} className="mt-3">
+    <div className="space-y-5">
+      <p className="text-2xs leading-relaxed text-ink-400">
+        The picture below is the plate with its sample lettering removed. The customer's words are
+        drawn into the boxes listed under it — correct any that sit wrong.
+      </p>
 
       <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)]">
         <div className="border border-stone-line bg-paper-off p-2">
@@ -227,5 +240,6 @@ export function PhotoArtworkEditor({
         </Button>
       </div>
     </div>
+    </Fold>
   );
 }
