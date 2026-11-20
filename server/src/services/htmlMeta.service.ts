@@ -38,6 +38,17 @@ function clamp(value: string, max = 300): string {
 }
 
 interface PageMeta {
+  /**
+   * False when the URL names nothing that exists.
+   *
+   * The shop is one page application, so the server used to answer every URL
+   * the same way: 200, here is the shell, let React decide. A customer who
+   * mistyped saw a proper "Page not found" screen and all was well -- but a
+   * search engine was told the page existed, and indexed a not-found screen
+   * as a real page of the shop. A deleted product kept its place in the
+   * results that way, and kept sending people to nothing.
+   */
+  found?: boolean;
   title?: string;
   description?: string;
   image?: string | null;
@@ -52,6 +63,15 @@ interface PageMeta {
  * studio's own settings, so nothing here claims anything about the business
  * that the studio has not written itself.
  */
+/*
+ * Routes the application owns whatever is behind them.
+ *
+ * Whether a particular order exists, or the visitor is signed in, is for the
+ * page itself to answer -- the address is real either way, and none of these
+ * are for search engines.
+ */
+const PRIVATE_PREFIXES = ['/admin', '/account', '/order', '/reset-password', '/forgot-password'];
+
 const STATIC_PAGES: Record<string, string> = {
   '/shop': 'Shop',
   '/cart': 'Your cart',
@@ -75,8 +95,13 @@ const STATIC_PAGES: Record<string, string> = {
 async function metaForPath(pathname: string): Promise<PageMeta | null> {
   /* The admin panel is not for search engines, and has nothing to share. */
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
-    return { title: 'Admin', noindex: true };
+    return { title: 'Admin', noindex: true, found: true };
   }
+
+  const owned = PRIVATE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+  if (owned) return { noindex: true, found: true };
 
   const product = /^\/product\/([^/]+)\/?$/.exec(pathname);
   if (product) {
@@ -91,12 +116,13 @@ async function metaForPath(pathname: string): Promise<PageMeta | null> {
         images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } },
       },
     });
-    if (!row) return null;
+    if (!row) return { found: false };
     return {
       title: row.seoTitle || row.name,
       description: row.seoDescription || row.shortDescription || undefined,
       image: row.images[0]?.url ?? null,
       type: 'product',
+      found: true,
     };
   }
 
@@ -104,10 +130,28 @@ async function metaForPath(pathname: string): Promise<PageMeta | null> {
    * The front page keeps the studio's own wording, but still earns a
    * canonical address and a share card: it is the link sent most often.
    */
-  if (pathname === '/') return {};
+  if (pathname === '/') return { found: true };
 
   const known = STATIC_PAGES[pathname.replace(/\/+$/, '') || '/'];
-  if (known) return { title: known };
+  if (known) return { title: known, found: true };
+
+  /*
+   * A collection. An address that names no category of ours is not a thinner
+   * shop page, it is a page we do not have.
+   */
+  const collection = /^\/shop\/([^/]+)\/?$/.exec(pathname);
+  if (collection) {
+    const category = await prisma.category.findFirst({
+      where: { slug: decodeURIComponent(collection[1]), status: 'PUBLISHED' },
+      select: { name: true, shortText: true, description: true },
+    });
+    if (!category) return { found: false };
+    return {
+      title: category.name,
+      description: category.shortText || category.description || undefined,
+      found: true,
+    };
+  }
 
   /* A page the studio wrote in the admin panel. */
   const slug = /^\/([^/]+)\/?$/.exec(pathname)?.[1];
@@ -120,11 +164,12 @@ async function metaForPath(pathname: string): Promise<PageMeta | null> {
       return {
         title: page.seoTitle || page.title,
         description: page.seoDescription || undefined,
+        found: true,
       };
     }
   }
 
-  return null;
+  return { found: false };
 }
 
 /*
@@ -150,10 +195,17 @@ function readShell(indexPath: string): string | null {
 /**
  * The shell with this page's own tags in it, or null to serve the file as is.
  */
+export interface Shell {
+  /** The filled-in page, or null to send the built file untouched. */
+  html: string | null;
+  /** What to answer with. 404 when the URL names nothing that exists. */
+  status: number;
+}
+
 export async function renderShell(
   pathname: string,
   clientDist: string,
-): Promise<string | null> {
+): Promise<Shell | null> {
   const html = readShell(path.join(clientDist, 'index.html'));
   if (!html) return null;
 
@@ -168,6 +220,19 @@ export async function renderShell(
     return null;
   }
   if (!meta) return null;
+
+  /*
+   * Nothing here. The visitor still gets the real page -- React draws the
+   * same "Page not found" screen it always did -- but the answer carries the
+   * code that says so, which is the part a search engine reads.
+   */
+  const status = meta.found === false ? 404 : 200;
+  if (status === 404) {
+    return {
+      status,
+      html: html.replace('</head>', '    <meta name="robots" content="noindex" />\n  </head>'),
+    };
+  }
 
   const [template, defaultTitle, siteName, defaultDescription, configuredUrl, defaultImage, robots] =
     await Promise.all([
@@ -220,5 +285,5 @@ export async function renderShell(
       `<meta name="description" content="${esc(description)}" />`,
     );
   }
-  return out.replace('</head>', `    ${tags.join('\n    ')}\n  </head>`);
+  return { status, html: out.replace('</head>', `    ${tags.join('\n    ')}\n  </head>`) };
 }

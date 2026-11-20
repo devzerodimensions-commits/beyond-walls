@@ -373,7 +373,18 @@ export function createApp() {
         if (err) next();
       });
       renderShell(req.path, clientDist)
-        .then((html) => { if (html) res.type('html').send(html); else plain(); })
+        .then((shell) => {
+          if (!shell) { plain(); return; }
+          /*
+           * The status is the whole point of the not-found case. The visitor
+           * sees the same "Page not found" screen either way; a crawler told
+           * 200 indexes that screen as a real page of the shop, and goes on
+           * sending people to a product that was deleted months ago.
+           */
+          res.status(shell.status);
+          if (shell.html) res.type('html').send(shell.html);
+          else plain();
+        })
         .catch(plain);
     });
   }
