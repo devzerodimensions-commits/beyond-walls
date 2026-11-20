@@ -431,6 +431,7 @@ export default function AdminProductNew() {
 
               <MediaPicker
                 multiple
+                folder="products"
                 open={libraryOpen}
                 onClose={() => setLibraryOpen(false)}
                 onPick={(assets) => void linkImages(assets)}

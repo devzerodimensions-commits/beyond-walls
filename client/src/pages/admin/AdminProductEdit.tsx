@@ -1276,6 +1276,7 @@ function ImagesTab({
 
         <MediaPicker
           multiple
+          folder="products"
           open={libraryOpen}
           onClose={() => setLibraryOpen(false)}
           onPick={(assets) => void linkFromLibrary(assets)}
@@ -2756,6 +2757,7 @@ function VideoField({ value, onChange }: { value: string; onChange: (v: string) 
 
         <MediaPicker
           accept="video"
+          folder="products"
           open={libraryOpen}
           onClose={() => setLibraryOpen(false)}
           onPick={(assets) => {

@@ -733,8 +733,31 @@ export function ImageField({
         <div className="flex items-center gap-3 border border-stone-line bg-paper p-3">
           <img src={assetUrl(value)} alt="" className="h-16 w-16 border border-stone-line object-contain" />
           <span className="flex-1 truncate text-xs text-ink-500">{value.split('/').pop()}</span>
+          {/*
+            * Both ways in, whether the field is empty or not.
+            *
+            * An empty field offered an upload and the library side by side; a
+            * filled one offered only "Change", which opens the library. So
+            * swapping a picture for one sitting on your own desk meant
+            * uploading it somewhere else first. The two routes are the same
+            * size here because neither is the odd one out.
+            */}
+          <label
+            className={clsx(
+              'cursor-pointer whitespace-nowrap px-2.5 py-1.5 text-xs transition-colors hover:text-ink',
+              uploading ? 'pointer-events-none opacity-60' : 'text-ink-500',
+            )}
+          >
+            {uploading ? 'Uploading…' : 'Upload'}
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.svg"
+              className="hidden"
+              onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ''; }}
+            />
+          </label>
           <Button type="button" size="sm" variant="ghost" onClick={() => setPickerOpen(true)}>
-            Change
+            Library
           </Button>
           <button
             type="button"
@@ -773,6 +796,7 @@ export function ImageField({
 
       <MediaPicker
         open={pickerOpen}
+        folder={folder}
         onClose={() => setPickerOpen(false)}
         onPick={(assets) => {
           if (assets[0]) onChange(assets[0].url);
@@ -784,7 +808,7 @@ export function ImageField({
 }
 
 export function MediaPicker({
-  open, onClose, onPick, multiple = false, accept = 'image',
+  open, onClose, onPick, multiple = false, accept = 'image', folder = 'general',
 }: {
   open: boolean;
   onClose: () => void;
@@ -801,11 +825,53 @@ export function MediaPicker({
    * the moment something is clicked rather than ask for a confirmation.
    */
   multiple?: boolean;
+  /** Where a file uploaded from here is filed. */
+  folder?: string;
 }) {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const { push } = useToast();
+
+  /*
+   * A picture that is not in the library yet.
+   *
+   * This window used to be a way of choosing from what was already uploaded
+   * and nothing else, so somebody with the photograph on their desk had to
+   * close it, leave whatever they were editing, go to Media, upload, come
+   * back, and find their place again. Several fields reach this window
+   * directly -- the About page's four photographs among them -- so for those
+   * there was no way to add a picture at all without that detour.
+   *
+   * What is uploaded is chosen straight away, because somebody who has just
+   * picked a file off their own computer has already said which one they
+   * want. In a window that takes several, it joins the ticks instead.
+   */
+  const uploadHere = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      for (const file of Array.from(multiple ? files : [files[0]])) form.append('files', file);
+      form.append('folder', folder);
+      const added = await api.upload<MediaAsset[]>('/admin/media', form);
+      if (!added.length) return;
+
+      setAssets((current) => [...added, ...current]);
+      if (!multiple) {
+        onPick([added[0]]);
+        return;
+      }
+      setPicked((current) => [...current, ...added.map((a) => a.id)]);
+      push(added.length > 1 ? `${added.length} files added` : 'File added', 'success');
+    } catch (err) {
+      push(err instanceof ApiError ? err.message : 'Upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -865,7 +931,33 @@ export function MediaPicker({
         ) : undefined
       }
     >
-      <AdminSearch value={search} onChange={setSearch} placeholder="Search files…" className="mb-4" />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <AdminSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search files…"
+          className="min-w-0 flex-1"
+        />
+        <label
+          className={clsx(
+            'flex shrink-0 cursor-pointer items-center gap-2 border border-stone-line bg-paper px-3 py-2.5',
+            'text-xs transition-colors hover:border-ink',
+            uploading && 'pointer-events-none opacity-60',
+          )}
+        >
+          {uploading ? <Spinner size={14} /> : <UploadIcon size={14} className="text-ink-400" />}
+          <span>{uploading ? 'Uploading…' : 'Upload from this device'}</span>
+          <input
+            type="file"
+            multiple={multiple}
+            accept={accept === 'video'
+              ? '.mp4,.webm,.mov,.m4v'
+              : '.jpg,.jpeg,.png,.webp,.gif,.avif,.svg'}
+            className="hidden"
+            onChange={(e) => { void uploadHere(e.target.files); e.target.value = ''; }}
+          />
+        </label>
+      </div>
 
       {loading ? (
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
@@ -877,8 +969,8 @@ export function MediaPicker({
       ) : assets.length === 0 ? (
         <p className="py-10 text-center text-sm text-ink-400">
           {accept === 'video'
-            ? 'No videos yet. Upload one from Admin → Media, or paste a YouTube or Vimeo link instead.'
-            : 'No files yet. Upload one from Admin → Media.'}
+            ? 'No videos yet. Upload one above, or paste a YouTube or Vimeo link instead.'
+            : 'No files yet — upload one above.'}
         </p>
       ) : (
         <div className="grid max-h-[55vh] grid-cols-3 gap-3 overflow-y-auto sm:grid-cols-5">

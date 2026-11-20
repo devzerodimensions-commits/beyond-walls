@@ -147,6 +147,7 @@ export function PhotoArtworkEditor({
           <MediaPicker
             open={picking}
             accept="image"
+            folder="products"
             onClose={() => setPicking(false)}
             onPick={(assets) => {
               if (assets[0]?.url) setImage(assets[0].url);
