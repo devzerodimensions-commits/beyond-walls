@@ -596,19 +596,45 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
       const openness = Math.max(openAbove, openBelow);
       if (openness < MIN_OPENNESS) continue;
 
-      let fgR = 0, fgG = 0, fgB = 0, fgN = 0;
+      /*
+       * The colour of the stroke, not of its edges.
+       *
+       * Averaging every pixel the mask calls ink was wrong in a way that
+       * showed on every plate: a letter's outline is anti-aliased, so its rim
+       * is part letter and part plate, and on black lettering over white that
+       * rim is mid-grey. The mean of black strokes and grey rims came out at
+       * #4c4c4c -- so a plate cut in solid black was previewed in grey, and
+       * the preview looked washed out beside the photograph it came from.
+       *
+       * The middle of a stroke carries the real colour. Taking the darkest
+       * third of a dark line (or the lightest third of a light one) is that
+       * middle, and it ignores the rim without having to find the rim.
+       */
+      const inkPixels: { r: number; g: number; b: number; luma: number }[] = [];
       for (const part of r) {
         for (let y = part.minY; y <= part.maxY; y += 1) {
           for (let x = part.minX; x <= part.maxX; x += 1) {
             const i = y * w + x;
             if (!anyInk(i)) continue;
             const p = i * ch;
-            fgR += data[p]; fgG += data[p + 1]; fgB += data[p + 2]; fgN += 1;
+            inkPixels.push({
+              r: data[p], g: data[p + 1], b: data[p + 2],
+              luma: lumaOf(data[p], data[p + 1], data[p + 2]),
+            });
           }
         }
       }
-      if (!fgN) continue;
-      const fg = { r: fgR / fgN, g: fgG / fgN, b: fgB / fgN };
+      if (!inkPixels.length) continue;
+      inkPixels.sort((a, b) => a.luma - b.luma);
+      const core = Math.max(1, Math.round(inkPixels.length / 3));
+      const chosen = group.polarity === 'dark'
+        ? inkPixels.slice(0, core)
+        : inkPixels.slice(inkPixels.length - core);
+      const fg = {
+        r: chosen.reduce((s, q) => s + q.r, 0) / chosen.length,
+        g: chosen.reduce((s, q) => s + q.g, 0) / chosen.length,
+        b: chosen.reduce((s, q) => s + q.b, 0) / chosen.length,
+      };
       const contrast =
         Math.abs(lumaOf(fg.r, fg.g, fg.b) - lumaOf(bg.r, bg.g, bg.b)) / 255;
 
