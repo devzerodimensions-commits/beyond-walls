@@ -20,7 +20,7 @@ import { ReadPhotograph } from '../../components/admin/ReadPhotograph';
 import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
 import { FontChoice } from '../../components/admin/FontChoice';
 import {
-  LivePreview, PLATE_FONTS, PREVIEW_SLOTS, buildPreviewSlots, resolvePreviewConfig,
+  LivePreview, PLATE_FONTS, PREVIEW_SLOTS, SIZEABLE_SLOTS, buildPreviewSlots, resolvePreviewConfig,
   usePreviewTemplates, type PreviewConfig,
 } from '../../components/product/LivePreview';
 import {
@@ -2229,6 +2229,29 @@ function PersonalizationTab({
 
   const previewSlots = useMemo(() => buildPreviewSlots(fields, demoValues), [fields, demoValues]);
 
+  /*
+   * Questions this plate has no line for.
+   *
+   * A preview read off a photograph has exactly as many lines as the
+   * photograph had writing on it. Ask for more than that and the extra
+   * questions are answerable but invisible: the customer types their flat
+   * number, nothing happens, and nobody in the studio finds out until the
+   * order arrives. The product page cannot say so -- a shopper has no idea
+   * what the plate was supposed to have -- so it is said here, where the
+   * questions are set and where it can still be fixed.
+   */
+  const unreachable = useMemo(() => {
+    const boxes = (previewConfig?.photo as { boxes?: { slot: string }[] } | undefined)?.boxes;
+    if (!Array.isArray(boxes) || !boxes.length) return [];
+    const drawn = new Set(boxes.map((box) => box.slot));
+    return fields.filter(
+      (f) => f.previewSlot
+        && SIZEABLE_SLOTS.includes(f.previewSlot)
+        && f.status === 'PUBLISHED'
+        && !drawn.has(f.previewSlot),
+    );
+  }, [previewConfig, fields]);
+
   return (
     <>
       <div className="grid gap-6 lg:grid-cols-3">
@@ -2242,6 +2265,23 @@ function PersonalizationTab({
               </Button>
             }
           >
+            {unreachable.length ? (
+              <div className="mb-4 border border-[#EADFC2] bg-[#F8F3E6] px-3 py-2.5 text-state-warning">
+                <p className="text-2xs uppercase tracking-architect">
+                  {unreachable.length === 1
+                    ? 'One question has nowhere to go on this plate'
+                    : `${unreachable.length} questions have nowhere to go on this plate`}
+                </p>
+                <p className="mt-1 text-2xs leading-relaxed">
+                  {unreachable.map((f) => `“${f.label}”`).join(', ')}
+                  {unreachable.length === 1 ? ' is answered by the customer but is not' : ' are answered by the customer but are not'}
+                  {' '}
+                  drawn on the preview, because the artwork reader found fewer lines of writing
+                  than this product asks for. Read the photograph again under Live preview, or
+                  add the missing line by hand under “Where the words go”.
+                </p>
+              </div>
+            ) : null}
             {fields.length ? (
               <SortableList
                 items={fields}

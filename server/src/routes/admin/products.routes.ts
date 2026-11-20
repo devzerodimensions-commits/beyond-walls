@@ -6,6 +6,7 @@ import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../ut
 import { toBool, uniqueSlug } from '../../utils/helpers';
 import { persistUploads, upload } from '../../middleware/upload';
 import { suggestPreviewFromImage } from '../../services/previewSuggest.service';
+import { bindPreviewBoxes, slotOrder } from '../../services/previewBinding.service';
 import { readPlate } from '../../services/plateText.service';
 import { deleteFileIfUnreferenced } from '../../services/media.service';
 import { isSellable } from '../../services/pricing.service';
@@ -433,7 +434,14 @@ router.get(
       include: ADMIN_PRODUCT_INCLUDE,
     });
     if (!product) throw ApiError.notFound('Product not found');
-    res.json({ success: true, data: product });
+    /* Same repair as the shop, so the editor and the shop never disagree. */
+    res.json({
+      success: true,
+      data: {
+        ...product,
+        livePreviewConfig: bindPreviewBoxes(product.livePreviewConfig, product.personalization),
+      },
+    });
   }),
 );
 
@@ -758,12 +766,7 @@ async function buildPreviewFromPhoto(productId: string, force = false) {
     if (!firstReason) firstReason = attempt.reason;
   }
 
-  const DEFAULT_SLOTS = ['line1', 'line2', 'line3', 'number'];
-  const asked = product.personalization
-    .filter((f) => f.previewSlot && f.status === 'PUBLISHED')
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((f) => f.previewSlot as string);
-  const order = [...asked, ...DEFAULT_SLOTS.filter((s) => !asked.includes(s))];
+  const order = slotOrder(product.personalization.filter((f) => f.status === 'PUBLISHED'));
 
   const chosenFont = (product.livePreviewConfig as { defaults?: { fontFamily?: string } } | null)
     ?.defaults?.fontFamily;
@@ -882,7 +885,6 @@ router.post(
      * A product with no questions yet falls back to the plain numbering,
      * which is what the fields created below are then made to match.
      */
-    const DEFAULT_SLOTS = ['line1', 'line2', 'line3', 'number'];
     const LABELS: Record<string, string> = {
       line1: 'First line',
       line2: 'Second line',
@@ -890,18 +892,14 @@ router.post(
       number: 'House / flat number',
     };
 
-    const asked = product.personalization
-      .filter((field) => field.previewSlot && field.status === 'PUBLISHED')
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((field) => field.previewSlot as string);
-
     /*
-     * Any line the product has no question for still gets a slot, so the
-     * studio can bind something to it later rather than finding a line of the
-     * artwork that cannot be reached at all.
+     * One rule, shared with the shop and with the reader, so a line can never
+     * mean one thing here and another thing on the product page. Any line the
+     * product has no question for still gets a slot, so the studio can bind
+     * something to it later rather than finding a line of the artwork that
+     * cannot be reached at all.
      */
-    const spare = DEFAULT_SLOTS.filter((slot) => !asked.includes(slot));
-    const order = [...asked, ...spare];
+    const order = slotOrder(product.personalization.filter((f) => f.status === 'PUBLISHED'));
 
     const boxes = read.boxes.slice(0, order.length).map((box, index) => ({
       ...box,
@@ -941,6 +939,8 @@ router.post(
         ...(chosenFont
           ? { fontFamily: chosenFont }
           : read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
+        /* How heavy the real lettering is, measured off the artwork. */
+        fontWeight: read.weight,
       },
       photo: { image: read.image, boxes },
     };

@@ -6,6 +6,7 @@ import { getSetting } from '../../services/settings.service';
 import { cachedPublic } from '../../lib/publicCache';
 import { optionalAuth, requireAuth } from '../../middleware/auth';
 import { reviewEligibility, submitReview } from '../../services/review.service';
+import { bindPreviewBoxes } from '../../services/previewBinding.service';
 
 const router = Router();
 
@@ -469,7 +470,20 @@ router.get(
       select: PRODUCT_CARD_SELECT,
     });
 
-    res.json({ success: true, data: { ...product, related } });
+    /*
+     * The preview's lines are matched to the product's questions here rather
+     * than trusted from the database, so a product whose questions were
+     * renamed, reordered or added to after its photograph was read still
+     * shows the customer's words in the right places.
+     */
+    res.json({
+      success: true,
+      data: {
+        ...product,
+        livePreviewConfig: bindPreviewBoxes(product.livePreviewConfig, product.personalization),
+        related,
+      },
+    });
   }),
 );
 
