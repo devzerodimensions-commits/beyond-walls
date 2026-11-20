@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import { useToast } from '../../context/StoreProvider';
-import { Badge, Button } from '../ui';
+import { Badge, Button, Select } from '../ui';
 import { LivePreview, resolvePreviewConfig } from '../product/LivePreview';
 
 /**
@@ -54,6 +54,28 @@ function sampleSlots(config: Record<string, unknown>): Record<string, string> {
   return slots;
 }
 
+/**
+ * Which question belongs on which line of the plate.
+ *
+ * The reader finds where the lettering sits; it cannot read what the lettering
+ * says, so it cannot know that the big line is the name and the small one is
+ * the flat number. It matches the product's questions to the lines top
+ * downwards, which is right on most plates and wrong on any plate that puts
+ * the name above the number -- and guessing from the shape of the marks is
+ * exactly the kind of guess that previously drew a black rectangle for a
+ * round gold plate.
+ *
+ * So it is not guessed. It is shown, pre-filled, next to the comparison the
+ * studio is already looking at, where putting it right takes one click. Three
+ * dropdowns beats a clever rule that is wrong on a tenth of the catalogue.
+ */
+const LINE_SLOTS = [
+  { value: 'number', label: 'House / flat number' },
+  { value: 'line1', label: 'First line' },
+  { value: 'line2', label: 'Second line' },
+  { value: 'line3', label: 'Third line' },
+];
+
 export function ReadPhotograph({
   productId, hasImage, photoUrl, onRead,
 }: {
@@ -66,6 +88,30 @@ export function ReadPhotograph({
   const { push } = useToast();
   const queryClient = useQueryClient();
   const [made, setMade] = useState<Record<string, unknown> | null>(null);
+
+  /** The lines the reader found, in the order they sit on the plate. */
+  const boxes = ((made?.photo as { boxes?: { slot: string }[] } | undefined)?.boxes ?? []);
+
+  /*
+   * Changing a line rewrites that one box and leaves the rest alone, so the
+   * positions the reader measured are never lost by renaming what sits in
+   * them. Saved immediately: this sits beside a picture of the result, and a
+   * setting that needs a separate Save is a setting people forget.
+   */
+  const setSlot = (index: number, slot: string) => {
+    if (!made) return;
+    const photo = made.photo as { boxes: { slot: string }[]; image: string };
+    const next = {
+      ...made,
+      photo: {
+        ...photo,
+        boxes: photo.boxes.map((box, i) => (i === index ? { ...box, slot } : box)),
+      },
+    };
+    setMade(next);
+    onRead('photo', next);
+    void api.put(`/admin/products/${productId}`, { livePreviewConfig: next });
+  };
 
   const read = useMutation({
     mutationFn: () => api.post<ReadResult>(`/admin/products/${productId}/preview-from-photo`, {}),
@@ -142,7 +188,31 @@ export function ReadPhotograph({
               <figcaption className="mt-1 text-2xs text-ink-400">What customers will see</figcaption>
             </figure>
           </div>
-          <p className="mt-2 text-2xs leading-relaxed text-ink-500">
+          {boxes.length ? (
+            <div className="mt-4 border-t border-stone-line pt-3">
+              <p className="text-2xs uppercase tracking-architect text-ink">
+                Which question goes on which line?
+              </p>
+              <p className="mb-2 mt-1 text-2xs leading-relaxed text-ink-400">
+                Listed top of the plate downwards. The reader knows where the lines are, not what
+                they said — so check this once and it is right for every order.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {boxes.map((box, index) => (
+                  // eslint-disable-next-line react/no-array-index-key
+                  <Select
+                    key={index}
+                    label={`Line ${index + 1}`}
+                    value={box.slot}
+                    options={LINE_SLOTS}
+                    onChange={(e) => setSlot(index, e.target.value)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <p className="mt-3 text-2xs leading-relaxed text-ink-500">
             The words differ — those are samples. What should match is where the lines sit and the
             style of the lettering. A photograph cannot say which typeface a piece was cut in, so if
             the lettering looks wrong, pick the right face under Lettering below. The lines can be
