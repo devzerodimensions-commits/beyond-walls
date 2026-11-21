@@ -993,10 +993,7 @@ async function applyRead(product: ReadTarget, read: PlatePreview, explicit: bool
   if (enable) {
     added = await ensureLineQuestions(product.id, boxes.map((b) => b.slot), published, explicit);
     await ensureLetteringQuestion(product.id, read.script, config.defaults.fontFamily);
-    if (symbolBoxes.length) {
-      const asked = await ensureSymbolQuestion(product.id, read.symbols?.[0]?.url ?? null);
-      if (asked) added.push(asked);
-    }
+    if (symbolBoxes.length) await ensureSymbolQuestion(product.id, read.symbols?.[0]?.url ?? null);
   }
   return { boxes, config, added, enabled: enable };
 }

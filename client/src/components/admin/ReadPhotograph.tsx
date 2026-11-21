@@ -178,6 +178,8 @@ export function ReadPhotograph({
       setSource(result.source ?? url ?? photoUrl ?? null);
       onRead('photo', result.livePreviewConfig);
       await queryClient.invalidateQueries({ queryKey: ['admin-product', productId] });
+      // A symbol taken off the plate joined the library; fetch it so it draws in the lettering colour.
+      if (result.symbols?.length) void queryClient.invalidateQueries({ queryKey: ['site-settings'] });
       const lines = result.boxes.length;
       push(`Read ${lines} line${lines === 1 ? '' : 's'} — check it matches below`, 'success');
     },
@@ -328,6 +330,14 @@ export function ReadPhotograph({
             </p>
           ) : null}
 
+          {read.data?.symbols?.length ? (
+            <p className="mt-3 border-l-2 border-state-info pl-3 text-2xs leading-relaxed text-ink-600">
+              {read.data.symbols.map((s) => `“${s.label}”`).join(', ')} was taken off the plate and added
+              to your symbol library. Customers choose the symbol from the whole library — add Om, Swastik
+              and others under Settings → Live preview → Symbols — and the plate starts on this one.
+            </p>
+          ) : null}
+
           {boxes.length ? (
             <div className="mt-4 border-t border-stone-line pt-3">
               <p className="text-2xs uppercase tracking-architect text-ink">
@@ -338,16 +348,18 @@ export function ReadPhotograph({
                 they said — so check this once and it is right for every order.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
-                {boxes.map((box, index) => (
-                  // eslint-disable-next-line react/no-array-index-key
-                  <Select
-                    key={index}
-                    label={`Line ${index + 1}`}
-                    value={box.slot}
-                    options={LINE_SLOTS}
-                    onChange={(e) => setSlot(index, e.target.value)}
-                  />
-                ))}
+                {boxes
+                  .map((box, index) => ({ box, index }))
+                  .filter(({ box }) => box.slot !== 'logo')
+                  .map(({ box, index }, line) => (
+                    <Select
+                      key={index}
+                      label={`Line ${line + 1}`}
+                      value={box.slot}
+                      options={LINE_SLOTS}
+                      onChange={(e) => setSlot(index, e.target.value)}
+                    />
+                  ))}
               </div>
             </div>
           ) : null}
