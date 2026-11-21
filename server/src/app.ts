@@ -239,8 +239,23 @@ export function createApp() {
       res.setHeader('X-Frame-Options', 'DENY');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
+      /*
+       * Everything else is handed over as a download rather than rendered.
+       *
+       * Fonts and video belong on this list as much as pictures do: a browser
+       * will not use a response marked as an attachment as a web font, so a
+       * studio's own lettering uploaded here was fetched, stored and served
+       * correctly and then silently refused by every browser -- the plate
+       * drawing in a stand-in with nothing to say why. Neither is a document
+       * the browser can be talked into executing, and nosniff keeps each one
+       * to the type it was validated as.
+       */
       const ext = path.extname(req.path).toLowerCase();
-      const inlineSafe = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.pdf'];
+      const inlineSafe = [
+        '.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.pdf',
+        '.woff2', '.woff', '.ttf', '.otf',
+        '.mp4', '.webm',
+      ];
       if (!inlineSafe.includes(ext)) {
         res.setHeader('Content-Disposition', 'attachment');
       }

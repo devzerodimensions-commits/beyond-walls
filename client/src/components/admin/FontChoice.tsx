@@ -200,17 +200,17 @@ export function FontChoice({
                 }}
               />
             ) : (
-              <div className="mt-1 flex items-baseline justify-between gap-1">
+              <div className="mt-1">
                 <button
                   type="button"
                   title="Rename"
                   onClick={() => setEditing(face.id)}
-                  className="min-w-0 truncate text-2xs text-ink-400 hover:text-ink hover:underline"
+                  className="block w-full truncate text-left text-2xs text-ink-400 hover:text-ink hover:underline"
                 >
-                  {face.label} · yours
+                  {face.label}
                 </button>
                 {removing === face.id ? (
-                  <span className="shrink-0 text-2xs">
+                  <span className="text-2xs">
                     <button
                       type="button"
                       className="text-red-700 underline underline-offset-2"
@@ -228,7 +228,7 @@ export function FontChoice({
                   <button
                     type="button"
                     title="Remove this font everywhere"
-                    className="shrink-0 text-2xs text-ink-300 underline underline-offset-2 hover:text-red-700"
+                    className="text-2xs text-ink-300 underline underline-offset-2 hover:text-red-700"
                     onClick={() => setRemoving(face.id)}
                   >
                     remove
