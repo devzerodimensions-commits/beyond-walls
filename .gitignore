@@ -46,3 +46,6 @@ assets/*.zip
 
 # Screenshots captured while checking a design change.
 .shots/
+
+# Written by the deploy so /api/health can say which commit is running.
+BUILD_COMMIT

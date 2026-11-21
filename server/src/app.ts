@@ -365,10 +365,27 @@ export function createApp() {
     }
   });
 
+  /*
+   * Which commit is actually running.
+   *
+   * A deploy that failed to build left the previous image serving, and the
+   * command that started it still printed "Started" -- so a change could be
+   * pushed, deployed, announced and tested against code that was a version
+   * behind, with every route answering 200. The commit is written into the
+   * build by the deploy, read once here, and reported, so "is the new code
+   * live?" has an answer that does not depend on noticing.
+   */
+  let build = 'unknown';
+  try {
+    build = fs.readFileSync(path.resolve(__dirname, '../../BUILD_COMMIT'), 'utf8').trim() || 'unknown';
+  } catch {
+    /* not written by this deploy, or running from source */
+  }
+
   app.get('/api/health', (_req, res) => {
     res.json({
       success: true,
-      data: { status: 'ok', env: env.nodeEnv, time: new Date().toISOString() },
+      data: { status: 'ok', env: env.nodeEnv, build, time: new Date().toISOString() },
     });
   });
 

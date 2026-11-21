@@ -21,7 +21,8 @@
     "postinstall": "prisma generate",
     "build:deploy": "prisma migrate deploy && npm run build && node scripts/register-uploads.mjs && node scripts/seed-content-pages.mjs",
     "register:uploads": "node scripts/register-uploads.mjs",
-    "seed:pages": "node scripts/seed-content-pages.mjs"
+    "seed:pages": "node scripts/seed-content-pages.mjs",
+    "transpile": "node scripts/transpile.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

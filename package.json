@@ -19,6 +19,7 @@
     "dev:client": "npm run dev -w client",
     "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
     "build": "npm run lint && npm run build -w server && npm run build -w client",
+    "build:image": "npm run lint && npm run transpile -w server && npm run bundle -w client",
     "start": "npm run start -w server",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
     "verify": "npm run verify -w server",
