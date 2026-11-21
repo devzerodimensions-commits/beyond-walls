@@ -162,7 +162,7 @@ export function PhotoPlateSetup({
         size="xl"
         title={
           step === 'pick' ? 'Choose the photograph'
-            : step === 'corners' ? 'Step 1 of 2 — drag the four dots to the plate’s corners'
+            : step === 'corners' ? 'Step 1 of 2 — put the four dots on the plate’s corners'
               : 'Step 2 of 2 — draw a box over each line of words'
         }
         footer={
@@ -239,8 +239,9 @@ export function PhotoPlateSetup({
               Click each corner of the plate itself — not the wall or its shadow. The nearest dot
               jumps there; drag a dot to fine-tune it.
             </p>
-            <div className="relative mx-auto w-full max-w-2xl select-none">
-              <img src={assetUrl(photo)} alt="" className="block w-full" draggable={false} />
+            {/* Sized to the dialog's height, so the whole plate is in view without scrolling. */}
+            <div className="relative mx-auto w-fit max-w-full select-none">
+              <img src={assetUrl(photo)} alt="" className="block max-h-[58vh] w-auto max-w-full" draggable={false} />
               <svg
                 ref={surface}
                 viewBox="0 0 1 1"
@@ -278,8 +279,8 @@ export function PhotoPlateSetup({
               number. Leave out anything that stays the same on every plate, like a symbol. A box can
               be loose; a letter that sticks out of it is still taken whole.
             </p>
-            <div className="relative mx-auto w-full max-w-md select-none">
-              <img src={assetUrl(flat.url)} alt="The plate, straightened" className="block w-full" draggable={false} />
+            <div className="relative mx-auto w-fit max-w-full select-none">
+              <img src={assetUrl(flat.url)} alt="The plate, straightened" className="block max-h-[58vh] w-auto max-w-full" draggable={false} />
               <svg
                 ref={surface}
                 viewBox="0 0 1 1"
