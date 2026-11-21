@@ -59,6 +59,19 @@ export interface PlateBox {
   anchor: number;
   /** Clear plate available from that anchor. A limit, not a target. */
   room: number;
+  /**
+   * Where the line's baseline sits, as a share of the box from its top.
+   *
+   * The box runs from the top of the tallest letter to the bottom of the
+   * lowest, and which letters those are depends on the sample name. "A 105"
+   * sits on its baseline; the y of "Ayush" hangs below it. Fitting a
+   * customer's words into that box made their size depend on whether THEY
+   * happened to type a letter with a tail: a "j" shrank the whole of
+   * "& Darji", and a word with no tall letter at all would have ballooned.
+   * Knowing the baseline lets the lettering be sized by the face's own
+   * capitals and stood where the sample stood.
+   */
+  base?: number;
 }
 
 export interface PlatePreview {
@@ -997,6 +1010,37 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
     );
   }
 
+  /*
+   * Lines that are set as a block.
+   *
+   * Each line used to be judged on its own, against the clear plate around
+   * it -- which works for a short line and cannot work for a long one. A line
+   * that nearly fills its space sits in the middle of it whatever its real
+   * alignment, so it always read as centred. Three of the studio's five
+   * designs are blocks, and that was wrong on all three: the cube-lattice
+   * plate and the Devanagari floral are set flush left, the acrylic plate
+   * flush right, and on each the longest line came back centred -- so a
+   * customer's shorter name drifted away from the lines above and below it.
+   *
+   * Measured: on those three the shared edge agrees to within 0.9% of the
+   * picture's width. Three lines are required, not two. On the round gold
+   * plate the name is centred and the flat number is tucked under its end, so
+   * their right edges agree too -- and forcing the name flush right would push
+   * a short name off-centre on a circle. Two lines on one edge is a
+   * relationship; three is a layout.
+   */
+  const SHARED_EDGE = 0.02 * w;
+  const extent = (values: number[]) => Math.max(...values) - Math.min(...values);
+  const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  const lefts = chosen.map((line) => line.left);
+  const rights = chosen.map((line) => line.right + 1);
+  const block: 'left' | 'right' | null =
+    chosen.length < 3 ? null
+      : extent(lefts) <= SHARED_EDGE ? 'left'
+        : extent(rights) <= SHARED_EDGE ? 'right'
+          : null;
+  const blockEdge = block === 'left' ? median(lefts) : block === 'right' ? median(rights) : 0;
+
   const boxes: PlateBox[] = [];
   for (const line of chosen) {
     const { clearL, clearR } = roomOf.get(line)!;
@@ -1004,8 +1048,10 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
     const mid = (clearL + clearR + 1) / 2;
     const span = Math.max(1, clearR - clearL + 1);
     const off = (centre - mid) / span;
-    const align = Math.abs(off) < 0.06 ? 'center' : off < 0 ? 'left' : 'right';
-    const anchorPx = align === 'center' ? centre : align === 'left' ? line.left : line.right + 1;
+    const align = block ?? (Math.abs(off) < 0.06 ? 'center' : off < 0 ? 'left' : 'right');
+    const anchorPx = block
+      ? blockEdge
+      : align === 'center' ? centre : align === 'left' ? line.left : line.right + 1;
     const room =
       align === 'center'
         ? Math.min(anchorPx - clearL, clearR + 1 - anchorPx) * 2
@@ -1013,12 +1059,35 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
           ? clearR + 1 - anchorPx
           : anchorPx - clearL;
 
+    /*
+     * The baseline, from the ink in each row.
+     *
+     * Letters crowd the rows between their tops and the baseline; below it
+     * only the tails of a few letters continue. So the baseline is the lowest
+     * row still carrying a good share of the line's busiest row. Component
+     * bottoms cannot be used instead: a script face joins its letters, so one
+     * piece carries both the baseline and a descender. Measured on the
+     * studio's plates: "Ayush" 0.79 of its box, the Devanagari surname 0.67
+     * (its vowel signs hang below), every line without tails 0.94 to 1.00.
+     */
+    const rows: number[] = [];
+    for (let y = line.top; y <= line.bottom; y += 1) {
+      let n = 0;
+      for (let x = line.left; x <= line.right; x += 1) if (anyInk(y * w + x)) n += 1;
+      rows.push(n);
+    }
+    const busiest = Math.max(1, ...rows);
+    let baseRow = rows.length - 1;
+    while (baseRow > 0 && rows[baseRow] < busiest * 0.35) baseRow -= 1;
+    const tall = line.bottom - line.top + 1;
+
     boxes.push({
       y: line.top / h,
-      h: (line.bottom - line.top + 1) / h,
+      h: tall / h,
       align,
       anchor: anchorPx / w,
       room: room / w,
+      base: Math.min(1, Math.max(0.3, (baseRow + 1) / tall)),
     });
   }
 

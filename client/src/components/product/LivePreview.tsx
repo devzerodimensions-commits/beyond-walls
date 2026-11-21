@@ -271,6 +271,12 @@ export interface PreviewPhotoBox {
   anchor: number;
   /** Clear plate available from that anchor. A limit, not a target. */
   room: number;
+  /**
+   * Where the sample's baseline sat, as a share of the box from its top.
+   * Measured by the reader; absent on boxes placed by hand or read before it
+   * was measured, which keep the older fitting.
+   */
+  base?: number;
 }
 
 export interface PreviewPhoto {
@@ -1416,9 +1422,44 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
          * for. Applied after the fit rather than inside it, so 100% is always
          * exactly the piece's own lettering and the steps read as steps.
          */
-        const fitted = Math.min(roomH / Math.max(0.01, m.ink), roomW / Math.max(0.01, m.width));
         const scale = (scales?.[box.slot] ?? 100) / 100;
-        const size = Math.max(6, fitted * scale);
+
+        /*
+         * Stood on the sample's baseline, sized by the face's own capitals.
+         *
+         * Fitting the customer's ink into the sample's ink box made their size
+         * depend on which letters they typed. The box for "& Aarna" has no
+         * tail below it, so "& Darji" was shrunk until its j fitted inside --
+         * the whole word smaller than the line above it on the real piece. A
+         * word with no tall letter would have gone the other way and been
+         * blown up to fill the box with its lowercase alone.
+         *
+         * The box now says where its baseline was. The sample's height above
+         * that line is the size of its capitals, so the customer's words are
+         * set at the size that gives this face the same capitals, on the same
+         * baseline, with any tail hanging below exactly as it would on the cut
+         * piece. Only the width is still a limit: a long name narrows to fit.
+         *
+         * Devanagari is left on the fitting it had, which was checked against
+         * the studio's own Marathi plate: its words hang from a headline rather
+         * than standing on a baseline, and its vowel signs sit both above and
+         * below. Decided by the words being drawn, not by the chosen face.
+         */
+        const devanagari = /[\u0900-\u097F]/.test(value);
+        let size: number;
+        let y: number;
+        if (box.base !== undefined && !devanagari) {
+          const capital = measure('H', font).ascent;
+          const above = box.h * box.base * VH;
+          const byCapitals = above / Math.max(0.01, capital);
+          const byWidth = roomW / Math.max(0.01, m.width);
+          size = Math.max(6, Math.min(byCapitals, byWidth) * scale);
+          y = (box.y + box.h * box.base) * VH;
+        } else {
+          const fitted = Math.min(roomH / Math.max(0.01, m.ink), roomW / Math.max(0.01, m.width));
+          size = Math.max(6, fitted * scale);
+          y = box.y * VH + m.ascent * size;
+        }
 
         const anchor = box.align === 'center' ? 'middle' : box.align === 'right' ? 'end' : 'start';
 
@@ -1426,7 +1467,7 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
           <text
             key={index}
             x={box.anchor * VW}
-            y={box.y * VH + m.ascent * size}
+            y={y}
             fill={text}
             fontFamily={font}
             fontWeight={config.defaults.fontWeight ?? 400}
