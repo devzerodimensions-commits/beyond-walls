@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { PLATE_FONTS, fontStack } from '../product/LivePreview';
+import { useSettings } from '../../context/StoreProvider';
+import { parseUploadedFonts } from '../../lib/uploadedFonts';
 
 /**
  * Choosing the face the preview letters a plate in.
@@ -29,7 +31,11 @@ export function FontChoice({
   fallback: string;
   onChange: (value: string) => void;
 }) {
-  const known = PLATE_FONTS.some((face) => face.id === value);
+  const { get } = useSettings();
+  // The studio's own faces, uploaded under Settings -> Live preview.
+  const uploaded = parseUploadedFonts(get<unknown>('preview.fonts', []));
+  const known = PLATE_FONTS.some((face) => face.id === value)
+    || uploaded.some((face) => face.family === value);
   const [custom, setCustom] = useState(() => value !== '' && !known);
 
   const fallbackLabel = PLATE_FONTS.find((f) => f.id === fallback)?.label ?? fallback;
@@ -90,6 +96,26 @@ export function FontChoice({
             <span className="mt-1 block text-2xs text-ink-400">{face.label}</span>
           </button>
         ))}
+
+        {uploaded.map((face) => (
+          <button
+            key={face.id}
+            type="button"
+            onClick={() => { setCustom(false); onChange(face.family); }}
+            title="Uploaded by the studio"
+            className={clsx(
+              'border px-3 py-2.5 text-left transition-colors',
+              value === face.family && !custom
+                ? 'border-ink bg-paper-off'
+                : 'border-stone-line hover:border-ink-300',
+            )}
+          >
+            <span className="block text-sm leading-tight text-ink" style={{ fontFamily: fontStack(face.family) }}>
+              Abhay 104
+            </span>
+            <span className="mt-1 block text-2xs text-ink-400">{face.label} · yours</span>
+          </button>
+        ))}
       </div>
 
       {custom ? (
@@ -101,8 +127,8 @@ export function FontChoice({
             onChange={(event) => onChange(event.target.value)}
           />
           <p className="mt-1 text-2xs text-ink-400">
-            Any CSS font family or stack. It has to be installed on the customer&apos;s device or the
-            preview falls back to the default face.
+            Any CSS font family or stack. Customers only see it if the font file is uploaded under
+            Settings → Live preview → Lettering fonts; until then the nearest built-in face stands in.
           </p>
         </div>
       ) : (

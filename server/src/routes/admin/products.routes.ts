@@ -7,6 +7,7 @@ import { toBool, uniqueSlug } from '../../utils/helpers';
 import { persistUploads, upload } from '../../middleware/upload';
 import { suggestPreviewFromImage } from '../../services/previewSuggest.service';
 import { alignLettering, bindPreviewBoxes, slotOrder } from '../../services/previewBinding.service';
+import { parseCorners, parseRects, readMarked, straightenStored } from '../../services/plateManual.service';
 import { readPlate, type PlatePreview } from '../../services/plateText.service';
 import { deleteFileIfUnreferenced } from '../../services/media.service';
 import { isSellable } from '../../services/pricing.service';
@@ -854,6 +855,33 @@ async function ensureLineQuestions(
   const missing = slots.filter((slot) => LINE_SLOTS.has(slot) && !asked.has(slot));
   if (!missing.length) return [];
 
+  /*
+   * A question the product already asks, that was never tied to the plate.
+   *
+   * The Ganesha plate asked for a "Name" bound to nothing, so reading its
+   * picture added a "First line" beside it -- two questions for one line,
+   * and the one a customer would naturally fill in went nowhere. A loose
+   * question that is plainly about the words on the plate takes the line
+   * instead, in the order the product asks them. Notes to the studio, phone
+   * numbers and the like are never taken: they are not on the plate.
+   */
+  const loose = await prisma.personalizationField.findMany({
+    where: { productId, previewSlot: null, type: 'TEXT', status: 'PUBLISHED' },
+    orderBy: { sortOrder: 'asc' },
+    select: { id: true, label: true, key: true },
+  });
+  const aboutTheWords = /name|surname|family|line|number|flat|house|title|text/i;
+  const notOnThePlate = /instruction|note|message|whatsapp|phone|mobile|email|address|gst|pin ?code|request/i;
+  let linked = 0;
+  for (const field of loose) {
+    const words = `${field.label} ${field.key}`;
+    if (!missing.length || !aboutTheWords.test(words) || notOnThePlate.test(words)) continue;
+    const slot = missing.shift() as string;
+    await prisma.personalizationField.update({ where: { id: field.id }, data: { previewSlot: slot } });
+    linked += 1;
+  }
+  if (!missing.length) return [];
+
   const existing = await prisma.personalizationField.findMany({
     where: { productId },
     select: { key: true, sortOrder: true },
@@ -873,7 +901,7 @@ async function ensureLineQuestions(
         key,
         label,
         type: 'TEXT',
-        required: fresh && index === 0,
+        required: fresh && !linked && index === 0,
         maxLength: 40,
         sortOrder: next,
         status: 'PUBLISHED',
@@ -1032,6 +1060,25 @@ async function buildPreviewFromPhoto(productId: string, force = false) {
  * service agreed to return anything, and the studio can still change or clear
  * it in the editor afterwards.
  */
+/**
+ * The plate inside four corners of a photograph, turned to face the camera.
+ *
+ * The first half of setting a preview up from a photograph when there is no
+ * design file: the result is kept in the media library as the flat picture of
+ * the plate, and its lines are then read or marked on it.
+ */
+router.post(
+  '/:id/straighten',
+  asyncHandler(async (req, res) => {
+    const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+    if (!/^\/uploads\/[\w./-]+$/.test(url) || url.includes('..')) {
+      throw ApiError.badRequest('Choose a photograph from this product or the media library.');
+    }
+    const flat = await straightenStored(url, parseCorners(req.body?.corners));
+    res.json({ success: true, data: flat });
+  }),
+);
+
 router.post(
   '/:id/preview-from-photo',
   asyncHandler(async (req, res) => {
@@ -1065,7 +1112,14 @@ router.post(
       if (!/^\/uploads\/[\w./-]+$/.test(chosen) || chosen.includes('..')) {
         throw ApiError.badRequest('Choose a file from the media library, or upload one.');
       }
-      const read = await readPlate(chosen);
+      /*
+       * Lines the studio marked by hand, on a picture the reader could not
+       * read alone -- usually a photograph straightened below. Only what was
+       * marked is painted out; see services/plateManual.service.ts.
+       */
+      const read = req.body?.lines !== undefined
+        ? await readMarked(chosen, parseRects(req.body.lines))
+        : await readPlate(chosen);
       /*
        * No falling back to the product's photographs here. The studio picked
        * this file on purpose; answering with a read of a different picture

@@ -18,6 +18,8 @@ export const UPLOAD_FOLDERS = [
   'pages',
   'testimonials',
   'general',
+  // Lettering faces for the live preview; see services/fontLibrary.service.ts.
+  'fonts',
 ] as const;
 
 export type UploadFolder = (typeof UPLOAD_FOLDERS)[number];
@@ -96,8 +98,9 @@ export async function persistUpload(
    */
   // Video is stored exactly as it arrived. There is no transcoder here, and
   // handing footage to an image optimiser would at best waste the work.
+  // A font is served byte for byte, like video: there is nothing to optimise.
   const optimized =
-    kind === 'video'
+    kind === 'video' || kind === 'font'
       ? null
       : await optimizeImage(
           file.buffer,

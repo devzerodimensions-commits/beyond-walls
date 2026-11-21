@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import type { PersonalizationField } from '../../lib/types';
 import { assetUrl } from '../../lib/api';
 import { useSettings } from '../../context/StoreProvider';
+import { findUploadedFont, type UploadedFontKind } from '../../lib/uploadedFonts';
 import { CubeBand, LeafFrame, VINE_PALETTE, VineBand } from './plateOrnaments';
 
 /**
@@ -139,11 +140,29 @@ export function fontStack(id: string | undefined | null): string {
   if (!value) return PLATE_FONTS[0].stack;
   if (FONT_STACKS[value]) return FONT_STACKS[value];
 
+  // A face the studio uploaded: its own family first, then the shipped face of
+  // the same kind, which shows while the file loads.
+  const uploaded = findUploadedFont(value);
+  if (uploaded) return `"${uploaded.family}", ${KIND_STACKS[uploaded.kind] ?? PLATE_FONTS[0].stack}`;
+
   // Admins may enter a custom CSS family/stack for a product. Keep a dependable
   // loaded face at the end so the preview remains readable when that custom
-  // font is not installed in the customer's browser.
-  return `${value}, ${standInFor(value)}`;
+  // font is not installed in the customer's browser. A single family name is
+  // quoted, so one that starts with a digit or carries a symbol stays valid CSS.
+  const family = /[,"']/.test(value) ? value : `"${value}"`;
+  return `${family}, ${standInFor(value)}`;
 }
+
+/** The shipped face standing in for each kind of uploaded one. */
+const KIND_STACKS: Record<UploadedFontKind, string> = {
+  script: FONT_STACKS.script,
+  serif: FONT_STACKS.serif,
+  sans: PLATE_FONTS[0].stack,
+  display: FONT_STACKS.display,
+};
+
+/** Faces served in a single weight; asking them for bold only makes the browser fake one. */
+const SINGLE_WEIGHT = new Set(['script', 'formal-script', 'devanagari']);
 
 /**
  * The served face nearest in kind to one the site cannot serve.
@@ -1004,11 +1023,22 @@ function useTextMetrics(): (value: string, stack: string, weight?: number) => Te
    * and never remeasured would be laid out for a font the customer is no
    * longer looking at.
    */
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(0);
   useEffect(() => {
     let live = true;
-    void document.fonts?.ready.then(() => { if (live) setReady(true); });
-    return () => { live = false; };
+    const bump = () => { if (live) setReady((n) => n + 1); };
+    void document.fonts?.ready.then(bump);
+    /*
+     * And again whenever another face arrives. An uploaded lettering face is
+     * only fetched once something asks for it -- after the first measure --
+     * so a plate measured in its stand-in would stay laid out for the wrong
+     * face.
+     */
+    document.fonts?.addEventListener?.('loadingdone', bump);
+    return () => {
+      live = false;
+      document.fonts?.removeEventListener?.('loadingdone', bump);
+    };
   }, []);
 
   return useMemo(() => {
@@ -1433,8 +1463,22 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
 
         const roomW = box.room * VW;
         const roomH = box.h * VH;
-        const face = box.face ? fontStack(box.face) : font;
-        const weight = box.weight ?? config.defaults.fontWeight ?? 400;
+        /*
+         * A line's own face holds only while the plate is as designed.
+         *
+         * The cut-out's number keeps its bold block figures under the script
+         * name -- until the customer picks a lettering style, and then every
+         * line follows the pick. Keeping the number in the design's face after
+         * that read as the lettering choice being broken: the name changed and
+         * the number beside it did not.
+         */
+        const asDesigned = !slots.fontFamily || slots.fontFamily === config.defaults.fontFamily;
+        const face = box.face && asDesigned ? fontStack(box.face) : font;
+        const ownWeight = box.weight ?? config.defaults.fontWeight ?? 400;
+        // Faces that come in one weight are drawn at it rather than smeared into a fake bold.
+        const chosen = slots.fontFamily ?? '';
+        const single = SINGLE_WEIGHT.has(chosen) || findUploadedFont(chosen)?.kind === 'script';
+        const weight = !asDesigned && single ? 400 : ownWeight;
         const m = measure(value, face, weight);
 
         /*

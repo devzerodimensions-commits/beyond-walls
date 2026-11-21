@@ -15,7 +15,7 @@ import { ApiError } from '../utils/http';
  *    .svg, .xml) regardless of what it claims to be.
  */
 
-export type UploadKind = 'image' | 'artwork' | 'video';
+export type UploadKind = 'image' | 'artwork' | 'video' | 'font';
 
 /** ext -> canonical mime, for the types we accept. */
 const ALLOWED: Record<UploadKind, Record<string, string>> = {
@@ -44,6 +44,19 @@ const ALLOWED: Record<UploadKind, Record<string, string>> = {
   video: {
     '.mp4': 'video/mp4',
     '.webm': 'video/webm',
+  },
+  /*
+   * A lettering face the studio owns, for the live preview. Only the four
+   * formats a browser can load with @font-face, and only by their bytes:
+   * operating systems label font files inconsistently -- Windows often sends
+   * no type at all, or a generic binary one -- so the declared type is not
+   * consulted for fonts. The signature check below is what decides.
+   */
+  font: {
+    '.woff2': 'font/woff2',
+    '.woff': 'font/woff',
+    '.ttf': 'font/ttf',
+    '.otf': 'font/otf',
   },
 };
 
@@ -98,6 +111,12 @@ const SIGNATURES: Signature[] = [
   { mime: 'video/mp4', magic: [0x66, 0x74, 0x79, 0x70], offset: 4 },
   // EBML header, shared by WebM and Matroska.
   { mime: 'video/webm', magic: [0x1a, 0x45, 0xdf, 0xa3] },
+  // Font containers: 'wOF2', 'wOFF', 'OTTO', and TrueType's version 1.0 or 'true'.
+  { mime: 'font/woff2', magic: [0x77, 0x4f, 0x46, 0x32] },
+  { mime: 'font/woff', magic: [0x77, 0x4f, 0x46, 0x46] },
+  { mime: 'font/otf', magic: [0x4f, 0x54, 0x54, 0x4f] },
+  { mime: 'font/ttf', magic: [0x00, 0x01, 0x00, 0x00] },
+  { mime: 'font/ttf', magic: [0x74, 0x72, 0x75, 0x65] },
 ];
 
 /** Identifies a buffer by its leading bytes, or null when unrecognised. */
@@ -168,7 +187,7 @@ export function validateUpload(
       `${extension} files are not accepted${extension === '.svg' ? ' — SVG can carry scripts. Please upload a PNG or JPG.' : ''}`,
     );
   }
-  if (BLOCKED_MIME.has(declared)) {
+  if (BLOCKED_MIME.has(declared) && !(kind === 'font' && declared === 'application/octet-stream')) {
     throw ApiError.badRequest(`"${file.originalname}" has a file type we do not accept`);
   }
 
@@ -181,8 +200,8 @@ export function validateUpload(
     );
   }
 
-  // 3. The declared MIME must agree with the extension.
-  if (declared && declared !== canonical) {
+  // 3. The declared MIME must agree with the extension (fonts: see ALLOWED.font).
+  if (kind !== 'font' && declared && declared !== canonical) {
     // jpg/jpeg and a couple of legacy aliases are the only tolerated mismatches.
     const aliases: Record<string, string[]> = {
       'image/jpeg': ['image/jpg', 'image/pjpeg'],
@@ -202,7 +221,9 @@ export function validateUpload(
       `"${file.originalname}" is not a valid ${extension.replace('.', '').toUpperCase()} file`,
     );
   }
-  if (sniffed !== canonical) {
+  const sameFamily = kind === 'font' && sniffed.startsWith('font/') && ['.ttf', '.otf'].includes(extension)
+    && ['font/ttf', 'font/otf'].includes(sniffed);
+  if (sniffed !== canonical && !sameFamily) {
     throw ApiError.badRequest(
       `"${file.originalname}" is really a ${sniffed} file, not ${canonical}`,
     );

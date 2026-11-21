@@ -10,6 +10,7 @@ import {
   resolveCart,
   validatePersonalization,
 } from '../../services/cart.service';
+import { alignLettering } from '../../services/previewBinding.service';
 import { assertPurchasable, resolveVariant } from '../../services/pricing.service';
 
 const router = Router();
@@ -57,7 +58,11 @@ router.post(
     const variant = resolveVariant(product, product.variants, body.variantId);
 
     // Server-side validation + pricing of the customisation.
-    const { entries } = validatePersonalization(product.personalization, body.personalization ?? {});
+    // Checked against the questions exactly as the shop showed them; see alignLettering.
+    const { entries } = validatePersonalization(
+      alignLettering(product.personalization, product.livePreviewConfig),
+      body.personalization ?? {},
+    );
 
     // Price, quantity limits and stock are all checked in one place.
     const quantity = assertPurchasable(
@@ -125,7 +130,10 @@ router.patch(
     }
 
     if (body.personalization !== undefined) {
-      const { entries } = validatePersonalization(item.product.personalization, body.personalization);
+      const { entries } = validatePersonalization(
+        alignLettering(item.product.personalization, item.product.livePreviewConfig),
+        body.personalization,
+      );
       data.personalization = entries;
     }
 

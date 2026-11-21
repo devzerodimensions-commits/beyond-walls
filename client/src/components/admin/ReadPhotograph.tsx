@@ -6,6 +6,7 @@ import type { MediaAsset } from '../../lib/types';
 import { useToast } from '../../context/StoreProvider';
 import { Badge, Button, Select, Spinner, UploadIcon } from '../ui';
 import { MediaPicker } from './AdminKit';
+import { PhotoPlateSetup } from './PhotoPlateSetup';
 import { LivePreview, resolvePreviewConfig } from '../product/LivePreview';
 
 /**
@@ -87,11 +88,16 @@ const LINE_SLOTS = [
   { value: 'line3', label: 'Third line' },
 ];
 
+/** What to read: a stored picture, optionally with its lines marked by hand. */
+type ReadRequest = string | { url: string; lines: { x: number; y: number; w: number; h: number }[] } | undefined;
+
 export function ReadPhotograph({
-  productId, hasImage, photoUrl, onRead, ready = true,
+  productId, hasImage, photoUrl, photos = [], onRead, ready = true,
 }: {
   productId: string;
   hasImage: boolean;
+  /** Every picture of the product, offered when setting up from a photograph. */
+  photos?: string[];
   /** The product's first photograph, read by the second option. */
   photoUrl?: string | null;
   onRead: (template: string, config: Record<string, unknown>) => void;
@@ -145,9 +151,13 @@ export function ReadPhotograph({
 
   /** Reads a chosen design file, or -- with no url -- the product's own photograph. */
   const read = useMutation({
-    mutationFn: (url?: string) =>
-      api.post<ReadResult>(`/admin/products/${productId}/preview-from-photo`, url ? { url } : {}),
-    onSuccess: async (result, url) => {
+    mutationFn: (request: ReadRequest) =>
+      api.post<ReadResult>(
+        `/admin/products/${productId}/preview-from-photo`,
+        typeof request === 'string' ? { url: request } : request ?? {},
+      ),
+    onSuccess: async (result, request) => {
+      const url = typeof request === 'string' ? request : request?.url;
       if (!result.ok || !result.livePreviewConfig) {
         push(result.reason || 'That picture could not be read', 'error');
         return;
@@ -246,6 +256,14 @@ export function ReadPhotograph({
             : 'No photographs on this product yet — upload the design file above instead.'}
         </p>
       </div>
+
+      {/* ---- no design file at all: set it up from a photograph -------- */}
+      <PhotoPlateSetup
+        productId={productId}
+        photos={photos}
+        busy={busy}
+        onMarked={(url, lines) => read.mutate({ url, lines })}
+      />
 
       {read.data && !read.data.ok ? (
         <p className="mt-3 border-l-2 border-state-warning pl-3 text-2xs leading-relaxed text-ink-600">

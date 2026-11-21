@@ -10,6 +10,7 @@ import {
   FIT_LABELS, RATIO_LABELS, imageFrame, isImageFit, type ImageFit,
 } from '../../lib/productImage';
 import { BrandColorField } from '../../components/admin/BrandColorField';
+import { FontLibrary } from '../../components/admin/FontLibrary';
 import { LivePreview, PREVIEW_TEMPLATES } from '../../components/product/LivePreview';
 import {
   AlertIcon, Badge, Button, Checkbox, Input, PageLoader, Select, Textarea, TrashIcon,
@@ -30,7 +31,7 @@ const GROUPS: { id: Group; label: string; description: string }[] = [
   { id: 'shipping', label: 'Shipping & tax', description: 'Rates, free shipping and GST handling.' },
   { id: 'store', label: 'Store behaviour', description: 'Wishlist, reviews, checkout and budget filters.' },
   { id: 'catalog', label: 'Product images', description: 'How product photos are shaped across the shop.' },
-  { id: 'preview', label: 'Live preview designs', description: 'What each plate design is called.' },
+  { id: 'preview', label: 'Live preview', description: 'Lettering fonts, and what each plate design is called.' },
   { id: 'about', label: 'About page', description: 'Every word on your About page.' },
   { id: 'footer', label: 'Footer', description: 'Footer text and copyright.' },
   { id: 'seo', label: 'SEO defaults', description: 'Titles, descriptions and the canonical site URL.' },
@@ -862,6 +863,7 @@ export default function AdminSettings() {
           ) : null}
 
           {/* ---- Live preview designs ---- */}
+          {group === 'preview' ? <FontLibrary /> : null}
           {group === 'preview' ? (
             <AdminCard
               title="Live preview designs"

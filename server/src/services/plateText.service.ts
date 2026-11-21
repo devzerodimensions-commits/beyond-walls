@@ -118,7 +118,7 @@ export interface PlateAnalysis extends Omit<PlatePreview, 'image'> {
 /** Analysis width. Letter strokes survive this; the work stays cheap. */
 const WORK = 760;
 /** Nothing larger is written out, so one huge upload cannot exhaust memory. */
-const MAX_OUT = 2600;
+export const MAX_OUT = 2600;
 /** How far a mark must stand clear of its surroundings to count as ink. */
 const INK = 16;
 /** Writing and plate must differ by at least this much to be separable. */
@@ -173,7 +173,7 @@ const MAX_LINES = 6;
  * 0.36 on the cut script, 0.44 on the Devanagari floral. The threshold is in
  * the gap, and every one of those five comes out right.
  */
-const BOLD_FILL = 0.45;
+export const BOLD_FILL = 0.45;
 
 /**
  * How tall the biggest line must be, as a share of the picture's height,
@@ -229,9 +229,9 @@ const MAX_LINE_TALL = 0.3;
 /** Lines are the same plate if their backgrounds are this close. */
 const SAME_PLATE = 30;
 
-const lumaOf = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+export const lumaOf = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-const hex = (r: number, g: number, b: number) =>
+export const hex = (r: number, g: number, b: number) =>
   '#' + [r, g, b].map((n) => Math.round(n).toString(16).padStart(2, '0')).join('');
 
 interface Rgb { r: number; g: number; b: number }
@@ -262,7 +262,7 @@ function boxBlur(src: Float32Array, w: number, h: number, r: number): Float32Arr
   return out;
 }
 
-interface Mark {
+export interface Mark {
   minX: number; maxX: number; minY: number; maxY: number;
   n: number; w: number; h: number;
   polarity: 'dark' | 'light';
@@ -314,7 +314,7 @@ function maskedBlur(
 }
 
 /** Connected runs of ink, eight-connected. */
-function components(mask: Uint8Array, w: number, h: number, polarity: 'dark' | 'light'): Mark[] {
+export function components(mask: Uint8Array, w: number, h: number, polarity: 'dark' | 'light'): Mark[] {
   const seen = new Uint8Array(w * h);
   const stack = new Int32Array(w * h);
   const out: Mark[] = [];

@@ -16,6 +16,7 @@ import { persistUploads, resolveFolder, upload, deleteUploadedFile, UPLOAD_FOLDE
 import { applyImageEdit, restoreOriginalImage, type ImageEdit } from '../../services/imageEdit.service';
 import { renderOrderDocument, type DocumentKind } from '../../services/orderDocument.service';
 import { fileReferenceCount } from '../../services/media.service';
+import { addFont, listFonts, removeFont, updateFont } from '../../services/fontLibrary.service';
 import {
   assignAwb, bookShipment, checkServiceability, shiprocketConfigured, testConnection,
 } from '../../services/shiprocket.service';
@@ -966,8 +967,56 @@ router.put(
       );
     }
 
+    /*
+     * The font list has its own endpoint, which stores and checks each file.
+     * The settings page holds a copy loaded when it opened, and saving that
+     * copy would quietly undo a font uploaded since.
+     */
+    delete (values as Record<string, unknown>)['preview.fonts'];
     await setSettings(values as Record<string, unknown>);
     res.json({ success: true, data: await getAllSettings() });
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Lettering fonts for the live preview
+// ---------------------------------------------------------------------------
+router.get(
+  '/fonts',
+  asyncHandler(async (_req, res) => {
+    res.json({ success: true, data: await listFonts() });
+  }),
+);
+
+router.post(
+  '/fonts',
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    const file = req.file as Express.Multer.File | undefined;
+    if (!file) throw ApiError.badRequest('Choose a font file — WOFF2, WOFF, TTF or OTF.');
+    const fonts = await addFont(file, {
+      family: typeof req.body?.family === 'string' ? req.body.family : undefined,
+      kind: typeof req.body?.kind === 'string' ? req.body.kind : undefined,
+    });
+    res.status(201).json({ success: true, data: fonts });
+  }),
+);
+
+router.patch(
+  '/fonts/:id',
+  asyncHandler(async (req, res) => {
+    const fonts = await updateFont(req.params.id, {
+      label: typeof req.body?.label === 'string' ? req.body.label : undefined,
+      kind: typeof req.body?.kind === 'string' ? req.body.kind : undefined,
+    });
+    res.json({ success: true, data: fonts });
+  }),
+);
+
+router.delete(
+  '/fonts/:id',
+  asyncHandler(async (req, res) => {
+    res.json({ success: true, data: await removeFont(req.params.id) });
   }),
 );
 

@@ -555,6 +555,7 @@ export default function AdminProductEdit() {
                     productId={id!}
                     hasImage={Boolean(product?.images?.length)}
                     photoUrl={(product?.images?.find((i) => i.isPrimary) ?? product?.images?.[0])?.url}
+                    photos={(product?.images ?? []).map((i) => i.url)}
                     onRead={(nextTemplate, nextConfig) => {
                       set('livePreviewTemplate', nextTemplate);
                       set('livePreviewConfig', nextConfig);

@@ -419,6 +419,18 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: 'Saved live preview designs',
     value: [],
   },
+  /**
+   * The studio's own lettering faces, uploaded as font files. Written only
+   * through /api/admin/fonts, which validates and stores each file; public
+   * because the shop has to load the faces to draw them. See
+   * services/fontLibrary.service.ts.
+   */
+  {
+    key: 'preview.fonts',
+    group: 'preview',
+    label: 'Uploaded lettering fonts',
+    value: [],
+  },
 ];
 
 const PUBLIC_GROUPS = new Set([

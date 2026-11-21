@@ -8,6 +8,7 @@ import {
   api, ApiError, clearCartSession, tokenStore, SESSION_EXPIRED_EVENT,
 } from '../lib/api';
 import type { Cart, SiteSettings, User } from '../lib/types';
+import { applyUploadedFonts } from '../lib/uploadedFonts';
 import { STAFF_ROLES } from '../lib/types';
 import {
   DEFAULT_BRAND_COLOR, applyBrandPalette, buildBrandPalette, isHexColor,
@@ -182,6 +183,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const chosen = isHexColor(brandColor) ? brandColor : DEFAULT_BRAND_COLOR;
     applyBrandPalette(buildBrandPalette(chosen), document.documentElement);
   }, [brandColor]);
+
+  /*
+   * The studio's uploaded lettering faces, declared for the whole site the
+   * moment the settings arrive: the shop's previews and the admin's pickers
+   * both draw in them. See lib/uploadedFonts.ts.
+   */
+  const uploadedFontList = settingsQuery.data?.settings?.['preview.fonts'];
+  useEffect(() => {
+    applyUploadedFonts(uploadedFontList);
+  }, [uploadedFontList]);
 
   // --- Auth ----------------------------------------------------------------
   const [user, setUser] = useState<User | null>(() => readCachedUser());
