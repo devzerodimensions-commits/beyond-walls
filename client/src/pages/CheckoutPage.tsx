@@ -11,6 +11,7 @@ import { openRazorpayCheckout } from '../lib/razorpay';
 import {
   Button, ButtonLink, Checkbox, EmptyState, Input, PageLoader, Select, Spinner,
 } from '../components/ui';
+import { LineThumb } from '../components/product/PlateSnapshot';
 
 const INDIAN_STATES = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat',
@@ -479,8 +480,9 @@ export default function CheckoutPage() {
                 {lines.map((line) => (
                   <li key={line.id} className="flex gap-3">
                     <div className="relative shrink-0">
-                      <img
-                        src={assetUrl(line.image)}
+                      <LineThumb
+                        preview={line.preview}
+                        image={line.image}
                         alt=""
                         className="h-16 w-14 bg-paper-warm object-cover"
                       />

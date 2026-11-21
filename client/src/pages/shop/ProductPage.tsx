@@ -186,6 +186,22 @@ export default function ProductPage() {
   const wishlistEnabled = get<boolean>('store.enableWishlist', true);
   const previewSlots = buildPreviewSlots(fields, values);
   /*
+   * What an untouched plate says: each question's own example.
+   *
+   * The plate used to open on a lone "YOUR NAME", with the number and the
+   * surname lines blank -- a different plate from the one in the photographs
+   * and from the examples written in the boxes beneath it. Showing those same
+   * examples on the plate makes the empty preview the product as pictured,
+   * and each line is replaced the moment the customer types into it.
+   */
+  // Worked out each render: this sits below the early returns, where a hook may not.
+  const samplePlaceholders: Record<string, string> = {};
+  for (const field of fields) {
+    const slot = field.previewSlot;
+    const sample = field.placeholder?.trim();
+    if (slot && ['number', 'line1', 'line2', 'line3'].includes(slot) && sample) samplePlaceholders[slot] = sample;
+  }
+  /*
    * Ticking "Enable the live preview" is not enough on its own: the preview
    * has to be built from something real. See previewIsUsable.
    */
@@ -334,6 +350,7 @@ export default function ProductPage() {
         variantId,
         quantity,
         personalization: resized ? { ...values, textSize: resized } : values,
+        previewScales: textSizes,
       });
       if (mode === 'buy') navigate('/checkout');
     } finally {
@@ -456,6 +473,7 @@ export default function ProductPage() {
                       template={product.livePreviewTemplate}
                       config={product.livePreviewConfig}
                       slots={previewSlots}
+                      placeholders={samplePlaceholders}
                       scales={textSizes}
                       // The strip above already says what this is.
                       hideLabel
@@ -1024,19 +1042,32 @@ export default function ProductPage() {
               Your details are attached to the order and used for production.
             </p>
 
-            {/* The plate updates as they type, which is the whole point. */}
+            {/*
+              * The plate updates as they type, which is the whole point -- so it
+              * stays in view while they do. It scrolled away with the sheet, and
+              * on a phone the name box sits below it: by the time somebody was
+              * typing their name, the plate showing it was off the top of the
+              * screen, under the keyboard's worth of form. Pinned to the top of
+              * the sheet and capped at a third of the screen, so a tall plate
+              * cannot crowd out the box being typed into.
+              */}
             {showPreview ? (
-              <div ref={sheetPreviewRef} className="mb-2">
+              <div
+                ref={sheetPreviewRef}
+                className="sticky -top-5 z-10 -mx-5 mb-2 bg-paper px-5 pb-2 pt-5 shadow-[0_10px_12px_-12px_rgba(0,0,0,0.35)] [&_svg]:max-h-[30vh]"
+              >
                 <LivePreview
                   template={product.livePreviewTemplate}
                   config={product.livePreviewConfig}
                   slots={previewSlots}
+                  placeholders={samplePlaceholders}
                   scales={textSizes}
-                  className="border border-stone-line"
+                  className="border border-stone-line !p-3"
+                  hideCaption
                 />
-                <SavePreview target={sheetPreviewRef} name={product.name} />
               </div>
             ) : null}
+            {showPreview ? <SavePreview target={sheetPreviewRef} name={product.name} /> : null}
 
             <PersonalizationForm
               palette={previewPalette}

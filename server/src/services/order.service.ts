@@ -152,6 +152,7 @@ export async function placeOrder(input: PlaceOrderInput) {
               quantity: line.quantity,
               lineTotal: line.lineTotal,
               personalization: (cartItem?.personalization ?? []) as Prisma.InputJsonValue,
+              ...(cartItem?.preview ? { preview: cartItem.preview as Prisma.InputJsonValue } : {}),
             };
           }),
         },

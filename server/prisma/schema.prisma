@@ -545,6 +545,8 @@ model CartItem {
   quantity  Int             @default(1)
   /// Snapshot of personalization: [{ key, label, type, value, priceDelta }]
   personalization Json      @default("[]")
+  /// The plate as the customer saw it: { template, config, slots, scales }.
+  preview         Json?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -658,6 +660,8 @@ model OrderItem {
 
   /// The customization travels with the order forever.
   personalization Json @default("[]")
+  /// The plate the customer approved, drawn again from { template, config, slots, scales }.
+  preview         Json?
 
   createdAt DateTime @default(now())
 

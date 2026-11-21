@@ -99,6 +99,8 @@ interface AddToCartInput {
   variantId?: string | null;
   quantity?: number;
   personalization?: Record<string, string>;
+  /** Per-line text sizes the customer set on the preview, kept with the plate. */
+  previewScales?: Record<string, number>;
 }
 
 interface CartContextValue {
@@ -343,6 +345,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           variantId: input.variantId ?? null,
           quantity: input.quantity ?? 1,
           personalization: input.personalization ?? {},
+          ...(input.previewScales && Object.keys(input.previewScales).length ? { previewScales: input.previewScales } : {}),
         });
         setCartData(cart);
         setDrawerOpen(true);

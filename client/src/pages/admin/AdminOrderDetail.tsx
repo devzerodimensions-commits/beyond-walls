@@ -10,6 +10,7 @@ import { AdminCard, AdminPageHeader, DefinitionList } from '../../components/adm
 import {
   Badge, Button, ButtonLink, ConfirmDialog, Input, Modal, PageLoader, Select, Textarea,
 } from '../../components/ui';
+import { ApprovedPlate } from '../../components/admin/ApprovedPlate';
 
 const ORDER_STATUSES: OrderStatus[] = [
   'PENDING', 'CONFIRMED', 'IN_PRODUCTION', 'READY_TO_SHIP',
@@ -248,6 +249,8 @@ export default function AdminOrderDetail() {
                         </p>
                       </div>
                     </div>
+
+                    {item.preview ? <ApprovedPlate preview={item.preview} name={item.productName} /> : null}
 
                     {item.personalization?.length ? (
                       <div className="mt-3 border border-stone-line bg-paper-off p-3">

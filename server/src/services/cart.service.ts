@@ -5,6 +5,7 @@ import { ApiError } from '../utils/http';
 import { money } from '../utils/helpers';
 import { boolSetting, getAllSettings, numberSetting, type SettingsMap } from './settings.service';
 import { availableStock, effectivePrice } from './pricing.service';
+import { bindPreviewBoxes } from './previewBinding.service';
 
 export const CART_INCLUDE = {
   coupon: true,
@@ -260,6 +261,70 @@ export function validatePersonalization(
 /** @deprecated Use `effectivePrice` from pricing.service — kept as a re-export. */
 export const unitPriceFor = effectivePrice;
 
+/**
+ * The plate as the customer saw it, kept so it can be drawn again anywhere.
+ *
+ * The cart, the checkout, the order and the studio's production screen all
+ * show the plate from this, not from the product as it is today: a design
+ * edited next month must not quietly change what a customer agreed to.
+ */
+export interface PreviewSnapshot {
+  template: string;
+  config: unknown;
+  slots: Record<string, string>;
+  scales?: Record<string, number>;
+}
+
+/** What a snapshot may draw into; anything else in a request is ignored. */
+const DRAWN_SLOTS = new Set(['number', 'line1', 'line2', 'line3', 'fontFamily', 'textColor', 'plateColor', 'logo']);
+
+/**
+ * Builds the snapshot from answers that have already been validated.
+ *
+ * Taken from the checked answers rather than from anything the browser sends
+ * about the picture, so the plate on the order can never say something the
+ * order does not. Only the per-line sizes come from the browser, and only as
+ * numbers within the range the size buttons offer.
+ */
+export function previewSnapshot(
+  product: { livePreviewEnabled: boolean; livePreviewTemplate: string | null; livePreviewConfig: unknown },
+  fields: PersonalizationField[],
+  entries: PersonalizationEntry[],
+  scales?: Record<string, unknown>,
+): PreviewSnapshot | null {
+  if (!product.livePreviewEnabled || !product.livePreviewTemplate) return null;
+  const config = bindPreviewBoxes(product.livePreviewConfig, fields);
+  if (product.livePreviewTemplate === 'photo') {
+    const photo = (config as { photo?: { image?: string; boxes?: unknown[] } } | null)?.photo;
+    if (!photo?.image || !photo.boxes?.length) return null;
+  }
+
+  const slots: Record<string, string> = {};
+  for (const entry of entries) {
+    const field = fields.find((f) => f.key === entry.key);
+    const slot = field?.previewSlot;
+    if (!field || !slot || !DRAWN_SLOTS.has(slot) || !entry.value) continue;
+    if (field.type === 'COLOR') {
+      const options = (Array.isArray(field.options) ? field.options : []) as FieldOption[];
+      slots[slot] = options.find((o) => String(o.value ?? o.label) === entry.value)?.hex ?? entry.value;
+    } else {
+      slots[slot] = entry.value;
+    }
+  }
+
+  const kept: Record<string, number> = {};
+  for (const [slot, size] of Object.entries(scales ?? {})) {
+    const n = Number(size);
+    if (DRAWN_SLOTS.has(slot) && Number.isFinite(n) && n >= 50 && n <= 200 && n !== 100) kept[slot] = Math.round(n);
+  }
+  return {
+    template: product.livePreviewTemplate,
+    config,
+    slots,
+    ...(Object.keys(kept).length ? { scales: kept } : {}),
+  };
+}
+
 export interface CartLine {
   id: string;
   productId: string;
@@ -274,6 +339,8 @@ export interface CartLine {
   personalizationCost: number;
   lineTotal: number;
   personalization: PersonalizationEntry[];
+  /** The plate as the customer saw it, when the product has a preview. */
+  preview: PreviewSnapshot | null;
   /** True when the catalogue entry has lost its price since it was added. */
   unavailable: boolean;
   inStock: boolean;
@@ -361,6 +428,7 @@ export async function priceCart(
       personalizationCost,
       lineTotal,
       personalization,
+      preview: (item.preview ?? null) as PreviewSnapshot | null,
       unavailable,
       inStock: stock === null || stock >= item.quantity,
       availableStock: stock,

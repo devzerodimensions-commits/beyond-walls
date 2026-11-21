@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useCart, useSettings } from '../../context/StoreProvider';
-import { assetUrl } from '../../lib/api';
 import { describePersonalization, formatPrice } from '../../lib/format';
 import { Button, ButtonLink, CartIcon, Drawer, EmptyState, MinusIcon, PlusIcon, TrashIcon } from '../ui';
+import { LineThumb } from '../product/PlateSnapshot';
 
 export function CartDrawer() {
   const { cart, isDrawerOpen, closeDrawer, updateItem, removeItem } = useCart();
@@ -80,8 +80,9 @@ export function CartDrawer() {
               return (
                 <li key={line.id} className="flex gap-4 p-5">
                   <Link to={`/product/${line.slug}`} onClick={closeDrawer} className="shrink-0">
-                    <img
-                      src={assetUrl(line.image)}
+                    <LineThumb
+                      preview={line.preview}
+                      image={line.image}
                       alt={line.name}
                       className="h-24 w-20 bg-paper-warm object-cover"
                     />

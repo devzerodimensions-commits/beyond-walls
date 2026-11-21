@@ -11,6 +11,7 @@ import { openRazorpayCheckout } from '../lib/razorpay';
 import {
   AlertIcon, Badge, Button, ButtonLink, CheckIcon, EmptyState, PageLoader, RefreshIcon,
 } from '../components/ui';
+import { LineThumb } from '../components/product/PlateSnapshot';
 
 export default function OrderConfirmationPage() {
   const { orderNumber } = useParams();
@@ -186,10 +187,10 @@ export default function OrderConfirmationPage() {
                 <li key={item.id} className="flex gap-4 py-5">
                   {item.slug ? (
                     <Link to={`/product/${item.slug}`} className="shrink-0">
-                      <img src={assetUrl(item.imageUrl)} alt="" className="h-24 w-20 bg-paper-warm object-cover" />
+                      <LineThumb preview={item.preview} image={item.imageUrl} alt="" className="h-24 w-20 bg-paper-warm object-cover" />
                     </Link>
                   ) : (
-                    <img src={assetUrl(item.imageUrl)} alt="" className="h-24 w-20 shrink-0 bg-paper-warm object-cover" />
+                    <LineThumb preview={item.preview} image={item.imageUrl} alt="" className="h-24 w-20 shrink-0 bg-paper-warm object-cover" />
                   )}
 
                   <div className="min-w-0 flex-1">

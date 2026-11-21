@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../../lib/prisma';
 import { ApiError, asyncHandler } from '../../utils/http';
@@ -9,6 +10,7 @@ import {
   reloadCart,
   resolveCart,
   validatePersonalization,
+  previewSnapshot,
 } from '../../services/cart.service';
 import { alignLettering } from '../../services/previewBinding.service';
 import { assertPurchasable, resolveVariant } from '../../services/pricing.service';
@@ -23,6 +25,8 @@ const addItemSchema = z.object({
   quantity: z.number().int().min(1).max(999).default(1),
   /** Either a { key: value } map or an array of { key, value }. */
   personalization: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(),
+  /** Per-line text sizes from the preview, as percentages. */
+  previewScales: z.record(z.number()).optional(),
 });
 
 // GET /api/cart
@@ -85,10 +89,16 @@ router.post(
         ) === fingerprint,
     );
 
+    // The plate exactly as it was approved, so the cart and the order can show it.
+    const preview = previewSnapshot(product, product.personalization, entries, body.previewScales);
+
     if (existing) {
       // Re-check the combined quantity against stock and per-order limits.
       const nextQty = assertPurchasable(product, variant, existing.quantity + quantity);
-      await prisma.cartItem.update({ where: { id: existing.id }, data: { quantity: nextQty } });
+      await prisma.cartItem.update({
+        where: { id: existing.id },
+        data: { quantity: nextQty, ...(preview ? { preview: preview as never } : {}) },
+      });
     } else {
       await prisma.cartItem.create({
         data: {
@@ -97,6 +107,7 @@ router.post(
           variantId: variant?.id ?? null,
           quantity,
           personalization: entries as never,
+          ...(preview ? { preview: preview as never } : {}),
         },
       });
     }
@@ -135,6 +146,10 @@ router.patch(
         body.personalization,
       );
       data.personalization = entries;
+      // Redrawn from the new answers, keeping the sizes the customer had set.
+      const before = item.preview as { scales?: Record<string, number> } | null;
+      const preview = previewSnapshot(item.product, item.product.personalization, entries, before?.scales);
+      data.preview = preview ?? Prisma.DbNull;
     }
 
     if (Object.keys(data).length) {

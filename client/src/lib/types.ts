@@ -1,3 +1,5 @@
+import type { PreviewSnapshot } from '../components/product/PlateSnapshot';
+
 /**
  * Account roles, matching the server Role enum.
  *
@@ -254,6 +256,8 @@ export interface CartLine {
   personalizationCost: number;
   lineTotal: number;
   personalization: PersonalizationEntry[];
+  /** The plate as the customer made it; see components/product/PlateSnapshot. */
+  preview?: PreviewSnapshot | null;
   unavailable: boolean;
   inStock: boolean;
   availableStock: number | null;
@@ -310,6 +314,8 @@ export interface OrderItem {
   quantity: number;
   lineTotal: string | number;
   personalization: PersonalizationEntry[];
+  /** The plate the customer approved, drawn again on the order. */
+  preview?: PreviewSnapshot | null;
 }
 
 export interface PaymentEvent {

@@ -9,6 +9,7 @@ import {
   Button, ButtonLink, CartIcon, EmptyState, Input, MinusIcon, PageLoader,
   PlusIcon, TrashIcon,
 } from '../components/ui';
+import { LineThumb } from '../components/product/PlateSnapshot';
 
 export default function CartPage() {
   const { cart, isLoading, updateItem, removeItem, applyCoupon, removeCoupon } = useCart();
@@ -71,8 +72,9 @@ export default function CartPage() {
               {lines.map((line) => (
                 <li key={line.id} className="flex gap-4 py-6 sm:gap-6">
                   <Link to={`/product/${line.slug}`} className="shrink-0">
-                    <img
-                      src={assetUrl(line.image)}
+                    <LineThumb
+                      preview={line.preview}
+                      image={line.image}
                       alt={line.name}
                       className="h-32 w-24 bg-paper-warm object-cover sm:h-36 sm:w-28"
                     />
