@@ -480,6 +480,22 @@ export async function analyseMarked(source: Buffer, rects: Rect[]): Promise<Plat
     return hex(sum[0] / samples.length, sum[1] / samples.length, sum[2] / samples.length);
   };
 
+  /*
+   * Handwriting, told from its shapes. Two signs, either enough: letters
+   * that run into one another, or small letters far shorter than the
+   * capitals -- a script's lower case is around a third of its capital's
+   * height (the Ganesha plate: 0.37), where a sans or a book serif sits at
+   * two thirds or more. The plate then starts in the script face rather than
+   * a plain sans that looks nothing like the piece; the studio can still
+   * choose another.
+   */
+  const busiest = lines.reduce((a, b) => (b.marks.length > a.marks.length ? b : a));
+  const widestMark = Math.max(...busiest.marks.map((m) => m.w));
+  const joined = widestMark >= (busiest.right - busiest.left + 1) * 0.4 && widestMark > (busiest.bottom - busiest.top + 1) * 1.5;
+  const heights = busiest.marks.filter((m) => m.n >= 20).map((m) => m.h).sort((p, q) => p - q);
+  const smallLetters = heights.length >= 4 && heights[heights.length >> 1] <= heights[heights.length - 1] * 0.5;
+  const handwriting = joined || smallLetters;
+
   const blank = await sharp(out, { raw: { width: w, height: h, channels: 3 } }).webp({ quality: 92 }).toBuffer();
   return {
     ok: true,
@@ -491,6 +507,7 @@ export async function analyseMarked(source: Buffer, rects: Rect[]): Promise<Plat
     weight,
     boxes,
     script: 'latin',
+    ...(handwriting ? { face: 'script' } : {}),
   };
 }
 
