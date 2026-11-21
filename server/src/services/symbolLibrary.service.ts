@@ -178,7 +178,33 @@ export async function removeSymbol(id: string): Promise<PlateSymbol[]> {
   if (!gone) throw ApiError.notFound('That symbol is not in the library.');
   const library = current.filter((s) => s.id !== id);
   await setSetting(KEY, library);
-  // Kept on disk while any product default or order still shows it.
+
+  /*
+   * Every product that pointed at it, not just the one on screen.
+   *
+   * A question left starting on a symbol that no longer exists draws nothing
+   * where the symbol was and offers a choice the shop cannot serve -- and the
+   * studio would only find out on whichever product they were not looking at.
+   * A plate starting on the removed symbol falls back to the first symbol
+   * left, or to none when the library is empty.
+   */
+  const fields = await prisma.personalizationField.findMany({
+    where: { previewSlot: 'logo' },
+    select: { id: true, defaultValue: true, options: true },
+  });
+  for (const field of fields) {
+    const data: Record<string, unknown> = {};
+    const options = Array.isArray(field.options) ? field.options as { value?: unknown }[] : [];
+    if (options.some((o) => o?.value === gone.url)) {
+      data.options = options.filter((o) => o?.value !== gone.url);
+    }
+    if (field.defaultValue === gone.url) data.defaultValue = library[0]?.url ?? null;
+    if (Object.keys(data).length) {
+      await prisma.personalizationField.update({ where: { id: field.id }, data: data as never });
+    }
+  }
+
+  // Kept on disk while an order still shows it: that plate was already agreed.
   await deleteFileIfUnreferenced(gone.url).catch(() => undefined);
   await deleteFileIfUnreferenced(gone.colour).catch(() => undefined);
   return library;

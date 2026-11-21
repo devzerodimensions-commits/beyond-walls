@@ -1,6 +1,8 @@
 import path from 'path';
 import zlib from 'zlib';
 import { nanoid } from 'nanoid';
+import { Prisma } from '@prisma/client';
+import prisma from '../lib/prisma';
 import { persistUpload } from '../middleware/upload';
 import { ApiError } from '../utils/http';
 import { deleteFileIfUnreferenced } from './media.service';
@@ -203,6 +205,29 @@ export async function removeFont(id: string): Promise<UploadedFont[]> {
   if (!gone) throw ApiError.notFound('That font is not in the library.');
   const next = current.filter((f) => f.id !== id);
   await setSetting(KEY, next);
+
+  /*
+   * Every product lettered in it, not just the one on screen.
+   *
+   * The face would still be named on those products and would quietly draw
+   * in a stand-in, which is the fault this library was built to end: a
+   * preview that does not look like the piece, with nothing saying why. The
+   * face is cleared instead, so the plate falls back to its design's own and
+   * the editor shows that plainly.
+   */
+  const products = await prisma.product.findMany({
+    where: { livePreviewConfig: { not: Prisma.DbNull } },
+    select: { id: true, livePreviewConfig: true },
+  });
+  for (const product of products) {
+    const config = product.livePreviewConfig as { defaults?: { fontFamily?: string } } | null;
+    if (config?.defaults?.fontFamily !== gone.family) continue;
+    const { fontFamily, ...rest } = config.defaults;
+    await prisma.product.update({
+      where: { id: product.id },
+      data: { livePreviewConfig: { ...config, defaults: rest } as never },
+    });
+  }
   await deleteFileIfUnreferenced(gone.url).catch(() => undefined);
   return next;
 }

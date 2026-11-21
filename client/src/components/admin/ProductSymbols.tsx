@@ -35,6 +35,9 @@ export function ProductSymbols({
   const { push } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
+  /** The symbol being renamed or removed; only one at a time. */
+  const [editing, setEditing] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
 
   const field = fields.find((f) => f.previewSlot === 'logo') ?? null;
   const library = useQuery({
@@ -105,6 +108,51 @@ export function ProductSymbols({
     onSettled: () => { if (fileRef.current) fileRef.current.value = ''; },
   });
 
+  const rename = useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) =>
+      api.patch<PlateSymbol[]>(`/admin/symbols/${id}`, { label }),
+    onSuccess: async (list) => {
+      queryClient.setQueryData(['admin-symbols'], list);
+      /*
+       * A plate offering a chosen few names each one in its own list, so a
+       * rename has to reach that list too -- otherwise the customer still
+       * sees the old name on this product while every other plate shows the
+       * new one.
+       */
+      if (field && !offersAll) {
+        const options = (field.options ?? [])
+          .map((o) => ({ value: o.value, label: list.find((sym) => sym.url === o.value)?.label ?? o.label }));
+        await saveField.mutateAsync({ options });
+      }
+      setEditing(null);
+      await refresh();
+    },
+    onError: fail,
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.delete<PlateSymbol[]>(`/admin/symbols/${id}`),
+    onSuccess: async (list, id) => {
+      queryClient.setQueryData(['admin-symbols'], list);
+      const gone = symbols.find((sym) => sym.id === id);
+      /*
+       * The plate must not be left pointing at a symbol that no longer
+       * exists: it would draw nothing where the symbol was, and the question
+       * would offer a choice the shop cannot serve.
+       */
+      if (gone && field) {
+        const patch: { options?: { label: string; value: string }[]; defaultValue?: string | null } = {};
+        if (!offersAll) patch.options = (field.options ?? []).filter((o) => o.value !== gone.url).map((o) => ({ label: o.label, value: o.value }));
+        if (field.defaultValue === gone.url) patch.defaultValue = list[0]?.url ?? null;
+        if (Object.keys(patch).length) await saveField.mutateAsync(patch);
+      }
+      setRemoving(null);
+      await refresh();
+      push('Symbol removed from every plate.', 'success');
+    },
+    onError: fail,
+  });
+
   const toggle = (symbol: PlateSymbol) => {
     const next = offered.includes(symbol.url)
       ? offered.filter((url) => url !== symbol.url)
@@ -154,7 +202,32 @@ export function ProductSymbols({
                 >
                   <img src={assetUrl(symbol.url)} alt={symbol.label} className="max-h-full max-w-full object-contain" />
                 </button>
-                <p className="mt-1 truncate text-center text-2xs text-ink-500" title={symbol.label}>{symbol.label}</p>
+                {editing === symbol.id ? (
+                  <input
+                    autoFocus
+                    defaultValue={symbol.label}
+                    aria-label={`Name of ${symbol.label}`}
+                    className="field mt-1 w-full px-1 py-0.5 text-center text-2xs"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.currentTarget.blur();
+                      if (e.key === 'Escape') setEditing(null);
+                    }}
+                    onBlur={(e) => {
+                      const next = e.target.value.trim();
+                      if (next && next !== symbol.label) rename.mutate({ id: symbol.id, label: next });
+                      else setEditing(null);
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(symbol.id)}
+                    title="Rename"
+                    className="mt-1 block w-full truncate text-center text-2xs text-ink-500 hover:text-ink hover:underline"
+                  >
+                    {symbol.label}
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={!on}
@@ -167,6 +240,31 @@ export function ProductSymbols({
                 >
                   {starts ? 'starts on this' : 'start on this'}
                 </button>
+                {removing === symbol.id ? (
+                  <div className="mt-0.5 text-center text-2xs leading-tight">
+                    <button
+                      type="button"
+                      className="text-red-700 underline underline-offset-2"
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate(symbol.id)}
+                    >
+                      delete?
+                    </button>
+                    {' '}
+                    <button type="button" className="text-ink-400 underline underline-offset-2" onClick={() => setRemoving(null)}>
+                      keep
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    title="Remove from every plate"
+                    className="mt-0.5 block w-full text-center text-2xs text-ink-300 underline underline-offset-2 hover:text-red-700"
+                    onClick={() => setRemoving(symbol.id)}
+                  >
+                    remove
+                  </button>
+                )}
               </div>
             );
           })}
@@ -205,7 +303,7 @@ export function ProductSymbols({
       </div>
       <p className="mt-1 text-2xs leading-relaxed text-ink-400">
         The symbol on a plain background, or a transparent PNG. The background is removed for you.
-        {symbols.length ? ' Click a symbol to offer it on this plate or take it off.' : ''}
+        {symbols.length ? ' Click a symbol to offer it on this plate or take it off; click its name to rename it.' : ''}
       </p>
 
       {!field ? (
