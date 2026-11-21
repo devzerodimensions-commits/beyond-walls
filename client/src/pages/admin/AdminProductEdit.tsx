@@ -198,31 +198,6 @@ export default function AdminProductEdit() {
     }
   }, [productQuery.data]);
 
-  /*
-   * A design built from a picture takes the product's picture, once there is
-   * one.
-   *
-   * The design carries the boxes, the shape and the colours; the photograph
-   * belongs to the product, so it is filled in here rather than travelling
-   * with the design. Only ever filled in when it is EMPTY -- a studio that
-   * has pointed the design at a blank plate of their own, which is usually
-   * not a catalogue photograph at all, must not have that quietly replaced
-   * the next time they add a picture to the gallery.
-   */
-  const primaryImage = productQuery.data?.images?.[0]?.url ?? null;
-  useEffect(() => {
-    if (form.livePreviewTemplate !== 'photo' || !primaryImage) return;
-    const photo = (form.livePreviewConfig as { photo?: { image?: string; boxes?: unknown[] } }).photo;
-    if (photo?.image) return;
-    setForm((prev) => ({
-      ...prev,
-      livePreviewConfig: {
-        ...prev.livePreviewConfig,
-        photo: { image: primaryImage, boxes: photo?.boxes ?? [] },
-      },
-    }));
-  }, [primaryImage, form.livePreviewTemplate, form.livePreviewConfig]);
-
   const set = <K extends keyof ProductForm>(key: K, value: ProductForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => {
@@ -1681,12 +1656,39 @@ function PreviewConfigEditor({
         />
       ) : null}
 
-      <LivePreview
-        template={template || 'nameplate-minimal'}
-        config={config}
-        slots={{}}
-        className="border border-stone-line"
-      />
+      {awaitingDesign(template, config) ? (
+        <NoDesignYet />
+      ) : (
+        <LivePreview
+          template={template || 'nameplate-minimal'}
+          config={config}
+          slots={{}}
+          className="border border-stone-line"
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * A design read from a picture, with no picture uploaded for it yet.
+ *
+ * This page used to fill that gap with the product's main photograph, so a
+ * product with nothing uploaded previewed its catalogue photo -- the piece on
+ * a wall, with no customer's words on it -- which looked like a broken
+ * preview, and saving the page then stored the photograph as the blank. The
+ * preview shows only what was uploaded for it, and until then it is empty.
+ */
+function awaitingDesign(template: string, config: Record<string, unknown>): boolean {
+  if (template !== 'photo') return false;
+  const photo = (config as { photo?: { image?: string } }).photo;
+  return !photo?.image;
+}
+
+function NoDesignYet() {
+  return (
+    <div className="flex min-h-[9rem] items-center justify-center border border-dashed border-stone-line bg-paper-warm p-6 text-center text-xs text-ink-400">
+      Nothing uploaded yet. Upload the design file and the preview appears here.
     </div>
   );
 }
@@ -2461,7 +2463,9 @@ function PersonalizationTab({
                   ))}
               </div>
 
-              {previewEnabled ? (
+              {previewEnabled && awaitingDesign(previewTemplate, previewConfig) ? (
+                <div className="mt-5"><NoDesignYet /></div>
+              ) : previewEnabled ? (
                 <LivePreview
                   template={previewTemplate || 'nameplate-minimal'}
                   config={previewConfig}
