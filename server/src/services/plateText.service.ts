@@ -72,6 +72,17 @@ export interface PlateBox {
    * capitals and stood where the sample stood.
    */
   base?: number;
+  /**
+   * A face of its own for this line, when the design sets it apart.
+   *
+   * A cut-out names the family in a joined script and cuts the flat number
+   * under it in bold block figures. One face for both drew the number in the
+   * script too, which is not the piece. Set only when the reader can see the
+   * difference; a line without it is set in the product's face.
+   */
+  face?: string;
+  /** The line's own weight, measured off its strokes, when it differs from the rest. */
+  weight?: PlateWeight;
 }
 
 export interface PlatePreview {
@@ -89,6 +100,14 @@ export interface PlatePreview {
   boxes: PlateBox[];
   /** Read off the lettering, so the preview can be set in the same alphabet. */
   script: PlateScript;
+  /**
+   * The kind of face the name is written in, when the structure says so.
+   *
+   * Only offered where it is plain from the shapes alone: a name whose
+   * letters run into one another is handwriting, so it is set in the script
+   * face until the studio picks one. Absent everywhere else.
+   */
+  face?: string;
 }
 
 /** The analysis, with the blank plate as bytes rather than a stored file. */
@@ -364,7 +383,16 @@ interface Line {
   openness: number;
 }
 
+/**
+ * Reads a picture of a plate: a one-piece cut-out by its structure, anything
+ * else by its letters. See analyseCutout for why there are two.
+ */
 export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
+  const cut = await analyseCutout(source).catch(() => null);
+  return cut ?? analyseLettering(source);
+}
+
+async function analyseLettering(source: Buffer): Promise<PlateAnalysis> {
   const no = (reason: string): PlateAnalysis => ({
     ok: false, reason, blank: null, aspect: null, plateColor: null, textColor: null, boxes: [], script: 'latin', weight: 400,
   });
@@ -381,9 +409,16 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
 
   const w = Math.min(WORK, fullW);
   const h = Math.max(1, Math.round((fullH * w) / fullW));
+  /*
+   * Transparency is laid on white, the way a design file is seen. Dropping
+   * the alpha channel instead kept whatever colour the transparent pixels
+   * happened to hold -- black, in most exports -- and a cut-out saved as a
+   * transparent PNG came in as a black page with the lettering invisible on it.
+   */
   const { data, info } = await sharp(source)
     .resize(w, h, { fit: 'fill' })
-    .removeAlpha()
+    .flatten({ background: '#ffffff' })
+    .toColourspace('srgb')
     .raw()
     .toBuffer({ resolveWithObject: true });
   const ch = info.channels;
@@ -818,6 +853,20 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
   const usable = stacked.filter(
     (l) => l.roughness <= MAX_ROUGHNESS && l.contrast >= MIN_CONTRAST,
   );
+  /*
+   * Two different failures, and they were reported as one.
+   *
+   * Lines that were found but sit on a rough surface are one thing. Finding
+   * no line at all is another -- a design whose letters are all joined into a
+   * single shape has no separate letters to line up -- and calling that an
+   * uneven surface sent the studio looking for a texture on a clean white
+   * design file.
+   */
+  if (!stacked.length) {
+    return no(
+      'No line of separate letters could be made out on this picture. If the design is cut as one piece, check the bar under the name runs straight across and the background is plain white; otherwise set the preview up by hand below.',
+    );
+  }
   if (!usable.length) {
     return no(
       'The writing on this picture sits on a surface too uneven to paint it off cleanly — a wall, a texture or a strong shadow behind it. Upload the design file the plate is cut from, or set the preview up by hand below.',
@@ -1108,7 +1157,10 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
    */
   const outW = Math.min(fullW, MAX_OUT);
   const outH = Math.max(1, Math.round((fullH * outW) / fullW));
-  const big = await sharp(source).resize(outW, outH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const big = await sharp(source).resize(outW, outH, { fit: 'fill' })
+    .flatten({ background: '#ffffff' })
+    .toColourspace('srgb')
+    .raw().toBuffer();
   const sx = outW / w;
   const sy = outH / h;
 
@@ -1255,6 +1307,350 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
     textColor: hex(ink.r, ink.g, ink.b),
     weight,
     boxes,
+  };
+}
+
+/*
+ * ---- Pieces cut as one ----
+ *
+ * The letter reader above looks for letters: separate marks of a like size
+ * sitting on a line. A cut-out nameplate is often not made of separate marks
+ * at all. The Kadamb design is one piece of steel -- the name in a joined
+ * script, a bar run along its foot, the flat number hanging from the bar --
+ * because a piece cut from one sheet has to hold together when it is lifted
+ * off the table. To the letter reader the whole design is a single shape
+ * nine-tenths the height of the picture, and nothing in it is shaped like a
+ * letter, so a clean design file was refused.
+ *
+ * A design like that is read by its structure instead: a page of one flat
+ * colour, a single thin bar across it, a name standing on the bar and,
+ * if there is one, a line of lettering under it. Only a picture that is all of
+ * those AND held together through the bar is read this way; anything else goes
+ * to the letter reader exactly as before, so no design it reads now changes.
+ *
+ * The blank keeps the bar and nothing else. The bar is the part of the piece
+ * that stays the same whatever the family is called; everything welded to it
+ * is lettering, and is the customer's to choose.
+ */
+
+/**
+ * Share of the picture's edge that has to be the plain page.
+ * The Kadamb file: 98%. No photograph on file came above 78%.
+ */
+const CUT_PAGE = 0.95;
+/**
+ * How even that page has to be, as a spread of brightness.
+ * The Kadamb file: 1.0. Photographs on file: 7.6 and up.
+ */
+const CUT_PAGE_SPREAD = 3;
+/** Page against ink, in brightness. A design file is near black on white. */
+const CUT_CONTRAST = 80;
+/** A row is bar when its longest unbroken run of ink spans this much of the width. */
+const CUT_BAR_RUN = 0.55;
+/** The thickest a bar can be, as a share of the height. The Kadamb bar: 0.033. */
+const CUT_BAR_THICK = 0.08;
+/** More ink than this and it is a plate on a page, not lettering cut out. */
+const CUT_MAX_INK = 0.45;
+/** Edges within this share of the width count as the same edge. */
+const CUT_SAME_EDGE = 0.06;
+
+async function analyseCutout(source: Buffer): Promise<PlateAnalysis | null> {
+  let meta;
+  try {
+    meta = await sharp(source).metadata();
+  } catch {
+    return null;
+  }
+  const fullW = meta.width ?? 0;
+  const fullH = meta.height ?? 0;
+  if (!fullW || !fullH) return null;
+
+  // Read at the size the blank is written at, so the bar is copied pixel for pixel.
+  const w = Math.min(fullW, MAX_OUT);
+  const h = Math.max(1, Math.round((fullH * w) / fullW));
+  const { data: rgb, info } = await sharp(source)
+    .resize(w, h, { fit: 'fill' })
+    .flatten({ background: '#ffffff' })
+    .toColourspace('srgb')
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  if (info.channels !== 3 || w < 40 || h < 20) return null;
+
+  const lum = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i += 1) lum[i] = lumaOf(rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]);
+
+  // ---- The page: the picture's edge, nearly all one flat colour ----
+  const edge: number[] = [];
+  for (let x = 0; x < w; x += 1) edge.push(x, (h - 1) * w + x);
+  for (let y = 1; y < h - 1; y += 1) edge.push(y * w, y * w + w - 1);
+  const edgeLevels = edge.map((i) => lum[i]).sort((a, b) => a - b);
+  const pageL = edgeLevels[edgeLevels.length >> 1];
+  const plain = edge.filter((i) => Math.abs(lum[i] - pageL) <= 20);
+  if (plain.length < edge.length * CUT_PAGE) return null;
+  const plainMean = plain.reduce((s, i) => s + lum[i], 0) / plain.length;
+  const plainSpread = Math.sqrt(plain.reduce((s, i) => s + (lum[i] - plainMean) ** 2, 0) / plain.length);
+  if (plainSpread > CUT_PAGE_SPREAD) return null;
+  const middleOf = (values: number[]) => values.sort((a, b) => a - b)[values.length >> 1];
+  const page = [0, 1, 2].map((c) => middleOf(plain.map((i) => rgb[i * 3 + c])));
+
+  // ---- The ink: whatever stands well clear of the page, split halfway ----
+  const levels = new Uint32Array(256);
+  let far = 0;
+  for (let i = 0; i < w * h; i += 1) {
+    if (Math.abs(lum[i] - pageL) <= 60) continue;
+    levels[Math.max(0, Math.min(255, Math.round(lum[i])))] += 1;
+    far += 1;
+  }
+  if (far < w * h * 0.01) return null;
+  let inkL = 0;
+  for (let seen = 0; inkL < 255; inkL += 1) {
+    seen += levels[inkL];
+    if (seen * 2 >= far) break;
+  }
+  if (Math.abs(inkL - pageL) < CUT_CONTRAST) return null;
+  const dark = inkL < pageL;
+  const split = (pageL + inkL) / 2;
+  const ink = new Uint8Array(w * h);
+  let inked = 0;
+  for (let i = 0; i < w * h; i += 1) {
+    if (dark ? lum[i] < split : lum[i] > split) { ink[i] = 1; inked += 1; }
+  }
+  if (inked > w * h * CUT_MAX_INK) return null;
+
+  // ---- The bar: one thin band of rows, each nearly all one run of ink ----
+  const runFrom = new Int32Array(h).fill(-1);
+  const runTo = new Int32Array(h).fill(-1);
+  for (let y = 0; y < h; y += 1) {
+    let best = 0, bestFrom = -1, run = 0;
+    for (let x = 0; x < w; x += 1) {
+      if (ink[y * w + x]) {
+        run += 1;
+        if (run > best) { best = run; bestFrom = x - run + 1; }
+      } else run = 0;
+    }
+    if (best >= w * CUT_BAR_RUN) { runFrom[y] = bestFrom; runTo[y] = bestFrom + best - 1; }
+  }
+  const bands: { top: number; bottom: number }[] = [];
+  for (let y = 0; y < h; y += 1) {
+    if (runFrom[y] < 0) continue;
+    const last = bands[bands.length - 1];
+    if (last && last.bottom === y - 1) last.bottom = y;
+    else bands.push({ top: y, bottom: y });
+  }
+  if (bands.length !== 1) return null;
+  const { top, bottom } = bands[0];
+  const thick = bottom - top + 1;
+  if (thick > h * CUT_BAR_THICK) return null;
+  const barRows = Array.from({ length: thick }, (_, k) => top + k);
+  const barL = middleOf(barRows.map((y) => runFrom[y]));
+  const barR = middleOf(barRows.map((y) => runTo[y]));
+
+  // ---- A name standing on the bar, taller than anything under it ----
+  let nameTop = -1, nameL = w, nameR = -1, inkAbove = 0;
+  for (let y = 0; y < top; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (!ink[y * w + x]) continue;
+      if (nameTop < 0) nameTop = y;
+      if (x < nameL) nameL = x;
+      if (x > nameR) nameR = x;
+      inkAbove += 1;
+    }
+  }
+  let underTop = -1, underBottom = -1, inkBelow = 0;
+  for (let y = bottom + 1; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (!ink[y * w + x]) continue;
+      if (underTop < 0) underTop = y;
+      underBottom = y;
+      inkBelow += 1;
+    }
+  }
+  if (nameTop < 0 || top - nameTop < h * 0.15) return null;
+  /*
+   * The name is the larger part. Without this, a Devanagari word -- whose
+   * letters hang from a headline that runs right across it -- would pass for
+   * a short name over a bar with a tall line under it.
+   */
+  if (inkAbove < inkBelow || (underTop >= 0 && underBottom - underTop + 1 > top - nameTop)) return null;
+
+  // ---- One piece: the bar carries the lettering ----
+  {
+    const seen = new Uint8Array(w * h);
+    const stack = new Int32Array(w * h);
+    const mid = (top + bottom) >> 1;
+    let seed = -1;
+    for (let x = barL; x <= barR && seed < 0; x += 1) if (ink[mid * w + x]) seed = mid * w + x;
+    if (seed < 0) return null;
+    let sp = 0;
+    stack[sp++] = seed;
+    seen[seed] = 1;
+    let carried = 0;
+    while (sp) {
+      const i = stack[--sp];
+      const x = i % w;
+      const y = (i - x) / w;
+      if (y < top || y > bottom) carried += 1;
+      if (x > 0 && ink[i - 1] && !seen[i - 1]) { seen[i - 1] = 1; stack[sp++] = i - 1; }
+      if (x < w - 1 && ink[i + 1] && !seen[i + 1]) { seen[i + 1] = 1; stack[sp++] = i + 1; }
+      if (y > 0 && ink[i - w] && !seen[i - w]) { seen[i - w] = 1; stack[sp++] = i - w; }
+      if (y < h - 1 && ink[i + w] && !seen[i + w]) { seen[i + w] = 1; stack[sp++] = i + w; }
+    }
+    if (carried < thick * (barR - barL + 1) * 0.5) return null;
+  }
+
+  const polarity = dark ? 'dark' : 'light';
+  const speck = Math.max(12, Math.round(w * h * 0.00005));
+  const fillOf = (m: Mark) => m.n / (m.w * m.h);
+  const medianFill = (marks: Mark[]) => (marks.length ? middleOf(marks.map(fillOf)) : 0);
+
+  // ---- The line under the bar: marks set side by side on one baseline ----
+  const below = new Uint8Array(w * h);
+  for (let i = (bottom + 1) * w; i < w * h; i += 1) below[i] = ink[i];
+  const parts = components(below, w, h, polarity).filter((m) => m.n >= speck).sort((a, b) => a.minX - b.minX);
+  const groups: Mark[][] = [];
+  for (const part of parts) {
+    const last = groups[groups.length - 1];
+    if (last) {
+      const reach = Math.max(...last.map((m) => m.maxX));
+      const tallest = Math.max(part.h, ...last.map((m) => m.h));
+      // A word space is narrower than its letters are tall; a stroke of the name is a world away.
+      if (part.minX - reach <= tallest) { last.push(part); continue; }
+    }
+    groups.push([part]);
+  }
+  const asLine = (group: Mark[]) => {
+    const tallest = Math.max(...group.map((m) => m.h));
+    const main = group.filter((m) => m.h >= tallest * 0.6);
+    if (main.length < 2) return null;
+    const feet = main.map((m) => m.maxY);
+    if (Math.max(...feet) - Math.min(...feet) > tallest * 0.15) return null;
+    return { group, main };
+  };
+  const line = groups
+    .map(asLine)
+    .filter((l): l is NonNullable<typeof l> => !!l)
+    .sort((a, b) => b.main.length - a.main.length)[0] ?? null;
+
+  const near = w * CUT_SAME_EDGE;
+  const boxes: PlateBox[] = [];
+
+  // The name, stood on the bar: on this kind of piece the bar is its baseline.
+  {
+    const name = { y: nameTop / h, h: (top - nameTop) / h, base: 1 };
+    const nameW = nameR - nameL + 1;
+    const barW = barR - barL + 1;
+    if (Math.abs(nameL - barL) <= near) {
+      boxes.push({ ...name, align: 'left', anchor: nameL / w, room: Math.min(w - nameL, Math.max(nameW, barR + 1 - nameL)) / w });
+    } else if (Math.abs(nameR - barR) <= near) {
+      boxes.push({ ...name, align: 'right', anchor: (nameR + 1) / w, room: Math.min(nameR + 1, Math.max(nameW, nameR + 1 - barL)) / w });
+    } else {
+      const centre = (nameL + nameR + 1) / 2;
+      boxes.push({ ...name, align: 'center', anchor: centre / w, room: Math.min(Math.max(nameW, barW), 2 * Math.min(centre, w - centre)) / w });
+    }
+  }
+
+  if (line) {
+    const L = Math.min(...line.group.map((m) => m.minX));
+    const R = Math.max(...line.group.map((m) => m.maxX));
+    const T = Math.min(...line.group.map((m) => m.minY));
+    const B = Math.max(...line.group.map((m) => m.maxY));
+
+    // Its baseline from its own rows: the lowest still carrying a good share of the busiest.
+    const rows = new Array<number>(B - T + 1).fill(0);
+    for (let y = T; y <= B; y += 1) for (let x = L; x <= R; x += 1) rows[y - T] += below[y * w + x];
+    const busiest = Math.max(...rows);
+    let foot = B;
+    while (foot > T && rows[foot - T] < busiest * 0.35) foot -= 1;
+
+    // Anything else under the bar is the name's own strokes passing through; the line keeps clear of them.
+    const others = parts.filter((m) => !line.group.includes(m));
+    const gap = (B - T + 1) * 0.25;
+    const leftLimit = Math.max(barL, ...others.filter((m) => m.maxX < L).map((m) => m.maxX + gap));
+    const rightLimit = Math.min(barR + 1, ...others.filter((m) => m.minX > R).map((m) => m.minX - gap));
+
+    const heights = line.main.map((m) => m.h);
+    const typical = middleOf([...heights]);
+    // Capitals and figures stand one height; a script line below the bar would not.
+    const block = heights.every((v) => Math.abs(v - typical) <= typical * 0.12);
+
+    const lineBox: PlateBox = {
+      y: T / h,
+      h: (B - T + 1) / h,
+      base: Math.min(1, Math.max(0.3, (foot - T + 1) / (B - T + 1))),
+      align: 'center',
+      anchor: (L + R + 1) / 2 / w,
+      room: Math.max(R + 1 - L, 2 * Math.min((L + R + 1) / 2 - leftLimit, rightLimit - (L + R + 1) / 2)) / w,
+      weight: medianFill(line.main) >= BOLD_FILL ? 700 : 400,
+      ...(block ? { face: 'grotesque' } : {}),
+    };
+    if (Math.abs(R - barR) <= near) {
+      Object.assign(lineBox, { align: 'right', anchor: (R + 1) / w, room: Math.max(R + 1 - L, R + 1 - leftLimit) / w });
+    } else if (Math.abs(L - barL) <= near) {
+      Object.assign(lineBox, { align: 'left', anchor: L / w, room: Math.max(R + 1 - L, rightLimit - L) / w });
+    }
+    boxes.push(lineBox);
+  }
+
+  // ---- The name's weight and kind, from the marks above the bar ----
+  const above = new Uint8Array(w * h);
+  for (let i = 0; i < top * w; i += 1) above[i] = ink[i];
+  const nameParts = components(above, w, h, polarity).filter((m) => m.n >= speck);
+  const widest = Math.max(0, ...nameParts.map((m) => m.w));
+  // Letters that run into one another over a good part of the name are handwriting.
+  const joined = widest >= (nameR - nameL + 1) * 0.4;
+
+  // ---- The blank: the page, with the bar and nothing else ----
+  const out = Buffer.alloc(w * h * 3);
+  for (let i = 0; i < w * h; i += 1) {
+    out[i * 3] = page[0];
+    out[i * 3 + 1] = page[1];
+    out[i * 3 + 2] = page[2];
+  }
+  const x0 = Math.max(0, barL - 1);
+  const x1 = Math.min(w - 1, barR + 1);
+  for (let y = top; y <= bottom; y += 1) {
+    rgb.copy(out, (y * w + x0) * 3, (y * w + x0) * 3, (y * w + x1 + 1) * 3);
+  }
+  /*
+   * The bar's soft edges, without the stubs of the letters that met it.
+   * Each edge row is set to its own typical colour along the bar, which is the
+   * bar's anti-aliased edge everywhere a letter did not join it.
+   */
+  for (const y of [top - 1, bottom + 1]) {
+    if (y < 0 || y >= h) continue;
+    const tone = [0, 1, 2].map((c) => {
+      const values: number[] = [];
+      for (let x = barL; x <= barR; x += 1) values.push(rgb[(y * w + x) * 3 + c]);
+      return middleOf(values);
+    });
+    for (let x = barL; x <= barR; x += 1) {
+      out[(y * w + x) * 3] = tone[0];
+      out[(y * w + x) * 3 + 1] = tone[1];
+      out[(y * w + x) * 3 + 2] = tone[2];
+    }
+  }
+  const blank = await sharp(out, { raw: { width: w, height: h, channels: 3 } }).webp({ quality: 92 }).toBuffer();
+
+  // The lettering's own colour: the ink pixels nearest its typical level.
+  const inkRgb = [0, 0, 0];
+  let inkN = 0;
+  for (let i = 0; i < w * h; i += 1) {
+    if (!ink[i] || Math.abs(lum[i] - inkL) > 12) continue;
+    inkRgb[0] += rgb[i * 3]; inkRgb[1] += rgb[i * 3 + 1]; inkRgb[2] += rgb[i * 3 + 2];
+    inkN += 1;
+  }
+
+  return {
+    ok: true,
+    reason: `Read a design cut as one piece: the name standing on its bar${line ? ' and the line under it' : ''}. Everything but the bar was cleared for the customer's own words.`,
+    blank,
+    aspect: { width: fullW, height: fullH },
+    script: 'latin',
+    plateColor: hex(page[0], page[1], page[2]),
+    textColor: inkN ? hex(inkRgb[0] / inkN, inkRgb[1] / inkN, inkRgb[2] / inkN) : null,
+    weight: medianFill(nameParts) >= BOLD_FILL ? 700 : 400,
+    boxes,
+    ...(joined ? { face: 'script' } : {}),
   };
 }
 

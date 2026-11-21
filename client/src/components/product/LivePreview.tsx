@@ -142,7 +142,25 @@ export function fontStack(id: string | undefined | null): string {
   // Admins may enter a custom CSS family/stack for a product. Keep a dependable
   // loaded face at the end so the preview remains readable when that custom
   // font is not installed in the customer's browser.
-  return `${value}, ${PLATE_FONTS[0].stack}`;
+  return `${value}, ${standInFor(value)}`;
+}
+
+/**
+ * The served face nearest in kind to one the site cannot serve.
+ *
+ * A studio naming its own face -- "Yustine Signature" on the cut-out -- is
+ * naming something no customer has installed, so every customer saw the
+ * fallback. That fallback was always the plain sans, which turned a signature
+ * name into block lettering: the opposite of the piece. Falling back to the
+ * same KIND of face keeps a script a script. Decided from the name only,
+ * because that is all there is to go on.
+ */
+function standInFor(family: string): string {
+  const name = family.toLowerCase();
+  if (/script|signature|hand|callig|brush|cursive|vibes/.test(name)) return FONT_STACKS.script;
+  if (/serif/.test(name) && !/sans/.test(name)) return FONT_STACKS.serif;
+  if (/mono|code/.test(name)) return FONT_STACKS.mono;
+  return PLATE_FONTS[0].stack;
 }
 
 const COLOR_MAP: Record<string, string> = {
@@ -277,6 +295,14 @@ export interface PreviewPhotoBox {
    * was measured, which keep the older fitting.
    */
   base?: number;
+  /**
+   * A face for this line alone, as a font id. Set by the reader where the
+   * design sets one line apart -- the bold figures under a script name on a
+   * cut-out. Lines without it use the product's face and the customer's choice.
+   */
+  face?: string;
+  /** This line's own weight, where it differs from the rest of the lettering. */
+  weight?: number;
 }
 
 export interface PreviewPhoto {
@@ -969,7 +995,7 @@ const UNMEASURED: TextMetrics = { width: 0.62, ink: 1, ascent: 0.75 };
 const REFERENCE = 100;
 let scratch: CanvasRenderingContext2D | null | undefined;
 
-function useTextMetrics(): (value: string, stack: string) => TextMetrics {
+function useTextMetrics(): (value: string, stack: string, weight?: number) => TextMetrics {
   /*
    * Measured again once the webfonts arrive.
    *
@@ -987,10 +1013,11 @@ function useTextMetrics(): (value: string, stack: string) => TextMetrics {
 
   return useMemo(() => {
     void ready;
-    return (value: string, stack: string): TextMetrics => {
+    return (value: string, stack: string, weight = 400): TextMetrics => {
       if (scratch === undefined) scratch = document.createElement('canvas').getContext('2d');
       if (!scratch) return UNMEASURED;
-      scratch.font = `${REFERENCE}px ${stack}`;
+      // Measured at the weight it is drawn at: bold figures set wider than regular ones.
+      scratch.font = `${weight} ${REFERENCE}px ${stack}`;
       const m = scratch.measureText(value);
       const ascent = m.actualBoundingBoxAscent;
       const descent = m.actualBoundingBoxDescent;
@@ -1406,7 +1433,9 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
 
         const roomW = box.room * VW;
         const roomH = box.h * VH;
-        const m = measure(value, font);
+        const face = box.face ? fontStack(box.face) : font;
+        const weight = box.weight ?? config.defaults.fontWeight ?? 400;
+        const m = measure(value, face, weight);
 
         /*
          * Sized to the ink, not to the font size.
@@ -1449,7 +1478,7 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
         let size: number;
         let y: number;
         if (box.base !== undefined && !devanagari) {
-          const capital = measure('H', font).ascent;
+          const capital = measure('H', face, weight).ascent;
           const above = box.h * box.base * VH;
           const byCapitals = above / Math.max(0.01, capital);
           const byWidth = roomW / Math.max(0.01, m.width);
@@ -1469,8 +1498,8 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
             x={box.anchor * VW}
             y={y}
             fill={text}
-            fontFamily={font}
-            fontWeight={config.defaults.fontWeight ?? 400}
+            fontFamily={face}
+            fontWeight={weight}
             fontSize={size}
             textAnchor={anchor}
           >

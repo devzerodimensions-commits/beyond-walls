@@ -67,8 +67,14 @@ interface LetteringField {
  * overriding the studio's choice.
  *
  * So the question is started on the product's current face every time the
- * product is served, exactly as the lines are bound. Nothing is stored, and a
- * face the question does not offer is left alone rather than forced.
+ * product is served, exactly as the lines are bound. Nothing is stored.
+ *
+ * A face the question does not offer -- one the studio named itself, such as
+ * "Yustine Signature" on the cut-out -- starts the question unanswered. Left
+ * on its own default, the question's Grotesque won over the studio's face and
+ * the signature name previewed in block capitals. Unanswered, the preview
+ * shows the studio's face until the customer picks one, and an optional
+ * question left blank is accepted at checkout exactly as before.
  */
 export function alignLettering<T extends LetteringField>(
   fields: T[],
@@ -81,7 +87,9 @@ export function alignLettering<T extends LetteringField>(
     if (field.previewSlot !== 'fontFamily') return field;
     if (field.defaultValue === face) return field;
     const options = Array.isArray(field.options) ? field.options as { value?: unknown }[] : [];
-    if (!options.some((o) => o?.value === face)) return field;
+    if (!options.some((o) => o?.value === face)) {
+      return field.defaultValue ? { ...field, defaultValue: null } : field;
+    }
     return { ...field, defaultValue: face };
   });
 }

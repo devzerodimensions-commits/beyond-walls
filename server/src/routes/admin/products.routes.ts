@@ -781,7 +781,8 @@ async function ensureLetteringQuestion(
     select: { sortOrder: true },
   });
 
-  const start = CUSTOMER_FACES.some((f) => f.value === startsOn) ? startsOn : 'grotesque';
+  // A face of the studio's own that the question cannot offer leaves it unanswered; see alignLettering.
+  const start = !startsOn ? 'grotesque' : CUSTOMER_FACES.some((f) => f.value === startsOn) ? startsOn : null;
 
   await prisma.personalizationField.create({
     data: {
@@ -923,9 +924,14 @@ async function applyRead(product: ReadTarget, read: PlatePreview, explicit: bool
     defaults: {
       ...(read.plateColor ? { plateColor: read.plateColor } : {}),
       ...(read.textColor ? { textColor: read.textColor } : {}),
+      /*
+       * Failing that, what the shapes say: Devanagari, or a name whose
+       * letters run together, which is handwriting and set in the script.
+       */
       ...(chosenFont
         ? { fontFamily: chosenFont }
-        : read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
+        : read.script === 'devanagari' ? { fontFamily: 'devanagari' }
+          : read.face ? { fontFamily: read.face } : {}),
       /* How heavy the real lettering is, measured off the artwork. */
       fontWeight: read.weight,
     },
