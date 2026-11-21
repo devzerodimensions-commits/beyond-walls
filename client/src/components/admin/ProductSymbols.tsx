@@ -180,7 +180,7 @@ export function ProductSymbols({
       <p className="text-2xs uppercase tracking-architect text-ink">Symbols customers can choose</p>
       <p className="mb-2 mt-1 text-2xs leading-relaxed text-ink-400">
         Shared across every plate that has a symbol, so a symbol added here is offered on all of them —
-        and on products you add later.
+        and on products you add later. Ticked ones are offered on this plate.
       </p>
 
       {symbols.length ? (
@@ -193,14 +193,23 @@ export function ProductSymbols({
                 <button
                   type="button"
                   aria-pressed={on}
-                  title={on ? `${symbol.label} — offered` : `${symbol.label} — not offered`}
+                  title={on ? `${symbol.label} — offered. Click to take it off this plate.` : `${symbol.label} — not offered. Click to offer it.`}
                   onClick={() => toggle(symbol)}
                   className={clsx(
-                    'flex h-16 w-20 items-center justify-center border bg-paper-off p-1.5 transition-colors',
-                    on ? 'border-ink' : 'border-stone-line opacity-40 hover:opacity-70',
+                    'relative flex h-16 w-20 items-center justify-center border bg-paper-off p-1.5 transition-colors',
+                    on ? 'border-ink' : 'border-dashed border-stone-line opacity-45 hover:opacity-75',
                   )}
                 >
                   <img src={assetUrl(symbol.url)} alt={symbol.label} className="max-h-full max-w-full object-contain" />
+                  <span
+                    className={clsx(
+                      'absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border text-[0.55rem] leading-none',
+                      on ? 'border-ink bg-ink text-paper' : 'border-stone-line bg-paper text-ink-300',
+                    )}
+                    aria-hidden="true"
+                  >
+                    {on ? '✓' : ''}
+                  </span>
                 </button>
                 {editing === symbol.id ? (
                   <input
