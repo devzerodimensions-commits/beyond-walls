@@ -68,6 +68,48 @@ async function countReferences(url: string, ignore?: { model: string; id: string
   });
   count += enquiries;
 
+  /*
+   * Everywhere else a picture's address can be written down.
+   *
+   * The checks above are the columns that hold one address each. A good deal
+   * of the site keeps addresses inside JSON instead, and none of it was looked
+   * at, so a file was "unused" when it was not:
+   *
+   *  - a product's preview: the blank plate, and artwork chosen by hand
+   *  - the page builder's sections, and the About page's photographs, which
+   *    are settings outside the brand and SEO groups
+   *  - the symbol pictures a customer picks from
+   *  - a customer's own upload inside their cart or their ORDER, which is the
+   *    artwork the studio has to cut from -- the one file that must never go
+   *  - a product's uploaded video, its share image, a category's share image,
+   *    a material swatch, a page's share image, a picture inside page text
+   *
+   * Deleting from the media library could therefore delete the About page's
+   * photograph, or the artwork an order is waiting to be made from. One query
+   * reads all of them as text, so a place added later only needs a line here.
+   * The address goes in as a parameter, never into the SQL. LIKE treats "_"
+   * as a wildcard, which can only find MORE matches -- so it errs towards
+   * keeping a file, never towards deleting one.
+   */
+  const pattern = `%${url}%`;
+  const [row] = await prisma.$queryRaw<{ n: bigint }[]>`
+    SELECT
+        (SELECT COUNT(*) FROM "Product"
+           WHERE "livePreviewConfig"::text LIKE ${pattern} OR "videoUrl" = ${url} OR "ogImage" = ${url})
+      + (SELECT COUNT(*) FROM "Category" WHERE "ogImage" = ${url})
+      + (SELECT COUNT(*) FROM "AttributeValue" WHERE "image" = ${url})
+      + (SELECT COUNT(*) FROM "PersonalizationField" WHERE "options"::text LIKE ${pattern})
+      + (SELECT COUNT(*) FROM "ProductVariant" WHERE "options"::text LIKE ${pattern})
+      + (SELECT COUNT(*) FROM "CartItem" WHERE "personalization"::text LIKE ${pattern})
+      + (SELECT COUNT(*) FROM "OrderItem" WHERE "personalization"::text LIKE ${pattern})
+      + (SELECT COUNT(*) FROM "PageSection" WHERE "config"::text LIKE ${pattern})
+      + (SELECT COUNT(*) FROM "GalleryItem" WHERE "videoUrl" = ${url})
+      + (SELECT COUNT(*) FROM "Page" WHERE "content" LIKE ${pattern} OR "ogImage" = ${url})
+      + (SELECT COUNT(*) FROM "Setting"
+           WHERE "group" NOT IN ('brand', 'seo') AND "value"::text LIKE ${pattern})
+      AS n`;
+  count += Number(row?.n ?? 0);
+
   return count;
 }
 

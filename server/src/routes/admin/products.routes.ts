@@ -938,6 +938,20 @@ async function applyRead(product: ReadTarget, read: PlatePreview, explicit: bool
     data: { livePreviewEnabled: enable, livePreviewTemplate: 'photo', livePreviewConfig: config },
   });
 
+  /*
+   * The blank this one replaces.
+   *
+   * Every read paints a new blank plate and stores it, and nothing ever took
+   * the previous one away -- so each re-read left a picture behind that no
+   * page could reach. Sixteen had piled up in two days of setting products
+   * up, and reading a design file again until it is right is now the normal
+   * way of working. Removed only once nothing else points at it.
+   */
+  const previous = (product.livePreviewConfig as { photo?: { image?: string } } | null)?.photo?.image;
+  if (previous && previous !== config.photo.image) {
+    await deleteFileIfUnreferenced(previous).catch(() => undefined);
+  }
+
   let added: string[] = [];
   if (enable) {
     added = await ensureLineQuestions(product.id, boxes.map((b) => b.slot), published, explicit);
