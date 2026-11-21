@@ -19,6 +19,7 @@ import { DesignLibrary } from '../../components/admin/DesignLibrary';
 import { ReadPhotograph } from '../../components/admin/ReadPhotograph';
 import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
 import { FontChoice } from '../../components/admin/FontChoice';
+import { ProductSymbols } from '../../components/admin/ProductSymbols';
 import {
   LivePreview, PLATE_FONTS, PREVIEW_SLOTS, SIZEABLE_SLOTS, buildPreviewSlots, previewIsUsable,
   resolvePreviewConfig,
@@ -561,6 +562,24 @@ export default function AdminProductEdit() {
                       set('livePreviewConfig', nextConfig);
                     }}
                     ready={previewIsUsable(form.livePreviewTemplate, form.livePreviewConfig)}
+                  />
+
+                  {/*
+                    * The symbols this plate offers, where the plate is set up.
+                    *
+                    * The library itself is shared -- the same Om belongs on
+                    * every plate -- but it is managed from here as well as
+                    * from Settings, because needing a symbol while setting a
+                    * product up and having to leave the product to add it is
+                    * two places for one job.
+                    */}
+                  <ProductSymbols
+                    productId={id!}
+                    fields={product?.personalization ?? []}
+                    hasSymbolBox={
+                      ((form.livePreviewConfig as { photo?: { boxes?: { slot?: string }[] } })?.photo?.boxes ?? [])
+                        .some((box) => box?.slot === 'logo')
+                    }
                   />
 
                   {/*
@@ -2529,7 +2548,14 @@ function FieldForm({
   onCancel: () => void;
 }) {
   const [form, setForm] = useState(draft);
-  const needsOptions = ['SELECT', 'RADIO', 'COLOR', 'FONT'].includes(form.type);
+  /*
+   * A symbol question's choices are pictures from the shared library, set in
+   * the Live preview panel. Shown here as label-and-value text boxes, they
+   * were a row of file addresses: no way to tell an Om from a Swastik, and
+   * one typo away from a plate drawing nothing.
+   */
+  const symbolField = form.previewSlot === 'logo';
+  const needsOptions = ['SELECT', 'RADIO', 'COLOR', 'FONT'].includes(form.type) && !symbolField;
 
   return (
     <form
@@ -2592,6 +2618,13 @@ function FieldForm({
           onChange={(e) => setForm({ ...form, priceDelta: e.target.value === '' ? null : Number(e.target.value) })}
         />
       </div>
+
+      {symbolField ? (
+        <p className="border border-stone-line p-4 text-xs leading-relaxed a-muted">
+          The symbols this plate offers are set under Details → Live preview, where you can see them.
+          Pictures, not typed values.
+        </p>
+      ) : null}
 
       {needsOptions ? (
         <div className="border border-stone-line p-4">
