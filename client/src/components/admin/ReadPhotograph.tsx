@@ -56,9 +56,9 @@ interface ReadResult {
 function sampleSlots(config: Record<string, unknown>): Record<string, string> {
   const SAMPLES: Record<string, string> = {
     number: 'A 101',
-    line1: 'YOUR NAME',
-    line2: 'FAMILY',
-    line3: 'EST 2020',
+    line1: 'Your Name',
+    line2: 'Family',
+    line3: 'A 101',
   };
   const base = resolvePreviewConfig('photo', config).placeholders as Record<string, string>;
   const boxes = (config.photo as { boxes?: { slot: string }[] } | undefined)?.boxes ?? [];

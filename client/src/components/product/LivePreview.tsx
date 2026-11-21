@@ -367,6 +367,15 @@ export const PREVIEW_PRESETS: Record<string, Partial<PreviewConfig>> = {
   'nameplate-minimal': {
     placeholders: { number: 'A 01', line1: 'YOUR NAME' },
   },
+  /*
+   * A plate read from its picture can be lettered in anything, script
+   * included, and a script in capitals is the one way to make it look like a
+   * mistake. So its sample is in ordinary case. On the shop each line shows
+   * its own question's example instead; this is the fallback.
+   */
+  photo: {
+    placeholders: { line1: 'Your Name' },
+  },
   'nameplate-classic': {
     plate: { inset: 30, radius: 4, showScrews: false, borderOnLight: true },
     placeholders: { line1: 'Your Name' },
