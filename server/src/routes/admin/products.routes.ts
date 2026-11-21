@@ -809,7 +809,8 @@ const LINE_LABELS: Record<string, string> = {
   line1: 'First line',
   line2: 'Second line',
   line3: 'Third line',
-  number: 'House / flat number',
+  // Only reached on a plate with four lines. Still a position, not a guess.
+  number: 'Fourth line',
 };
 const LINE_SLOTS = new Set(['number', 'line1', 'line2', 'line3']);
 

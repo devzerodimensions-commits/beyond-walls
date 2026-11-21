@@ -19,8 +19,19 @@
  * step with its own preview however its questions are edited afterwards.
  */
 
-/** Slots a line of writing can be bound to. */
-const TEXT_SLOTS = ['number', 'line1', 'line2', 'line3'] as const;
+/**
+ * Slots a line of writing can be bound to, in the order lines are given out
+ * to a plate nobody has asked any questions about yet.
+ *
+ * Name first. Across the studio's plates the name is the top line on four of
+ * six; the flat number is on top on two. This list used to start with the
+ * number, so a fresh plate's top line -- usually the big script name -- was
+ * labelled "House / flat number" and made the one required question, and a
+ * customer would have been told to type their flat number into the name.
+ * A plain "First line" is never wrong in that way; which line is the number
+ * is for the studio to say, and the editor asks it to.
+ */
+const TEXT_SLOTS = ['line1', 'line2', 'line3', 'number'] as const;
 
 /*
  * `logo` is drawable but never bound automatically: it holds a picture the
