@@ -294,10 +294,16 @@ export function PhotoPlateSetup({
             <p className="mb-3 text-2xs leading-relaxed text-ink-500">
               Drag a box over each line the customer will change — the name, the surname, the
               number. If the plate has a symbol customers may swap, such as a Ganesha or an Om, box it
-              too and mark it as a symbol below. Leave out anything that stays on every plate, like a
+              too and mark it as a symbol in the list. Leave out anything that stays on every plate, like a
               house sign. A box can be loose; a letter that sticks out of it is still taken whole.
             </p>
-            <div className="relative mx-auto w-fit max-w-full select-none">
+            {/*
+              * The boxes are listed beside the plate, not under it. Under it, the
+              * first box drawn made the list appear, the dialog re-centred and the
+              * plate jumped -- so every box after the first landed somewhere else.
+              */}
+            <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start sm:justify-center">
+            <div className="relative w-fit max-w-full shrink-0 select-none">
               <img src={assetUrl(flat.url)} alt="The plate, straightened" className="block max-h-[58vh] w-auto max-w-full" draggable={false} />
               <svg
                 ref={surface}
@@ -336,8 +342,9 @@ export function PhotoPlateSetup({
               ))}
             </div>
 
+            <div className="w-full sm:w-72 sm:shrink-0">
             {lines.length ? (
-              <ul className="mx-auto mt-4 max-w-md space-y-2">
+              <ul className="space-y-2">
                 {lines.map((r, i) => (
                   // eslint-disable-next-line react/no-array-index-key
                   <li key={i} className="flex flex-wrap items-center gap-2 text-xs">
@@ -369,11 +376,16 @@ export function PhotoPlateSetup({
               </ul>
             ) : null}
             {lines.some((r) => r.kind === 'symbol') ? (
-              <p className="mx-auto mt-2 max-w-md text-2xs leading-relaxed text-ink-400">
+              <p className="mt-2 text-2xs leading-relaxed text-ink-400">
                 The symbol is taken off the plate and added to your symbol library. Customers then
                 choose from every symbol in the library; the plate starts on this one.
               </p>
             ) : null}
+            {!lines.length ? (
+              <p className="text-2xs leading-relaxed text-ink-400">Boxes you draw are listed here, where you can mark each one as words or a symbol.</p>
+            ) : null}
+            </div>
+            </div>
           </div>
         ) : null}
       </Modal>
