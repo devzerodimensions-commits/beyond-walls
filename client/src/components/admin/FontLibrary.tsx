@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api';
 import { useToast } from '../../context/StoreProvider';
@@ -73,6 +73,11 @@ export function FontLibrary() {
   });
 
   const list = fonts.data ?? [];
+
+  // The shop's settings can lag a minute behind an upload; this list cannot, so it declares the faces itself.
+  useEffect(() => {
+    if (fonts.data) applyUploadedFonts(fonts.data);
+  }, [fonts.data]);
 
   return (
     <AdminCard

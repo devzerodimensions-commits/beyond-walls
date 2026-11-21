@@ -38,6 +38,27 @@ function fractionOf(event: { clientX: number; clientY: number }, element: Elemen
   };
 }
 
+/**
+ * Follows one press across the whole window until it is let go.
+ *
+ * Listening on the picture alone lost a quick drag the moment the pointer
+ * outran it, and the dot stopped short of the corner. The release is
+ * reported with its own position, so the dot always lands where it was
+ * dropped.
+ */
+function follow(element: Element, onMove: (p: Point) => void, onEnd: (p: Point) => void) {
+  const move = (e: PointerEvent) => onMove(fractionOf(e, element));
+  const end = (e: PointerEvent) => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', end);
+    window.removeEventListener('pointercancel', end);
+    onEnd(fractionOf(e, element));
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
+}
+
 export function PhotoPlateSetup({
   productId, photos, busy, onMarked,
 }: {
@@ -56,7 +77,6 @@ export function PhotoPlateSetup({
   const [flat, setFlat] = useState<{ url: string; width: number; height: number } | null>(null);
   const [lines, setLines] = useState<Rect[]>([]);
   const [drawing, setDrawing] = useState<{ from: Point; to: Point } | null>(null);
-  const dragging = useRef<number | null>(null);
   const surface = useRef<SVGSVGElement>(null);
 
   const reset = () => {
@@ -75,31 +95,47 @@ export function PhotoPlateSetup({
   });
 
   // ---- corners --------------------------------------------------------------
-  const onCornerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (dragging.current === null || !surface.current) return;
+  const moveCorner = (index: number, point: Point) =>
+    setCorners((current) => current.map((c, i) => (i === index ? point : c)));
+
+  /*
+   * Pressing anywhere on the photograph brings the nearest dot there, and it
+   * follows the pointer until it is let go. Clicking the plate's four corners
+   * one after another is all it takes; dragging works too.
+   */
+  const onPhotoDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (!surface.current) return;
+    event.preventDefault();
     const point = fractionOf(event, surface.current);
-    setCorners((current) => current.map((c, i) => (i === dragging.current ? point : c)));
+    let nearest = 0;
+    corners.forEach((c, i) => {
+      if (Math.hypot(c.x - point.x, c.y - point.y) < Math.hypot(corners[nearest].x - point.x, corners[nearest].y - point.y)) nearest = i;
+    });
+    moveCorner(nearest, point);
+    follow(surface.current, (p) => moveCorner(nearest, p), (p) => moveCorner(nearest, p));
+  };
+  const onDotDown = (index: number) => (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!surface.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    follow(surface.current, (p) => moveCorner(index, p), (p) => moveCorner(index, p));
   };
 
   // ---- line boxes -----------------------------------------------------------
   const onDrawStart = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (!surface.current) return;
-    (event.target as Element).setPointerCapture?.(event.pointerId);
-    const point = fractionOf(event, surface.current);
-    setDrawing({ from: point, to: point });
-  };
-  const onDrawMove = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!drawing || !surface.current) return;
-    setDrawing({ ...drawing, to: fractionOf(event, surface.current) });
-  };
-  const onDrawEnd = () => {
-    if (!drawing) return;
-    const x = Math.min(drawing.from.x, drawing.to.x);
-    const y = Math.min(drawing.from.y, drawing.to.y);
-    const w = Math.abs(drawing.to.x - drawing.from.x);
-    const h = Math.abs(drawing.to.y - drawing.from.y);
-    setDrawing(null);
-    if (w > 0.03 && h > 0.015) setLines((current) => [...current, { x, y, w, h }].slice(0, 6));
+    event.preventDefault();
+    const from = fractionOf(event, surface.current);
+    setDrawing({ from, to: from });
+    follow(
+      surface.current,
+      (to) => setDrawing({ from, to }),
+      (to) => {
+        setDrawing(null);
+        const box = { x: Math.min(from.x, to.x), y: Math.min(from.y, to.y), w: Math.abs(to.x - from.x), h: Math.abs(to.y - from.y) };
+        if (box.w > 0.03 && box.h > 0.015) setLines((current) => [...current, box].slice(0, 6));
+      },
+    );
   };
   const live = drawing && {
     x: Math.min(drawing.from.x, drawing.to.x),
@@ -200,8 +236,8 @@ export function PhotoPlateSetup({
         {step === 'corners' && photo ? (
           <div>
             <p className="mb-3 text-2xs leading-relaxed text-ink-500">
-              Drag each dot onto a corner of the plate itself — not the wall or the shadow. Order does
-              not matter for you; the dots are labelled.
+              Click each corner of the plate itself — not the wall or its shadow. The nearest dot
+              jumps there; drag a dot to fine-tune it.
             </p>
             <div className="relative mx-auto w-full max-w-2xl select-none">
               <img src={assetUrl(photo)} alt="" className="block w-full" draggable={false} />
@@ -209,10 +245,8 @@ export function PhotoPlateSetup({
                 ref={surface}
                 viewBox="0 0 1 1"
                 preserveAspectRatio="none"
-                className="absolute inset-0 h-full w-full touch-none"
-                onPointerMove={onCornerMove}
-                onPointerUp={() => { dragging.current = null; }}
-                onPointerLeave={() => { dragging.current = null; }}
+                className="absolute inset-0 h-full w-full cursor-crosshair touch-none"
+                onPointerDown={onPhotoDown}
               >
                 <polygon
                   points={corners.map((c) => `${c.x},${c.y}`).join(' ')}
@@ -230,11 +264,7 @@ export function PhotoPlateSetup({
                   title={CORNER_NAMES[i]}
                   className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border-2 border-white bg-[#0E7A57] shadow"
                   style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%` }}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    dragging.current = i;
-                    surface.current?.setPointerCapture?.(e.pointerId);
-                  }}
+                  onPointerDown={onDotDown(i)}
                 />
               ))}
             </div>
@@ -256,8 +286,6 @@ export function PhotoPlateSetup({
                 preserveAspectRatio="none"
                 className="absolute inset-0 h-full w-full cursor-crosshair touch-none"
                 onPointerDown={onDrawStart}
-                onPointerMove={onDrawMove}
-                onPointerUp={onDrawEnd}
               >
                 {[...lines, ...(live ? [live] : [])].map((r, i) => (
                   <rect
