@@ -597,6 +597,7 @@ export default function AdminProductEdit() {
                     template={form.livePreviewTemplate}
                     config={form.livePreviewConfig}
                     images={product?.images ?? []}
+                    symbol={product?.personalization?.find((f) => f.previewSlot === 'logo')?.defaultValue ?? null}
                     onChange={(next) => set('livePreviewConfig', next)}
                   />
                 </div>
@@ -1360,10 +1361,12 @@ const ASPECT_PRESETS = [
  * hands it back to the template.
  */
 function PreviewConfigEditor({
-  template, config, onChange, images = [],
+  template, config, onChange, images = [], symbol = null,
 }: {
   template: string;
   config: Record<string, unknown>;
+  /** The symbol this product's plate starts on, drawn so the editor shows the whole plate. */
+  symbol?: string | null;
   onChange: (next: Record<string, unknown>) => void;
   /** The product's own pictures, so a blank plate already uploaded can be used. */
   images?: { url: string; alt?: string | null }[];
@@ -1663,7 +1666,7 @@ function PreviewConfigEditor({
         <LivePreview
           template={template || 'nameplate-minimal'}
           config={config}
-          slots={{}}
+          slots={symbol ? { logo: symbol } : {}}
           className="border border-stone-line"
         />
       )}
@@ -2307,7 +2310,11 @@ function PersonalizationTab({
     onError: (err) => push(err instanceof ApiError ? err.message : 'Could not apply preset', 'error'),
   });
 
-  const previewSlots = useMemo(() => buildPreviewSlots(fields, demoValues), [fields, demoValues]);
+  const previewSlots = useMemo(() => {
+    const slots = buildPreviewSlots(fields, demoValues);
+    const symbol = fields.find((f) => f.previewSlot === 'logo')?.defaultValue;
+    return symbol && !slots.logo ? { ...slots, logo: symbol } : slots;
+  }, [fields, demoValues]);
 
   /*
    * Questions this plate has no line for.
@@ -2453,7 +2460,7 @@ function PersonalizationTab({
             <>
               <div className="space-y-3">
                 {fields
-                  .filter((f) => f.previewSlot)
+                  .filter((f) => f.previewSlot && f.previewSlot !== 'logo')
                   .map((field) => (
                     <Input
                       key={field.id}

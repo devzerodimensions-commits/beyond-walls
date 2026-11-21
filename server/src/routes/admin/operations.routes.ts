@@ -17,6 +17,7 @@ import { applyImageEdit, restoreOriginalImage, type ImageEdit } from '../../serv
 import { renderOrderDocument, type DocumentKind } from '../../services/orderDocument.service';
 import { fileReferenceCount } from '../../services/media.service';
 import { addFont, listFonts, removeFont, updateFont } from '../../services/fontLibrary.service';
+import { addSymbol, listSymbols, removeSymbol, updateSymbol } from '../../services/symbolLibrary.service';
 import {
   assignAwb, bookShipment, checkServiceability, shiprocketConfigured, testConnection,
 } from '../../services/shiprocket.service';
@@ -973,6 +974,7 @@ router.put(
      * copy would quietly undo a font uploaded since.
      */
     delete (values as Record<string, unknown>)['preview.fonts'];
+    delete (values as Record<string, unknown>)['preview.symbols'];
     await setSettings(values as Record<string, unknown>);
     res.json({ success: true, data: await getAllSettings() });
   }),
@@ -1017,6 +1019,48 @@ router.delete(
   '/fonts/:id',
   asyncHandler(async (req, res) => {
     res.json({ success: true, data: await removeFont(req.params.id) });
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Symbols customers can put on a plate
+// ---------------------------------------------------------------------------
+router.get(
+  '/symbols',
+  asyncHandler(async (_req, res) => {
+    res.json({ success: true, data: await listSymbols() });
+  }),
+);
+
+router.post(
+  '/symbols',
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    const file = req.file as Express.Multer.File | undefined;
+    if (!file) throw ApiError.badRequest('Choose a picture of the symbol — PNG, JPG or WebP.');
+    const symbols = await addSymbol(file, {
+      label: typeof req.body?.label === 'string' ? req.body.label : undefined,
+      tint: req.body?.tint === undefined ? true : String(req.body.tint) !== 'false',
+    });
+    res.status(201).json({ success: true, data: symbols });
+  }),
+);
+
+router.patch(
+  '/symbols/:id',
+  asyncHandler(async (req, res) => {
+    const symbols = await updateSymbol(req.params.id, {
+      label: typeof req.body?.label === 'string' ? req.body.label : undefined,
+      tint: typeof req.body?.tint === 'boolean' ? req.body.tint : undefined,
+    });
+    res.json({ success: true, data: symbols });
+  }),
+);
+
+router.delete(
+  '/symbols/:id',
+  asyncHandler(async (req, res) => {
+    res.json({ success: true, data: await removeSymbol(req.params.id) });
   }),
 );
 

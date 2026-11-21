@@ -934,10 +934,13 @@ async function ensureLineQuestions(
 async function applyRead(product: ReadTarget, read: PlatePreview, explicit: boolean) {
   const published = product.personalization.filter((f) => f.status === 'PUBLISHED');
   const order = slotOrder(published);
-  const boxes = read.boxes.slice(0, order.length).map((box, index) => ({
-    ...box,
-    slot: order[index],
-  }));
+  // A symbol's box stays a symbol's box; only lines of writing are matched to questions.
+  const lineBoxes = read.boxes.filter((box) => box.slot !== 'logo');
+  const symbolBoxes = read.boxes.filter((box) => box.slot === 'logo');
+  const boxes = [
+    ...lineBoxes.slice(0, order.length).map((box, index) => ({ ...box, slot: order[index] })),
+    ...symbolBoxes.map((box) => ({ ...box, slot: 'logo' })),
+  ];
 
   /*
    * A face the studio has already chosen is knowledge the reader does not
@@ -990,8 +993,60 @@ async function applyRead(product: ReadTarget, read: PlatePreview, explicit: bool
   if (enable) {
     added = await ensureLineQuestions(product.id, boxes.map((b) => b.slot), published, explicit);
     await ensureLetteringQuestion(product.id, read.script, config.defaults.fontFamily);
+    if (symbolBoxes.length) {
+      const asked = await ensureSymbolQuestion(product.id, read.symbols?.[0]?.url ?? null);
+      if (asked) added.push(asked);
+    }
   }
   return { boxes, config, added, enabled: enable };
+}
+
+/**
+ * Gives a plate with a symbol on it a question for choosing that symbol.
+ *
+ * The options are left empty on purpose: an empty list means "every symbol
+ * in the library", filled in each time the product is served (see
+ * alignSymbols), so a symbol uploaded later appears here without anybody
+ * editing this product. It starts on the plate's own symbol, the one taken
+ * off its picture, so an untouched plate still looks like the photograph. A
+ * question that already exists keeps its own choices; only an empty starting
+ * symbol is filled in.
+ */
+async function ensureSymbolQuestion(productId: string, plateSymbol: string | null): Promise<string | null> {
+  const existing = await prisma.personalizationField.findFirst({
+    where: { productId, previewSlot: 'logo' },
+    select: { id: true, defaultValue: true },
+  });
+  if (existing) {
+    if (plateSymbol && !existing.defaultValue) {
+      await prisma.personalizationField.update({ where: { id: existing.id }, data: { defaultValue: plateSymbol } });
+    }
+    return null;
+  }
+  const last = await prisma.personalizationField.findFirst({
+    where: { productId },
+    orderBy: { sortOrder: 'desc' },
+    select: { sortOrder: true },
+  });
+  const keys = new Set((await prisma.personalizationField.findMany({ where: { productId }, select: { key: true } })).map((f) => f.key));
+  let key = 'symbol';
+  for (let n = 2; keys.has(key); n += 1) key = `symbol-${n}`;
+  await prisma.personalizationField.create({
+    data: {
+      productId,
+      key,
+      label: 'Symbol',
+      type: 'RADIO',
+      helpText: 'Choose the symbol for your plate — or none.',
+      required: false,
+      options: [],
+      defaultValue: plateSymbol,
+      sortOrder: (last?.sortOrder ?? 0) + 1,
+      status: 'PUBLISHED',
+      previewSlot: 'logo',
+    },
+  });
+  return 'Symbol';
 }
 
 async function buildPreviewFromPhoto(productId: string, force = false) {

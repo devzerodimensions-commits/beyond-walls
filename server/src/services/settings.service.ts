@@ -431,6 +431,17 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: 'Uploaded lettering fonts',
     value: [],
   },
+  /**
+   * Symbols customers can choose for a plate -- Ganesha, Om, Swastik and the
+   * like. Written only through /api/admin/symbols; see
+   * services/symbolLibrary.service.ts.
+   */
+  {
+    key: 'preview.symbols',
+    group: 'preview',
+    label: 'Plate symbols',
+    value: [],
+  },
 ];
 
 const PUBLIC_GROUPS = new Set([

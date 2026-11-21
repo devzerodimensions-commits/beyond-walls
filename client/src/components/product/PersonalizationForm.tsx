@@ -237,6 +237,22 @@ function PersonalizationInput({
     return (
       <FieldWrap label={label} required={required} error={error} hint={field.helpText ?? undefined}>
         <div className="mt-1 flex flex-wrap gap-2">
+          {/* A plate without a symbol is a real choice, so it is offered rather than hidden in a second click. */}
+          {!required && !field.options.some((option) => !option.value) ? (
+            <button
+              type="button"
+              title="No symbol"
+              aria-label="No symbol"
+              aria-pressed={!value}
+              onClick={() => onChange('')}
+              className={clsx(
+                'flex h-14 w-14 items-center justify-center border bg-paper p-1.5 transition-colors',
+                !value ? 'border-ink' : 'border-stone-line hover:border-ink-300',
+              )}
+            >
+              <span className="text-2xs leading-none text-ink-400">None</span>
+            </button>
+          ) : null}
           {field.options.map((option) => (
             <button
               key={option.value || option.label}

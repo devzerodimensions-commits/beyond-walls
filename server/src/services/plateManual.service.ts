@@ -7,8 +7,9 @@ import { readStored } from './mediaFile.service';
 import { getStorage } from './storage.service';
 import {
   BOLD_FILL, MAX_OUT, components, hex, lumaOf,
-  type Mark, type PlateAnalysis, type PlateBox, type PlatePreview,
+  type CapturedSymbol, type Mark, type PlateAnalysis, type PlateBox, type PlatePreview,
 } from './plateText.service';
+import { saveSymbol } from './symbolLibrary.service';
 
 /**
  * A preview from a photograph, with the studio pointing.
@@ -36,7 +37,12 @@ import {
 
 /** Fractions of the picture, so they survive any resize. */
 export interface Point { x: number; y: number }
-export interface Rect { x: number; y: number; w: number; h: number }
+export interface Rect {
+  x: number; y: number; w: number; h: number;
+  /** A box over a symbol rather than a line of words, and what to call that symbol. */
+  kind?: 'words' | 'symbol';
+  label?: string;
+}
 
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 const unit = (n: number) => Math.min(1, Math.max(0, n));
@@ -59,7 +65,9 @@ export function parseRects(raw: unknown): Rect[] {
     }
     const x = unit(r.x);
     const y = unit(r.y);
-    return { x, y, w: Math.min(1 - x, Math.max(0, r.w)), h: Math.min(1 - y, Math.max(0, r.h)) };
+    const kind = r.kind === 'symbol' ? 'symbol' as const : 'words' as const;
+    const label = typeof r.label === 'string' ? r.label.replace(/[<>"]/g, '').trim().slice(0, 40) : '';
+    return { x, y, w: Math.min(1 - x, Math.max(0, r.w)), h: Math.min(1 - y, Math.max(0, r.h)), kind, label };
   });
 }
 
@@ -200,6 +208,8 @@ export async function analyseMarked(source: Buffer, rects: Rect[]): Promise<Plat
 
   const ink = new Uint8Array(w * h);
   const lines: Line[] = [];
+  /** Symbols marked on the plate: painted out like the words, and kept as shapes. */
+  const symbolMarks: { line: Line; label: string; coverage: Float32Array }[] = [];
   const plateSamples: number[][] = [];
   const inkSamples: number[][] = [];
 
@@ -343,6 +353,29 @@ export async function analyseMarked(source: Buffer, rects: Rect[]): Promise<Plat
     while (foot > top && rows[foot - top] < busiest * 0.35) foot -= 1;
 
     for (let i = 0; i < w * h; i += 1) if (mask[i]) ink[i] = 1;
+    if (r.kind === 'symbol') {
+      /*
+       * How much of each pixel is symbol, from how far it stands from the
+       * plate -- so its soft edge comes away soft rather than jagged. Only the
+       * marks taken for this box count, never the plate around them.
+       */
+      const coverage = new Float32Array(w * h);
+      for (let y = Math.max(0, top - 2); y <= Math.min(h - 1, bottom + 2); y += 1) {
+        for (let x = Math.max(X0, left - 2); x <= Math.min(X1, right + 2); x += 1) {
+          const i = y * w + x;
+          let near = mask[i] === 1;
+          for (let dy = -1; dy <= 1 && !near; dy += 1) {
+            for (let dx = -1; dx <= 1 && !near; dx += 1) {
+              const j = (y + dy) * w + (x + dx);
+              if (j >= 0 && j < w * h && mask[j]) near = true;
+            }
+          }
+          if (near) coverage[i] = Math.min(1, Math.max(0, (stand(x, y) - cut * 0.4) / (core * 0.8)));
+        }
+      }
+      symbolMarks.push({ line: { rect: { x0, y0, x1, y1 }, left, right, top, bottom, foot, marks }, label: r.label || 'Symbol', coverage });
+      continue;
+    }
     lines.push({ rect: { x0, y0, x1, y1 }, left, right, top, bottom, foot, marks });
 
     for (let x = X0; x <= X1; x += 5) {
@@ -360,7 +393,7 @@ export async function analyseMarked(source: Buffer, rects: Rect[]): Promise<Plat
   }
 
   // ---- Paint out what was marked, and put the surface's grain back ----
-  const tallest = Math.max(...lines.map((l) => l.bottom - l.top + 1));
+  const tallest = Math.max(...[...lines, ...symbolMarks.map((s) => s.line)].map((l) => l.bottom - l.top + 1));
   const grow = Math.max(2, Math.round(tallest * 0.08));
   const patch = new Uint8Array(w * h);
   for (let y = 0; y < h; y += 1) {
@@ -489,17 +522,61 @@ export async function analyseMarked(source: Buffer, rects: Rect[]): Promise<Plat
    * a plain sans that looks nothing like the piece; the studio can still
    * choose another.
    */
-  const busiest = lines.reduce((a, b) => (b.marks.length > a.marks.length ? b : a));
-  const widestMark = Math.max(...busiest.marks.map((m) => m.w));
-  const joined = widestMark >= (busiest.right - busiest.left + 1) * 0.4 && widestMark > (busiest.bottom - busiest.top + 1) * 1.5;
-  const heights = busiest.marks.filter((m) => m.n >= 20).map((m) => m.h).sort((p, q) => p - q);
-  const smallLetters = heights.length >= 4 && heights[heights.length >> 1] <= heights[heights.length - 1] * 0.5;
-  const handwriting = joined || smallLetters;
+  let handwriting = false;
+  if (lines.length) {
+    const busiest = lines.reduce((a, b) => (b.marks.length > a.marks.length ? b : a));
+    const widestMark = Math.max(...busiest.marks.map((m) => m.w));
+    const joined = widestMark >= (busiest.right - busiest.left + 1) * 0.4 && widestMark > (busiest.bottom - busiest.top + 1) * 1.5;
+    const heights = busiest.marks.filter((m) => m.n >= 20).map((m) => m.h).sort((p, q) => p - q);
+    const smallLetters = heights.length >= 4 && heights[heights.length >> 1] <= heights[heights.length - 1] * 0.5;
+    handwriting = joined || smallLetters;
+  }
+
+  /*
+   * Each symbol's box, and the symbol itself cut out as a shape.
+   *
+   * The box is the symbol's own footprint, centred where it sat, so a symbol
+   * the customer picks instead is drawn in exactly that space. The cut-out
+   * goes to the library as the plate's own symbol, which is what the plate
+   * shows until a customer chooses another.
+   */
+  const captured: CapturedSymbol[] = [];
+  for (const symbol of symbolMarks) {
+    const { left, right, top, bottom } = symbol.line;
+    const pad = Math.round(Math.max(right - left, bottom - top) * 0.03);
+    const sx0 = Math.max(0, left - pad), sy0 = Math.max(0, top - pad);
+    const sx1 = Math.min(w - 1, right + pad), sy1 = Math.min(h - 1, bottom + pad);
+    const cw = sx1 - sx0 + 1;
+    const ch = sy1 - sy0 + 1;
+    const shapeRaw = Buffer.alloc(cw * ch * 4);
+    const colourRaw = Buffer.alloc(cw * ch * 4);
+    for (let y = 0; y < ch; y += 1) {
+      for (let x = 0; x < cw; x += 1) {
+        const i = (y + sy0) * w + (x + sx0);
+        const o = (y * cw + x) * 4;
+        const a = Math.round(symbol.coverage[i] * 255);
+        shapeRaw[o + 3] = a;
+        colourRaw[o] = orig[i * 3]; colourRaw[o + 1] = orig[i * 3 + 1]; colourRaw[o + 2] = orig[i * 3 + 2];
+        colourRaw[o + 3] = a;
+      }
+    }
+    const png = (raw: Buffer) => sharp(raw, { raw: { width: cw, height: ch, channels: 4 } }).png({ compressionLevel: 9 }).toBuffer();
+    const [shape, colour] = await Promise.all([png(shapeRaw), png(colourRaw)]);
+    captured.push({ label: symbol.label, shape, colour, width: cw, height: ch });
+    boxes.push({
+      slot: 'logo',
+      y: top / h,
+      h: (bottom - top + 1) / h,
+      align: 'center',
+      anchor: (left + right + 1) / 2 / w,
+      room: (right - left + 1) / w,
+    });
+  }
 
   const blank = await sharp(out, { raw: { width: w, height: h, channels: 3 } }).webp({ quality: 92 }).toBuffer();
   return {
     ok: true,
-    reason: `Painted out the ${lines.length} line${lines.length === 1 ? '' : 's'} you marked and measured where each sat. Everything outside the boxes is untouched.`,
+    reason: `Painted out the ${lines.length} line${lines.length === 1 ? '' : 's'}${symbolMarks.length ? ` and ${symbolMarks.length} symbol${symbolMarks.length === 1 ? '' : 's'}` : ''} you marked and measured where each sat. Everything outside the boxes is untouched.`,
     blank,
     aspect: { width: fullW, height: fullH },
     plateColor: average(plateSamples),
@@ -508,6 +585,7 @@ export async function analyseMarked(source: Buffer, rects: Rect[]): Promise<Plat
     boxes,
     script: 'latin',
     ...(handwriting ? { face: 'script' } : {}),
+    ...(captured.length ? { captured } : {}),
   };
 }
 
@@ -518,13 +596,20 @@ export async function readMarked(url: string, rects: Rect[]): Promise<PlatePrevi
     return { ok: false, reason: 'That picture could not be read.', image: null, aspect: null, plateColor: null, textColor: null, boxes: [], script: 'latin', weight: 400 };
   }
   const read = await analyseMarked(stored.buffer, rects);
-  const { blank, ...rest } = read;
+  const { blank, captured, ...rest } = read;
   if (!read.ok || !blank) return { ...rest, image: null };
+
+  // Each symbol taken off the plate joins the library, as the plate's own.
+  const symbols: { url: string; label: string }[] = [];
+  for (const symbol of captured ?? []) {
+    const saved = await saveSymbol(symbol, { label: symbol.label, tint: true });
+    symbols.push({ url: saved.symbol.url, label: saved.symbol.label });
+  }
   const put = await getStorage().put({
     buffer: blank,
     filename: `plate-${nanoid(10)}.webp`,
     mimeType: 'image/webp',
     folder: 'products',
   });
-  return { ...rest, image: put.url };
+  return { ...rest, image: put.url, ...(symbols.length ? { symbols } : {}) };
 }

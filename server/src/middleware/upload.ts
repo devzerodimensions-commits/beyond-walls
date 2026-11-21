@@ -20,6 +20,8 @@ export const UPLOAD_FOLDERS = [
   'general',
   // Lettering faces for the live preview; see services/fontLibrary.service.ts.
   'fonts',
+  // Symbols a customer can choose for a plate; see services/symbolLibrary.service.ts.
+  'symbols',
 ] as const;
 
 export type UploadFolder = (typeof UPLOAD_FOLDERS)[number];

@@ -83,6 +83,8 @@ export interface PlateBox {
   face?: string;
   /** The line's own weight, measured off its strokes, when it differs from the rest. */
   weight?: PlateWeight;
+  /** Set on a symbol's box: a picture the customer chooses, never a line of writing. */
+  slot?: 'logo';
 }
 
 export interface PlatePreview {
@@ -108,11 +110,23 @@ export interface PlatePreview {
    * face until the studio picks one. Absent everywhere else.
    */
   face?: string;
+  /** Symbols taken off the plate and added to the library, in the order of their boxes. */
+  symbols?: { url: string; label: string }[];
+}
+
+/** A symbol cut out of the picture: its shape, its own colours, and what to call it. */
+export interface CapturedSymbol {
+  label: string;
+  shape: Buffer;
+  colour: Buffer;
+  width: number;
+  height: number;
 }
 
 /** The analysis, with the blank plate as bytes rather than a stored file. */
-export interface PlateAnalysis extends Omit<PlatePreview, 'image'> {
+export interface PlateAnalysis extends Omit<PlatePreview, 'image' | 'symbols'> {
   blank: Buffer | null;
+  captured?: CapturedSymbol[];
 }
 
 /** Analysis width. Letter strokes survive this; the work stays cheap. */

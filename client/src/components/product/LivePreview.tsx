@@ -4,6 +4,7 @@ import type { PersonalizationField } from '../../lib/types';
 import { assetUrl } from '../../lib/api';
 import { useSettings } from '../../context/StoreProvider';
 import { findUploadedFont, type UploadedFontKind } from '../../lib/uploadedFonts';
+import { parsePlateSymbols } from '../../lib/plateSymbols';
 import { CubeBand, LeafFrame, VINE_PALETTE, VineBand } from './plateOrnaments';
 
 /**
@@ -1390,6 +1391,8 @@ function PlateCubes({ slots, plate, text, font, config, uid }: TemplateProps) {
 function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateProps) {
   const photo = config.photo;
   const measure = useTextMetrics();
+  const { get } = useSettings();
+  const symbols = parsePlateSymbols(get<unknown>('preview.symbols', []));
   const VW = config.aspect.width;
   const VH = config.aspect.height;
 
@@ -1457,10 +1460,39 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
           const left = box.align === 'center' ? box.anchor * VW - boxW / 2
             : box.align === 'right' ? box.anchor * VW - boxW
               : box.anchor * VW;
+          /*
+           * In the lettering's colour, like the real piece.
+           *
+           * A symbol from the library is a shape, and it is cut or printed in
+           * the same colour as the words -- so it is drawn as that shape filled
+           * with the plate's text colour. A black Om on a black acrylic plate
+           * would otherwise vanish, and a white one on brushed steel would
+           * glare. A symbol the studio marked as keeping its own colours, and
+           * any picture that is not in the library, is drawn as it is.
+           */
+          const symbol = symbols.find((s) => s.url === value);
+          if (symbol?.tint) {
+            const maskId = `symbol-${uid}-${index}`;
+            return (
+              <g key={index}>
+                <mask id={maskId} maskUnits="userSpaceOnUse" x={left} y={box.y * VH} width={boxW} height={boxH} style={{ maskType: 'alpha' }}>
+                  <image
+                    href={assetUrl(symbol.url)}
+                    x={left}
+                    y={box.y * VH}
+                    width={boxW}
+                    height={boxH}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                </mask>
+                <rect x={left} y={box.y * VH} width={boxW} height={boxH} fill={text} mask={`url(#${maskId})`} />
+              </g>
+            );
+          }
           return (
             <image
               key={index}
-              href={assetUrl(value)}
+              href={assetUrl(symbol ? symbol.colour : value)}
               x={left}
               y={box.y * VH}
               width={boxW}

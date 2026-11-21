@@ -12,7 +12,7 @@ import {
   validatePersonalization,
   previewSnapshot,
 } from '../../services/cart.service';
-import { alignLettering } from '../../services/previewBinding.service';
+import { servedFields } from '../../services/symbolLibrary.service';
 import { assertPurchasable, resolveVariant } from '../../services/pricing.service';
 
 const router = Router();
@@ -64,7 +64,7 @@ router.post(
     // Server-side validation + pricing of the customisation.
     // Checked against the questions exactly as the shop showed them; see alignLettering.
     const { entries } = validatePersonalization(
-      alignLettering(product.personalization, product.livePreviewConfig),
+      await servedFields(product.personalization, product.livePreviewConfig),
       body.personalization ?? {},
     );
 
@@ -142,7 +142,7 @@ router.patch(
 
     if (body.personalization !== undefined) {
       const { entries } = validatePersonalization(
-        alignLettering(item.product.personalization, item.product.livePreviewConfig),
+        await servedFields(item.product.personalization, item.product.livePreviewConfig),
         body.personalization,
       );
       data.personalization = entries;

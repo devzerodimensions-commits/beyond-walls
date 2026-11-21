@@ -144,20 +144,29 @@ export function bindPreviewBoxes<T>(config: T, fields: PreviewField[]): T {
   const asked = askedSlots(fields);
   if (!asked.length) return config;
 
-  const slots = (boxes as PhotoBox[]).map((b) => b?.slot);
+  /*
+   * A symbol's box is a picture, never a line of writing, so it is left out
+   * of the binding entirely. Counted in, it made every plate with a symbol
+   * look unsound, and the repair then handed the symbol's box to a line --
+   * the customer's surname drawn where the Ganesha should be.
+   */
+  const symbolBoxes = (boxes as PhotoBox[]).filter((b) => b?.slot === 'logo');
+  const lineBoxes = (boxes as PhotoBox[]).filter((b) => b?.slot !== 'logo');
+
+  const slots = lineBoxes.map((b) => b?.slot);
   const sound =
     slots.every((s) => typeof s === 'string' && asked.includes(s))
     && new Set(slots).size === slots.length;
   if (sound) return config;
 
   const order = slotOrder(fields);
-  const placed = [...(boxes as PhotoBox[])]
+  const placed = [...lineBoxes]
     .sort((a, b) => (a?.y ?? 0) - (b?.y ?? 0))
     .map((box, index) => ({ ...box, slot: order[index] ?? order[order.length - 1] }));
 
   return {
     ...(stored as object),
-    photo: { ...(stored as { photo: object }).photo, boxes: placed },
+    photo: { ...(stored as { photo: object }).photo, boxes: [...placed, ...symbolBoxes] },
   } as T;
 }
 
@@ -169,8 +178,9 @@ export function bindingWarning(
   config: unknown,
   fields: PreviewField[],
 ): { lines: number; asked: number; missing: string[] } | null {
-  const boxes = (config as { photo?: { boxes?: unknown } } | null)?.photo?.boxes;
-  if (!Array.isArray(boxes)) return null;
+  const all = (config as { photo?: { boxes?: unknown } } | null)?.photo?.boxes;
+  if (!Array.isArray(all)) return null;
+  const boxes = (all as PhotoBox[]).filter((b) => b?.slot !== 'logo');
 
   const asked = askedSlots(fields);
   if (boxes.length >= asked.length) return null;

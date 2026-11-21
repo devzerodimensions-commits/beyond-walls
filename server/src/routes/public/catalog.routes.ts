@@ -6,7 +6,8 @@ import { getSetting } from '../../services/settings.service';
 import { cachedPublic } from '../../lib/publicCache';
 import { optionalAuth, requireAuth } from '../../middleware/auth';
 import { reviewEligibility, submitReview } from '../../services/review.service';
-import { alignLettering, bindPreviewBoxes } from '../../services/previewBinding.service';
+import { bindPreviewBoxes } from '../../services/previewBinding.service';
+import { servedFields } from '../../services/symbolLibrary.service';
 
 const router = Router();
 
@@ -555,7 +556,7 @@ router.get(
       data: {
         ...product,
         livePreviewConfig: bindPreviewBoxes(product.livePreviewConfig, product.personalization),
-        personalization: alignLettering(product.personalization, product.livePreviewConfig),
+        personalization: await servedFields(product.personalization, product.livePreviewConfig),
         related,
       },
     });

@@ -234,7 +234,7 @@ export default function ProductPage() {
    * would be worse than leaving it on the photograph.
    */
   const hasTypedForPreview = Object.entries(previewSlots).some(
-    ([slot, value]) => slot !== 'fontFamily' && slot !== 'plateColor' && slot !== 'textColor'
+    ([slot, value]) => slot !== 'fontFamily' && slot !== 'plateColor' && slot !== 'textColor' && slot !== 'logo'
       && typeof value === 'string' && value.trim() !== '',
   );
 

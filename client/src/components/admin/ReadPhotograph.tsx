@@ -43,6 +43,8 @@ interface ReadResult {
   added?: string[];
   /** The file that was read: the chosen design file, or the product's photograph. */
   source?: string;
+  /** Symbols taken off the plate and added to the library. */
+  symbols?: { url: string; label: string }[];
 }
 
 /**
@@ -53,7 +55,7 @@ interface ReadResult {
  * whether the other two landed in the right places, the thing the comparison
  * exists to show. Each box found gets a sample instead.
  */
-function sampleSlots(config: Record<string, unknown>): Record<string, string> {
+function sampleSlots(config: Record<string, unknown>, symbol?: string | null): Record<string, string> {
   const SAMPLES: Record<string, string> = {
     number: 'A 101',
     line1: 'Your Name',
@@ -63,7 +65,14 @@ function sampleSlots(config: Record<string, unknown>): Record<string, string> {
   const base = resolvePreviewConfig('photo', config).placeholders as Record<string, string>;
   const boxes = (config.photo as { boxes?: { slot: string }[] } | undefined)?.boxes ?? [];
   const slots: Record<string, string> = {};
-  for (const box of boxes) slots[box.slot] = base[box.slot] || SAMPLES[box.slot] || 'SAMPLE';
+  for (const box of boxes) {
+    // A symbol's box holds a picture: the one taken off the plate, or nothing.
+    if (box.slot === 'logo') {
+      if (symbol) slots.logo = symbol;
+      continue;
+    }
+    slots[box.slot] = base[box.slot] || SAMPLES[box.slot] || 'SAMPLE';
+  }
   return slots;
 }
 
@@ -89,7 +98,10 @@ const LINE_SLOTS = [
 ];
 
 /** What to read: a stored picture, optionally with its lines marked by hand. */
-type ReadRequest = string | { url: string; lines: { x: number; y: number; w: number; h: number }[] } | undefined;
+type ReadRequest = string | {
+  url: string;
+  lines: { x: number; y: number; w: number; h: number; kind?: 'words' | 'symbol'; label?: string }[];
+} | undefined;
 
 export function ReadPhotograph({
   productId, hasImage, photoUrl, photos = [], onRead, ready = true,
@@ -299,7 +311,7 @@ export function ReadPhotograph({
               <LivePreview
                 template="photo"
                 config={made}
-                slots={sampleSlots(made)}
+                slots={sampleSlots(made, read.data?.symbols?.[0]?.url)}
                 hideLabel
                 hideCaption
                 className="border border-stone-line"

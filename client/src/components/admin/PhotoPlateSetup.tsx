@@ -22,7 +22,13 @@ import { MediaPicker } from './AdminKit';
  */
 
 interface Point { x: number; y: number }
-interface Rect { x: number; y: number; w: number; h: number }
+interface Rect {
+  x: number; y: number; w: number; h: number;
+  /** Words the customer types, or a symbol they choose (Ganesha, Om ...). */
+  kind?: 'words' | 'symbol';
+  /** What to call a symbol in the library. */
+  label?: string;
+}
 
 const START: Point[] = [
   { x: 0.25, y: 0.15 }, { x: 0.75, y: 0.15 }, { x: 0.75, y: 0.85 }, { x: 0.25, y: 0.85 },
@@ -133,7 +139,7 @@ export function PhotoPlateSetup({
       (to) => {
         setDrawing(null);
         const box = { x: Math.min(from.x, to.x), y: Math.min(from.y, to.y), w: Math.abs(to.x - from.x), h: Math.abs(to.y - from.y) };
-        if (box.w > 0.03 && box.h > 0.015) setLines((current) => [...current, box].slice(0, 6));
+        if (box.w > 0.03 && box.h > 0.015) setLines((current) => [...current, { ...box, kind: 'words' as const }].slice(0, 6));
       },
     );
   };
@@ -149,11 +155,12 @@ export function PhotoPlateSetup({
   return (
     <div className="mt-4 border-t border-stone-line pt-3">
       <Button size="sm" variant="secondary" disabled={busy} onClick={() => setOpen(true)}>
-        No design file? Set it up from a photo
+        Set it up by hand — from a photo, or with a symbol
       </Button>
       <p className="mt-1 text-2xs leading-relaxed text-ink-400">
-        For a product with only photographs. You mark the plate’s corners and box each line of
-        words; the photo is straightened and only those words are taken off.
+        For a product with only photographs, or a plate with a symbol customers can change (Ganesha,
+        Om, Swastik). You mark the plate’s corners — skipped for a flat design file — and box each line
+        and symbol; only what you box is taken off.
       </p>
 
       <Modal
@@ -179,9 +186,19 @@ export function PhotoPlateSetup({
               ) : null}
             </div>
             {step === 'corners' ? (
-              <Button size="sm" loading={straighten.isPending} onClick={() => straighten.mutate()}>
-                Straighten the plate
-              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                {/* A design file is already head-on: its symbol and lines can be marked as it is. */}
+                <button
+                  type="button"
+                  className="text-2xs underline underline-offset-2"
+                  onClick={() => { if (photo) { setFlat({ url: photo, width: 0, height: 0 }); setLines([]); } }}
+                >
+                  Already flat — skip this step
+                </button>
+                <Button size="sm" loading={straighten.isPending} onClick={() => straighten.mutate()}>
+                  Straighten the plate
+                </Button>
+              </div>
             ) : step === 'lines' ? (
               <div className="flex items-center gap-3">
                 {lines.length ? (
@@ -276,8 +293,9 @@ export function PhotoPlateSetup({
           <div>
             <p className="mb-3 text-2xs leading-relaxed text-ink-500">
               Drag a box over each line the customer will change — the name, the surname, the
-              number. Leave out anything that stays the same on every plate, like a symbol. A box can
-              be loose; a letter that sticks out of it is still taken whole.
+              number. If the plate has a symbol customers may swap, such as a Ganesha or an Om, box it
+              too and mark it as a symbol below. Leave out anything that stays on every plate, like a
+              house sign. A box can be loose; a letter that sticks out of it is still taken whole.
             </p>
             <div className="relative mx-auto w-fit max-w-full select-none">
               <img src={assetUrl(flat.url)} alt="The plate, straightened" className="block max-h-[58vh] w-auto max-w-full" draggable={false} />
@@ -288,7 +306,7 @@ export function PhotoPlateSetup({
                 className="absolute inset-0 h-full w-full cursor-crosshair touch-none"
                 onPointerDown={onDrawStart}
               >
-                {[...lines, ...(live ? [live] : [])].map((r, i) => (
+                {[...lines, ...(live ? [live] : [])].map((r: Rect, i) => (
                   <rect
                     // eslint-disable-next-line react/no-array-index-key
                     key={i}
@@ -296,8 +314,8 @@ export function PhotoPlateSetup({
                     y={r.y}
                     width={r.w}
                     height={r.h}
-                    fill="rgba(14,122,87,0.15)"
-                    stroke="#0E7A57"
+                    fill={r.kind === 'symbol' ? 'rgba(180,83,9,0.15)' : 'rgba(14,122,87,0.15)'}
+                    stroke={r.kind === 'symbol' ? '#B45309' : '#0E7A57'}
                     strokeWidth={2}
                     vectorEffect="non-scaling-stroke"
                   />
@@ -308,7 +326,7 @@ export function PhotoPlateSetup({
                   // eslint-disable-next-line react/no-array-index-key
                   key={i}
                   type="button"
-                  className="absolute -translate-y-full bg-[#0E7A57] px-1.5 text-2xs text-white"
+                  className={`absolute -translate-y-full px-1.5 text-2xs text-white ${r.kind === 'symbol' ? 'bg-[#B45309]' : 'bg-[#0E7A57]'}`}
                   style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%` }}
                   onClick={() => setLines((current) => current.filter((_, k) => k !== i))}
                   aria-label={`Remove box ${i + 1}`}
@@ -317,6 +335,45 @@ export function PhotoPlateSetup({
                 </button>
               ))}
             </div>
+
+            {lines.length ? (
+              <ul className="mx-auto mt-4 max-w-md space-y-2">
+                {lines.map((r, i) => (
+                  // eslint-disable-next-line react/no-array-index-key
+                  <li key={i} className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="w-12 text-ink-400">Box {i + 1}</span>
+                    {(['words', 'symbol'] as const).map((kind) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        aria-pressed={(r.kind ?? 'words') === kind}
+                        onClick={() => setLines((current) => current.map((box, k) => (
+                          k === i ? { ...box, kind, label: kind === 'symbol' ? box.label || 'Symbol' : box.label } : box
+                        )))}
+                        className={`border px-2.5 py-1 ${(r.kind ?? 'words') === kind ? 'border-ink bg-ink text-paper' : 'border-stone-line hover:border-ink'}`}
+                      >
+                        {kind === 'words' ? 'Words' : 'Symbol'}
+                      </button>
+                    ))}
+                    {r.kind === 'symbol' ? (
+                      <input
+                        className="field min-w-0 flex-1 py-1 text-xs"
+                        value={r.label ?? ''}
+                        placeholder="Name it, e.g. Ganesha"
+                        aria-label={`Name of the symbol in box ${i + 1}`}
+                        onChange={(e) => setLines((current) => current.map((box, k) => (k === i ? { ...box, label: e.target.value } : box)))}
+                      />
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {lines.some((r) => r.kind === 'symbol') ? (
+              <p className="mx-auto mt-2 max-w-md text-2xs leading-relaxed text-ink-400">
+                The symbol is taken off the plate and added to your symbol library. Customers then
+                choose from every symbol in the library; the plate starts on this one.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </Modal>

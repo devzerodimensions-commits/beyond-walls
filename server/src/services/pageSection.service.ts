@@ -1,7 +1,8 @@
 import type { PageSection, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { PRODUCT_CARD_SELECT } from '../routes/public/catalog.routes';
-import { alignLettering, bindPreviewBoxes } from './previewBinding.service';
+import { bindPreviewBoxes } from './previewBinding.service';
+import { servedFields } from './symbolLibrary.service';
 
 /**
  * Page sections.
@@ -726,7 +727,7 @@ export async function resolveSections(
               ? [{
                 ...product,
                 livePreviewConfig: bindPreviewBoxes(product.livePreviewConfig, product.personalization),
-                personalization: alignLettering(product.personalization, product.livePreviewConfig),
+                personalization: await servedFields(product.personalization, product.livePreviewConfig),
               }]
               : [],
           };
