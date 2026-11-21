@@ -138,7 +138,7 @@ export function PhotoArtworkEditor({
             label="Blank artwork"
             value={current.image}
             placeholder="/uploads/products/…"
-            hint="The plate with no lettering on it. Made automatically when a photograph is read; upload your own to the media library if the piece has never been photographed with a name on it."
+            hint="The plate with its lettering already removed. Made for you when a design file is read. Choosing one here only swaps the picture — the lines stay where they are, so to have them found for you use “Upload the design file” above instead."
             onChange={(e) => setImage(e.target.value)}
           />
           <Button size="sm" variant="secondary" onClick={() => setPicking(true)}>

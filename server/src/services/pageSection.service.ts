@@ -1,6 +1,7 @@
 import type { PageSection, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { PRODUCT_CARD_SELECT } from '../routes/public/catalog.routes';
+import { alignLettering, bindPreviewBoxes } from './previewBinding.service';
 
 /**
  * Page sections.
@@ -715,7 +716,20 @@ export async function resolveSections(
               personalization: { where: visibility, orderBy: { sortOrder: 'asc' } },
             },
           });
-          return { ...section, items: product ? [product] : [] };
+          /*
+           * The same repair the product page gets, so the front page cannot
+           * show a customer's words on a different line from the product page.
+           */
+          return {
+            ...section,
+            items: product
+              ? [{
+                ...product,
+                livePreviewConfig: bindPreviewBoxes(product.livePreviewConfig, product.personalization),
+                personalization: alignLettering(product.personalization, product.livePreviewConfig),
+              }]
+              : [],
+          };
         }
 
         case 'GALLERY': {

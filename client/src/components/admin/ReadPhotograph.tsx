@@ -1,27 +1,35 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { ApiError, api, assetUrl } from '../../lib/api';
+import type { MediaAsset } from '../../lib/types';
 import { useToast } from '../../context/StoreProvider';
-import { Badge, Button, Select } from '../ui';
+import { Badge, Button, Select, Spinner, UploadIcon } from '../ui';
+import { MediaPicker } from './AdminKit';
 import { LivePreview, resolvePreviewConfig } from '../product/LivePreview';
 
 /**
  * Making the preview out of the product's own artwork, from the editor.
  *
- * The reader existed but only ran inside the add-product wizard, on one step,
- * once. Anyone who skipped that step, came back to an existing product, or
- * uploaded better artwork afterwards had no way to reach it -- so a studio
- * could upload a finished piece of artwork and still be looking at the plain
- * black nameplate the template defaults to, with nothing on the screen to
- * suggest the two had anything to do with each other.
+ * Two ways in, and the first is the one that works best.
  *
- * It is the same reading the wizard does, from the same endpoint, so a design
- * made here and one made there cannot come out differently.
+ * The flat design file a piece is cut from -- square on, evenly lit, nothing
+ * behind it -- is the ideal thing to read. A photograph of the piece is not:
+ * it sits on a textured wall, in sunlight, at an angle, next to a caption, and
+ * the reader either turns it down or, before it learned better, built a
+ * preview out of a caption in the corner of an infographic. Uploading a design
+ * file used to be possible only further down, under the line boxes, where it
+ * swapped the picture and read nothing -- so the lines stayed wherever they had
+ * been and the customer's name landed on the wrong part of the new artwork.
  *
- * It writes to the product immediately -- the blank plate it paints has to be
- * stored somewhere -- and hands the settings straight back so the editor can
- * show them without reloading the product and throwing away whatever else is
- * being edited.
+ * So the design file comes first and is READ: its sample lettering is taken
+ * off, its lines are found, and the product's questions are matched to them.
+ * Reading the product's own photograph is still offered, second, for a product
+ * photographed cleanly enough to work.
+ *
+ * Either way the result is written straight to the product -- the blank plate
+ * it paints has to be stored somewhere -- and handed back so the editor can show
+ * it without reloading and discarding whatever else is being edited.
  */
 
 interface ReadResult {
@@ -30,6 +38,10 @@ interface ReadResult {
   image: string | null;
   boxes: unknown[];
   livePreviewConfig?: Record<string, unknown>;
+  /** Questions created so every line on the plate can be filled in. */
+  added?: string[];
+  /** The file that was read: the chosen design file, or the product's photograph. */
+  source?: string;
 }
 
 /**
@@ -66,8 +78,7 @@ function sampleSlots(config: Record<string, unknown>): Record<string, string> {
  * round gold plate.
  *
  * So it is not guessed. It is shown, pre-filled, next to the comparison the
- * studio is already looking at, where putting it right takes one click. Three
- * dropdowns beats a clever rule that is wrong on a tenth of the catalogue.
+ * studio is already looking at, where putting it right takes one click.
  */
 const LINE_SLOTS = [
   { value: 'number', label: 'House / flat number' },
@@ -77,17 +88,25 @@ const LINE_SLOTS = [
 ];
 
 export function ReadPhotograph({
-  productId, hasImage, photoUrl, onRead,
+  productId, hasImage, photoUrl, onRead, ready = true,
 }: {
   productId: string;
   hasImage: boolean;
-  /** The photograph being read, shown beside the result so the two can be compared. */
+  /** The product's first photograph, read by the second option. */
   photoUrl?: string | null;
   onRead: (template: string, config: Record<string, unknown>) => void;
+  /**
+   * Whether customers currently see a preview. Said plainly when they do not,
+   * because a ticked "Enable" box with nothing behind it looks finished.
+   */
+  ready?: boolean;
 }) {
   const { push } = useToast();
   const queryClient = useQueryClient();
   const [made, setMade] = useState<Record<string, unknown> | null>(null);
+  const [source, setSource] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   /** The lines the reader found, in the order they sit on the plate. */
   const boxes = ((made?.photo as { boxes?: { slot: string }[] } | undefined)?.boxes ?? []);
@@ -95,9 +114,20 @@ export function ReadPhotograph({
   /*
    * Changing a line rewrites that one box and leaves the rest alone, so the
    * positions the reader measured are never lost by renaming what sits in
-   * them. Saved immediately: this sits beside a picture of the result, and a
-   * setting that needs a separate Save is a setting people forget.
+   * them. Saved immediately, and a failure is reported: this first went out
+   * as a PUT this API does not have, fired and forgotten, so the dropdown and
+   * the preview moved and nothing was saved.
    */
+  const saveSlot = useMutation({
+    mutationFn: (config: Record<string, unknown>) =>
+      api.patch(`/admin/products/${productId}`, { livePreviewConfig: config }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-product', productId] }),
+    onError: (err) => push(
+      err instanceof ApiError ? err.message : 'That line could not be saved',
+      'error',
+    ),
+  });
+
   const setSlot = (index: number, slot: string) => {
     if (!made) return;
     const photo = made.photo as { boxes: { slot: string }[]; image: string };
@@ -110,77 +140,130 @@ export function ReadPhotograph({
     };
     setMade(next);
     onRead('photo', next);
-    /*
-     * PATCH, and the failure is reported.
-     *
-     * This first went out as a PUT, which this API does not have, so every
-     * change 404'd -- and because the call was fired and forgotten, the
-     * dropdown moved, the preview beside it moved, and nothing was saved. A
-     * write that can fail silently is worse than one that does not exist.
-     */
     saveSlot.mutate(next);
   };
 
-  const saveSlot = useMutation({
-    mutationFn: (config: Record<string, unknown>) =>
-      api.patch(`/admin/products/${productId}`, { livePreviewConfig: config }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-product', productId] }),
-    onError: (err) => push(
-      err instanceof ApiError ? err.message : 'That line could not be saved',
-      'error',
-    ),
-  });
-
+  /** Reads a chosen design file, or -- with no url -- the product's own photograph. */
   const read = useMutation({
-    mutationFn: () => api.post<ReadResult>(`/admin/products/${productId}/preview-from-photo`, {}),
-    onSuccess: async (result) => {
+    mutationFn: (url?: string) =>
+      api.post<ReadResult>(`/admin/products/${productId}/preview-from-photo`, url ? { url } : {}),
+    onSuccess: async (result, url) => {
       if (!result.ok || !result.livePreviewConfig) {
         push(result.reason || 'That picture could not be read', 'error');
         return;
       }
       setMade(result.livePreviewConfig);
+      setSource(result.source ?? url ?? photoUrl ?? null);
       onRead('photo', result.livePreviewConfig);
       await queryClient.invalidateQueries({ queryKey: ['admin-product', productId] });
-      push(`Read ${result.boxes.length} line${result.boxes.length === 1 ? '' : 's'} from the artwork`, 'success');
+      const lines = result.boxes.length;
+      push(`Read ${lines} line${lines === 1 ? '' : 's'} — check it matches below`, 'success');
     },
     onError: (err) => push(err instanceof ApiError ? err.message : 'Could not read that picture', 'error'),
   });
 
+  /** A design file from this device: stored in the media library, then read. */
+  const uploadAndRead = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('files', file);
+      form.append('folder', 'products');
+      const [asset] = await api.upload<MediaAsset[]>('/admin/media', form);
+      if (!asset?.url) throw new Error('The upload did not return a file');
+      read.mutate(asset.url);
+    } catch (err) {
+      push(err instanceof ApiError ? err.message : 'Upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const busy = uploading || read.isPending;
+
   return (
     <div className="mt-4 border border-stone-line bg-paper-off p-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Badge tone="info">From your artwork</Badge>
-        <Button size="sm" loading={read.isPending} disabled={!hasImage} onClick={() => read.mutate()}>
-          Make the preview from this product's picture
+        {ready ? null : (
+          <span className="text-2xs text-state-warning">Customers don’t see a preview yet</span>
+        )}
+      </div>
+
+      {/* ---- the design file, first ------------------------------------ */}
+      <p className="mt-3 text-xs font-medium text-ink">Upload the design file</p>
+      <p className="mt-1 text-2xs leading-relaxed text-ink-500">
+        The flat 2D artwork the piece is cut from — head-on, on a plain background, with sample
+        lettering on it. The sample words are taken off and the customer’s own are drawn in exactly
+        where they sat.
+      </p>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <label
+          className={clsx(
+            'inline-flex cursor-pointer items-center gap-2 bg-ink px-3.5 py-2 text-2xs font-medium uppercase',
+            'tracking-architect text-paper transition-opacity hover:opacity-90',
+            busy && 'pointer-events-none opacity-60',
+          )}
+        >
+          {busy ? <Spinner size={13} /> : <UploadIcon size={13} />}
+          {uploading ? 'Uploading…' : read.isPending ? 'Reading…' : 'Upload from this device'}
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp"
+            className="hidden"
+            onChange={(e) => { void uploadAndRead(e.target.files?.[0]); e.target.value = ''; }}
+          />
+        </label>
+        <Button size="sm" variant="secondary" disabled={busy} onClick={() => setPicking(true)}>
+          Choose from library
         </Button>
       </div>
-      <p className="mt-2 text-2xs leading-relaxed text-ink-500">
-        {hasImage
-          ? 'Reads the first photograph, takes the sample name off it and uses the piece itself as the preview. Best with the flat design file the piece is cut from; a photograph of one on a wall will be turned down with a reason.'
-          : 'Add a photograph on the Images tab first — the preview is made from it.'}
-      </p>
+      <MediaPicker
+        open={picking}
+        accept="image"
+        folder="products"
+        onClose={() => setPicking(false)}
+        onPick={(assets) => {
+          setPicking(false);
+          if (assets[0]?.url) read.mutate(assets[0].url);
+        }}
+      />
+
+      {/* ---- the product's own photograph, second ----------------------- */}
+      <div className="mt-4 border-t border-stone-line pt-3">
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!hasImage || busy}
+          onClick={() => read.mutate(undefined)}
+        >
+          Or read this product’s photograph
+        </Button>
+        <p className="mt-1 text-2xs leading-relaxed text-ink-400">
+          {hasImage
+            ? 'Works when the photograph shows the piece head-on and evenly lit. A picture of it on a textured wall, at an angle or beside a caption is turned down with the reason — that is what the design file is for.'
+            : 'No photographs on this product yet — upload the design file above instead.'}
+        </p>
+      </div>
+
       {read.data && !read.data.ok ? (
-        <p className="mt-2 border-l-2 border-state-warning pl-3 text-2xs leading-relaxed text-ink-600">
+        <p className="mt-3 border-l-2 border-state-warning pl-3 text-2xs leading-relaxed text-ink-600">
           {read.data.reason}
         </p>
       ) : null}
 
       {/*
-        * The photograph and what was made from it, side by side.
+        * What was read and what was made from it, side by side.
         *
         * A preview that does not look like the product is the one fault that
         * hides: every line gets drawn, nothing errors, and the plate simply
-        * comes out in the wrong lettering or with the wrong words in the wrong
-        * places. Nobody goes looking for it, because nothing suggests there is
-        * anything to look for.
-        *
-        * Reading a photograph cannot tell which typeface a piece was cut in --
-        * no picture carries that -- so instead of guessing, the two are put
-        * next to each other at the moment the preview is made, with sample
-        * words in the boxes it found. A studio that can see both in one glance
-        * does not need to be told what to check.
+        * comes out in the wrong lettering or with the words in the wrong
+        * places. Put next to each other at the moment the preview is made,
+        * with sample words in the boxes it found, nobody needs telling what
+        * to check.
         */}
-      {made && photoUrl ? (
+      {made && source ? (
         <div className="mt-4 border-t border-stone-line pt-4">
           <p className="text-2xs uppercase tracking-architect text-ink">
             Does this match your product?
@@ -188,11 +271,11 @@ export function ReadPhotograph({
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
             <figure className="m-0">
               <img
-                src={assetUrl(photoUrl)}
-                alt="The photograph this was made from"
+                src={assetUrl(source)}
+                alt="The artwork this was made from"
                 className="w-full border border-stone-line object-contain"
               />
-              <figcaption className="mt-1 text-2xs text-ink-400">Your photograph</figcaption>
+              <figcaption className="mt-1 text-2xs text-ink-400">What was read</figcaption>
             </figure>
             <figure className="m-0">
               <LivePreview
@@ -206,6 +289,15 @@ export function ReadPhotograph({
               <figcaption className="mt-1 text-2xs text-ink-400">What customers will see</figcaption>
             </figure>
           </div>
+
+          {read.data?.added?.length ? (
+            <p className="mt-3 border-l-2 border-state-info pl-3 text-2xs leading-relaxed text-ink-600">
+              The plate has a line nobody was asked for, so a question was added for it:{' '}
+              {read.data.added.map((label) => `“${label}”`).join(', ')}. Rename it under
+              Personalisation — for example “House / flat number”.
+            </p>
+          ) : null}
+
           {boxes.length ? (
             <div className="mt-4 border-t border-stone-line pt-3">
               <p className="text-2xs uppercase tracking-architect text-ink">
@@ -232,9 +324,8 @@ export function ReadPhotograph({
 
           <p className="mt-3 text-2xs leading-relaxed text-ink-500">
             The words differ — those are samples. What should match is where the lines sit and the
-            style of the lettering. A photograph cannot say which typeface a piece was cut in, so if
-            the lettering looks wrong, pick the right face under Lettering below. The lines can be
-            nudged under “Where the words go”.
+            style of the lettering. A picture cannot say which typeface a piece was cut in, so if
+            the lettering looks wrong, pick the right face under Lettering below.
           </p>
         </div>
       ) : null}

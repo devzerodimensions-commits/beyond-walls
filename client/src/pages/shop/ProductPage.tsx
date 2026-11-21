@@ -12,7 +12,7 @@ import { useRecentlyViewed } from '../../hooks/useRecentlyViewed';
 import { ProductCard, ProductGrid } from '../../components/product/ProductCard';
 import { GalleryBadges, ProductGallery } from '../../components/product/ProductGallery';
 import {
-  LivePreview, buildPreviewSlots, previewScript, resolvePreviewConfig,
+  LivePreview, buildPreviewSlots, previewIsUsable, previewScript, resolvePreviewConfig,
 } from '../../components/product/LivePreview';
 import { SavePreview } from '../../components/product/SavePreview';
 import { ReviewForm } from '../../components/product/ReviewForm';
@@ -185,6 +185,12 @@ export default function ProductPage() {
   const saved = isWishlisted(product.id);
   const wishlistEnabled = get<boolean>('store.enableWishlist', true);
   const previewSlots = buildPreviewSlots(fields, values);
+  /*
+   * Ticking "Enable the live preview" is not enough on its own: the preview
+   * has to be built from something real. See previewIsUsable.
+   */
+  const showPreview = product.livePreviewEnabled
+    && previewIsUsable(product.livePreviewTemplate, product.livePreviewConfig);
   /*
    * The colours this product sells, for any colour question that carries none
    * of its own. Resolved the same way the preview resolves them, so the
@@ -433,7 +439,7 @@ export default function ProductPage() {
               productName={product.name}
               videoUrl={product.videoUrl}
               previewFilled={hasTypedForPreview}
-              preview={product.livePreviewEnabled ? (
+              preview={showPreview ? (
                 <div>
                   {/*
                     Said out loud, because the two pictures in this gallery
@@ -611,7 +617,7 @@ export default function ProductPage() {
                       palette={previewPalette}
                       script={script}
                       sizes={textSizes}
-                      onSize={product.livePreviewEnabled ? setTextSize : undefined}
+                      onSize={showPreview ? setTextSize : undefined}
                       fields={fields}
                       values={values}
                       errors={errors}
@@ -1019,7 +1025,7 @@ export default function ProductPage() {
             </p>
 
             {/* The plate updates as they type, which is the whole point. */}
-            {product.livePreviewEnabled ? (
+            {showPreview ? (
               <div ref={sheetPreviewRef} className="mb-2">
                 <LivePreview
                   template={product.livePreviewTemplate}
@@ -1036,7 +1042,7 @@ export default function ProductPage() {
               palette={previewPalette}
               script={script}
               sizes={textSizes}
-              onSize={product.livePreviewEnabled ? setTextSize : undefined}
+              onSize={showPreview ? setTextSize : undefined}
               fields={fields}
               values={values}
               errors={errors}

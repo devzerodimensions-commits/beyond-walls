@@ -385,6 +385,35 @@ export const PREVIEW_PRESETS: Record<string, Partial<PreviewConfig>> = {
   },
 };
 
+/**
+ * Whether a product's preview is real enough to put in front of a customer.
+ *
+ * A preview that does not look like the product is worse than none, and the
+ * shop had two ways of drawing exactly that. A product with the preview
+ * switched on but nothing chosen fell through to the default design and was
+ * drawn as a plain black nameplate -- the shape of a different product
+ * entirely. A product whose photograph could not be read was drawn as an
+ * empty dashed rectangle. Both reached customers whenever the box was ticked
+ * before the artwork was in place, and nothing in the admin said so.
+ *
+ * So: a design the studio deliberately picked is shown. A preview made from
+ * the product's own artwork is shown once there is artwork and at least one
+ * line to write on. Anything else is not shown at all, and the product page
+ * simply keeps its photographs.
+ */
+export function previewIsUsable(
+  template: string | null | undefined,
+  config: unknown,
+): boolean {
+  if (!template) return false;
+  if (template !== 'photo') return true;
+  const photo = (config as { photo?: { image?: unknown; boxes?: unknown } } | null)?.photo;
+  return typeof photo?.image === 'string'
+    && photo.image.length > 0
+    && Array.isArray(photo.boxes)
+    && photo.boxes.length > 0;
+}
+
 /** Deep-merges the preset for `template` and the product's stored overrides. */
 export function resolvePreviewConfig(
   template: string | null | undefined,

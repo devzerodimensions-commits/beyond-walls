@@ -7,7 +7,7 @@ import type {
   Banner, Category, Faq, GalleryItem, HomeSection, PersonalizationField, Product, Testimonial,
 } from '../../lib/types';
 import { ProductCard, ProductGrid } from '../product/ProductCard';
-import { LivePreview, buildPreviewSlots } from '../product/LivePreview';
+import { LivePreview, buildPreviewSlots, previewIsUsable } from '../product/LivePreview';
 import { ArrowRight, ButtonLink, ChevronDown, Input } from '../ui';
 import { useSettings } from '../../context/StoreProvider';
 
@@ -418,7 +418,14 @@ export function PersonalisationDemo({ section }: { section: HomeSection }) {
     return out;
   }, [fields]);
 
-  if (!product) return null;
+  /*
+   * A demonstration of a preview that does not look like the product is a
+   * demonstration of the wrong thing, on the front page. Same rule as the
+   * product page: shown only when it is built from something real.
+   */
+  if (!product || !previewIsUsable(product.livePreviewTemplate, product.livePreviewConfig)) {
+    return null;
+  }
 
   // Only the text slots get an input here — colour/font stay on the product page.
   const textFields = fields.filter((f) =>

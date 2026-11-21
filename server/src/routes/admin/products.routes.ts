@@ -7,7 +7,7 @@ import { toBool, uniqueSlug } from '../../utils/helpers';
 import { persistUploads, upload } from '../../middleware/upload';
 import { suggestPreviewFromImage } from '../../services/previewSuggest.service';
 import { alignLettering, bindPreviewBoxes, slotOrder } from '../../services/previewBinding.service';
-import { readPlate } from '../../services/plateText.service';
+import { readPlate, type PlatePreview } from '../../services/plateText.service';
 import { deleteFileIfUnreferenced } from '../../services/media.service';
 import { isSellable } from '../../services/pricing.service';
 
@@ -805,6 +805,146 @@ async function ensureLetteringQuestion(
   });
 }
 
+const LINE_LABELS: Record<string, string> = {
+  line1: 'First line',
+  line2: 'Second line',
+  line3: 'Third line',
+  number: 'House / flat number',
+};
+const LINE_SLOTS = new Set(['number', 'line1', 'line2', 'line3']);
+
+interface ReadTarget {
+  id: string;
+  livePreviewEnabled: boolean;
+  livePreviewConfig: unknown;
+  personalization: { previewSlot: string | null; status: string; sortOrder: number }[];
+}
+
+/**
+ * Makes sure every line on the plate can be filled in.
+ *
+ * A preview with a line nobody is asked for has a hole in it: the sample
+ * lettering was painted off that spot, and nothing goes back. That is what a
+ * cut-out plate with a name AND a house number came to, when it only asked
+ * for the name.
+ *
+ * A product with no questions about its words yet is being set up, so each
+ * line gets one, the first of them required. A product that already asks its
+ * own questions is only added to when somebody has explicitly read a picture
+ * for it -- an upload arriving in the background must never put a new question
+ * in front of customers on a product that may already be selling. Questions
+ * are worded plainly by position, because nothing in a picture says which line
+ * is the house number; the studio renames them in a moment, and being told
+ * "second line" is better than being told something untrue.
+ */
+async function ensureLineQuestions(
+  productId: string,
+  slots: string[],
+  published: { previewSlot: string | null }[],
+  explicit: boolean,
+): Promise<string[]> {
+  const asked = new Set(
+    published.map((f) => f.previewSlot).filter((s): s is string => !!s && LINE_SLOTS.has(s)),
+  );
+  const fresh = asked.size === 0;
+  if (!fresh && !explicit) return [];
+
+  const missing = slots.filter((slot) => LINE_SLOTS.has(slot) && !asked.has(slot));
+  if (!missing.length) return [];
+
+  const existing = await prisma.personalizationField.findMany({
+    where: { productId },
+    select: { key: true, sortOrder: true },
+  });
+  const keys = new Set(existing.map((f) => f.key));
+  let next = existing.reduce((n, f) => Math.max(n, f.sortOrder), -1) + 1;
+
+  const added: string[] = [];
+  for (const [index, slot] of missing.entries()) {
+    let key = slot;
+    for (let n = 2; keys.has(key); n += 1) key = `${slot}-${n}`;
+    keys.add(key);
+    const label = LINE_LABELS[slot] ?? slot;
+    await prisma.personalizationField.create({
+      data: {
+        productId,
+        key,
+        label,
+        type: 'TEXT',
+        required: fresh && index === 0,
+        maxLength: 40,
+        sortOrder: next,
+        status: 'PUBLISHED',
+        previewSlot: slot,
+      },
+    });
+    next += 1;
+    added.push(label);
+  }
+  return added;
+}
+
+/**
+ * Turns a successful read into the product's preview.
+ *
+ * One routine for every way a picture gets read -- the button, a design file,
+ * and a photograph arriving in the background. There used to be two copies,
+ * and the copy behind the button had already drifted from the other: it kept
+ * its own list of labels, created questions under a different rule, and was
+ * the only one that knew a product could have none.
+ *
+ * What differs is whether somebody ASKED. An explicit read switches the
+ * preview on and makes sure every line has a question. A background read only
+ * stores what it found: it must not turn a preview on, or put questions in
+ * front of customers, on a product that is not being personalised -- a fresh
+ * photograph of a stock safety sign would otherwise have grown a live preview
+ * and a typeface question for customers to answer. Stored, the work is still
+ * done: tick "Enable" and the preview is already there.
+ */
+async function applyRead(product: ReadTarget, read: PlatePreview, explicit: boolean) {
+  const published = product.personalization.filter((f) => f.status === 'PUBLISHED');
+  const order = slotOrder(published);
+  const boxes = read.boxes.slice(0, order.length).map((box, index) => ({
+    ...box,
+    slot: order[index],
+  }));
+
+  /*
+   * A face the studio has already chosen is knowledge the reader does not
+   * have, so reading a new picture -- a better design file, say -- must not
+   * quietly put the lettering back to a plain sans.
+   */
+  const chosenFont = (product.livePreviewConfig as { defaults?: { fontFamily?: string } } | null)
+    ?.defaults?.fontFamily;
+
+  const config = {
+    aspect: read.aspect ?? undefined,
+    defaults: {
+      ...(read.plateColor ? { plateColor: read.plateColor } : {}),
+      ...(read.textColor ? { textColor: read.textColor } : {}),
+      ...(chosenFont
+        ? { fontFamily: chosenFont }
+        : read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
+      /* How heavy the real lettering is, measured off the artwork. */
+      fontWeight: read.weight,
+    },
+    photo: { image: read.image as string, boxes },
+  };
+
+  const enable = explicit || product.livePreviewEnabled;
+  await prisma.product.update({
+    where: { id: product.id },
+    data: { livePreviewEnabled: enable, livePreviewTemplate: 'photo', livePreviewConfig: config },
+  });
+
+  let added: string[] = [];
+  if (enable) {
+    added = await ensureLineQuestions(product.id, boxes.map((b) => b.slot), published, explicit);
+    await ensureLetteringQuestion(product.id, read.script, config.defaults.fontFamily);
+  }
+  return { boxes, config, added, enabled: enable };
+}
+
 async function buildPreviewFromPhoto(productId: string, force = false) {
   const product = await prisma.product.findUnique({
     where: { id: productId },
@@ -839,35 +979,15 @@ async function buildPreviewFromPhoto(productId: string, force = false) {
     if (!firstReason) firstReason = attempt.reason;
   }
 
-  const order = slotOrder(product.personalization.filter((f) => f.status === 'PUBLISHED'));
-
-  const chosenFont = (product.livePreviewConfig as { defaults?: { fontFamily?: string } } | null)
-    ?.defaults?.fontFamily;
-
   if (read && read.image) {
-    const boxes = read.boxes.slice(0, order.length).map((box, index) => ({
-      ...box,
-      slot: order[index],
-    }));
-    const config = {
-      aspect: read.aspect ?? undefined,
-      defaults: {
-        ...(read.plateColor ? { plateColor: read.plateColor } : {}),
-        ...(read.textColor ? { textColor: read.textColor } : {}),
-        ...(chosenFont
-          ? { fontFamily: chosenFont }
-          : read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
-        /* How heavy the real lettering is, measured off the artwork. */
-        fontWeight: read.weight,
-      },
-      photo: { image: read.image, boxes },
+    const applied = await applyRead(product, read, force);
+    return {
+      from: 'artwork' as const,
+      reason: read.reason,
+      boxes: applied.boxes.length,
+      config: applied.config,
+      added: applied.added,
     };
-    await prisma.product.update({
-      where: { id: product.id },
-      data: { livePreviewEnabled: true, livePreviewTemplate: 'photo', livePreviewConfig: config },
-    });
-    await ensureLetteringQuestion(product.id, read.script, config.defaults.fontFamily);
-    return { from: 'artwork' as const, reason: read.reason, boxes: boxes.length, config };
   }
 
   /*
@@ -903,22 +1023,63 @@ router.post(
     });
     if (!product) throw ApiError.notFound('Product not found');
 
+    /*
+     * A design file the studio has chosen, read in preference to anything.
+     *
+     * The flat artwork a piece is cut from is the best thing there is to read:
+     * square on, evenly lit, nothing behind it. The product's own photographs
+     * are pictures OF the piece -- on a textured wall, at an angle, in
+     * sunlight, with a caption beside it -- and two products went out with a
+     * preview built from a caption in the corner of an infographic because
+     * that was what the reader could find. Uploading the design file was
+     * possible, but it only swapped the picture; nothing read it, so the lines
+     * stayed wherever they had been.
+     *
+     * Only a file this site stored itself may be named. The reader fetches
+     * nothing from anywhere else, and a path is not allowed to climb out of
+     * the upload folder.
+     */
+    const chosen = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+    if (chosen) {
+      if (!/^\/uploads\/[\w./-]+$/.test(chosen) || chosen.includes('..')) {
+        throw ApiError.badRequest('Choose a file from the media library, or upload one.');
+      }
+      const read = await readPlate(chosen);
+      /*
+       * No falling back to the product's photographs here. The studio picked
+       * this file on purpose; answering with a read of a different picture
+       * would be answering a question nobody asked.
+       */
+      if (!read.ok || !read.image) {
+        return res.json({ success: true, data: { ...read, source: chosen } });
+      }
+      const applied = await applyRead(product, read, true);
+      return res.json({
+        success: true,
+        data: {
+          ...read,
+          boxes: applied.boxes,
+          livePreviewConfig: applied.config,
+          added: applied.added,
+          source: chosen,
+        },
+      });
+    }
+
     const image = product.images.find((i) => i.isPrimary) ?? product.images[0];
     if (!image) {
       return res.json({
         success: true,
-        data: { ok: false, reason: 'Add a photograph first and this can read it.', image: null, aspect: null, plateColor: null, textColor: null, boxes: [] },
+        data: {
+          ok: false,
+          reason: 'Add a photograph, or upload the flat design file the piece is cut from, and this can read it.',
+          image: null, aspect: null, plateColor: null, textColor: null, boxes: [],
+        },
       });
     }
 
     const read = await readPlate(image.url);
     if (!read.ok || !read.image) {
-      /*
-       * The lettering could not be lifted off, but the shape still can be, so
-       * the preview becomes a clean plate at the real piece's proportions
-       * rather than nothing at all. The reason goes back either way: the
-       * studio is told what happened and can supply a flat artwork file.
-       */
       /*
        * The first picture failed, but another of the product's own pictures
        * may still read -- which is the whole point of trying them all.
@@ -931,131 +1092,26 @@ router.post(
             ok: true,
             reason: 'Read from another of this product\'s pictures.',
             image: null,
-            boxes: new Array(another.boxes).fill(null),
+            boxes: another.config.photo.boxes,
             livePreviewConfig: another.config,
+            added: another.added ?? [],
           },
         });
       }
       return res.json({ success: true, data: read });
     }
 
-    /*
-     * Which question each line asks.
-     *
-     * Nothing in a picture says the short line at the top is a flat number
-     * rather than a surname -- but the product usually already says so. A
-     * product that has been set up asks its questions in the order they are
-     * answered, top of the plate downwards, so its own questions are matched
-     * to the lines found, in order.
-     *
-     * Numbering the lines line1, line2, line3 regardless was how a plate came
-     * back wrong in the way that is hardest to spot: a product asking for a
-     * flat number, a name and a family name got its name painted on the line
-     * the flat number came off, its family name on the name's line, and the
-     * flat number nowhere at all, because no box was ever bound to it. Every
-     * line was drawn, so nothing looked broken -- it just said the wrong
-     * things in the wrong places.
-     *
-     * A product with no questions yet falls back to the plain numbering,
-     * which is what the fields created below are then made to match.
-     */
-    const LABELS: Record<string, string> = {
-      line1: 'First line',
-      line2: 'Second line',
-      line3: 'Third line',
-      number: 'House / flat number',
-    };
-
-    /*
-     * One rule, shared with the shop and with the reader, so a line can never
-     * mean one thing here and another thing on the product page. Any line the
-     * product has no question for still gets a slot, so the studio can bind
-     * something to it later rather than finding a line of the artwork that
-     * cannot be reached at all.
-     */
-    const order = slotOrder(product.personalization.filter((f) => f.status === 'PUBLISHED'));
-
-    const boxes = read.boxes.slice(0, order.length).map((box, index) => ({
-      ...box,
-      slot: order[index],
-    }));
-
-    /*
-     * Built once and both stored and returned. The editor needs the settings
-     * that were just written so it can show them without reloading the whole
-     * product and discarding whatever else is being edited, and working them
-     * out a second time on the client is how the two drift apart.
-     */
-    /*
-     * A face the studio has already chosen is knowledge the reader does not
-     * have. No photograph carries the typeface it was set in, so re-reading a
-     * picture -- to pick up better artwork, or to fix the lines -- must not
-     * quietly put the lettering back to a plain sans and undo a choice made by
-     * eye. Only a product that has never had one falls back to the alphabet.
-     */
-    const chosenFont = (product.livePreviewConfig as { defaults?: { fontFamily?: string } } | null)
-      ?.defaults?.fontFamily;
-
-    const livePreviewConfig = {
-      aspect: read.aspect ?? undefined,
-      defaults: {
-        ...(read.plateColor ? { plateColor: read.plateColor } : {}),
-        ...(read.textColor ? { textColor: read.textColor } : {}),
-        /*
-         * Set in the alphabet the piece is lettered in.
-         *
-         * A picture carries no typeface, so this used to stay on a Latin face
-         * and a plate cut in Devanagari came back with the customer's name in
-         * the wrong alphabet's font -- the one thing that came out wrong on a
-         * plate where everything else came out right, and so the last thing
-         * anyone would think to go and change.
-         */
-        ...(chosenFont
-          ? { fontFamily: chosenFont }
-          : read.script === 'devanagari' ? { fontFamily: 'devanagari' } : {}),
-        /* How heavy the real lettering is, measured off the artwork. */
-        fontWeight: read.weight,
-      },
-      photo: { image: read.image, boxes },
-    };
-
-    await prisma.product.update({
-      where: { id: product.id },
+    const applied = await applyRead(product, read, true);
+    return res.json({
+      success: true,
       data: {
-        livePreviewEnabled: true,
-        livePreviewTemplate: 'photo',
-        livePreviewConfig,
+        ...read,
+        boxes: applied.boxes,
+        livePreviewConfig: applied.config,
+        added: applied.added,
+        source: image.url,
       },
     });
-
-    await ensureLetteringQuestion(product.id, read.script, livePreviewConfig.defaults.fontFamily);
-
-    /*
-     * Fields are only created for a product that has none. Re-reading a
-     * photograph after the studio has worded its own questions must not bury
-     * them under a second set saying "First line".
-     */
-    let fields = product.personalization.length;
-    if (!fields) {
-      for (const [index, box] of boxes.entries()) {
-        await prisma.personalizationField.create({
-          data: {
-            productId: product.id,
-            key: box.slot,
-            label: LABELS[box.slot] ?? box.slot,
-            type: 'TEXT',
-            required: index === 0,
-            maxLength: 40,
-            sortOrder: index,
-            status: 'PUBLISHED',
-            previewSlot: box.slot,
-          },
-        });
-      }
-      fields = boxes.length;
-    }
-
-    return res.json({ success: true, data: { ...read, boxes, fields, livePreviewConfig } });
   }),
 );
 router.post(

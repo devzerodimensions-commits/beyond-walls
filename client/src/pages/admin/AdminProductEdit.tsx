@@ -20,7 +20,8 @@ import { ReadPhotograph } from '../../components/admin/ReadPhotograph';
 import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
 import { FontChoice } from '../../components/admin/FontChoice';
 import {
-  LivePreview, PLATE_FONTS, PREVIEW_SLOTS, SIZEABLE_SLOTS, buildPreviewSlots, resolvePreviewConfig,
+  LivePreview, PLATE_FONTS, PREVIEW_SLOTS, SIZEABLE_SLOTS, buildPreviewSlots, previewIsUsable,
+  resolvePreviewConfig,
   usePreviewTemplates, type PreviewConfig,
 } from '../../components/product/LivePreview';
 import {
@@ -583,6 +584,7 @@ export default function AdminProductEdit() {
                       set('livePreviewTemplate', nextTemplate);
                       set('livePreviewConfig', nextConfig);
                     }}
+                    ready={previewIsUsable(form.livePreviewTemplate, form.livePreviewConfig)}
                   />
 
                   {/*

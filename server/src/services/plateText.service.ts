@@ -143,6 +143,43 @@ const MAX_LINES = 6;
  */
 const BOLD_FILL = 0.45;
 
+/**
+ * How tall the biggest line must be, as a share of the picture's height,
+ * before it is believed to be the lettering of the piece.
+ *
+ * A nameplate's name is the largest thing on it. Read off a flat design file
+ * or a decent picture of the piece, it is never small: across the studio's
+ * plates the smallest name that was read correctly stands 0.081 of the picture
+ * (the botanical frame), and plain sign text 0.050.
+ *
+ * What the reader was also finding, and building previews out of, sat far
+ * below that: the studio's own "BEYOND WALLS" watermark (0.013), the caption
+ * on a material-details card (0.033 and 0.037), a detail on a cut-out plate's
+ * wall (0.016). Two draft products went out with exactly that -- a customer's
+ * name bound into a caption in the corner of an infographic while the real
+ * name sat untouched on the plate beside it. Everything that was junk is under
+ * 0.040; everything that was real is 0.050 or more.
+ */
+const MIN_LINE_SHARE = 0.045;
+
+/**
+ * How much a painted-out patch may change from one column to the next before
+ * it shows.
+ *
+ * The fill closes each column by running the surface down from above the
+ * writing to below it. On a flat plate the columns all agree and the patch
+ * cannot be seen. On textured stone, a sunlit wall or brushed metal, each
+ * column carries its own grain down with it and the patch comes out as
+ * vertical stripes -- which is what a cut-out nameplate on a rendered wall
+ * produced: a striped band where the name had been, with the customer's name
+ * then drawn over it.
+ *
+ * Measured as the mean change in brightness between neighbouring pixels across
+ * the patch. Every patch that looked clean measured 0.01 to 0.21 on a
+ * nameplate and up to 0.62 on sign text; the striped wall measured 3.97.
+ */
+const MAX_FILL_STRIPE = 1.5;
+
 const HEADLINE_BAND: [number, number] = [0.1, 0.45];
 const HEADLINE_INK = 0.7;
 /** How wide a line's typical piece runs, relative to the line's height. */
@@ -953,6 +990,13 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
   const medianFill = fills[Math.floor(fills.length / 2)] ?? 0;
   const weight: PlateWeight = medianFill >= BOLD_FILL ? 700 : 400;
 
+  const largest = Math.max(...chosen.map((line) => (line.bottom - line.top + 1) / h));
+  if (largest < MIN_LINE_SHARE) {
+    return no(
+      'What was found is too small to be the lettering on the piece — a caption, a watermark or a detail in the picture. Upload the flat design file the piece is cut from and the preview will be built from that.',
+    );
+  }
+
   const boxes: PlateBox[] = [];
   for (const line of chosen) {
     const { clearL, clearR } = roomOf.get(line)!;
@@ -1095,6 +1139,34 @@ export async function analysePlate(source: Buffer): Promise<PlateAnalysis> {
         }
       }
       Y = end + 1;
+    }
+  }
+
+  /*
+   * Would the patch show?
+   *
+   * Measured across the painted pixels only, between neighbours that were
+   * both painted, so the edge where the patch meets the untouched surface does
+   * not count against it.
+   */
+  {
+    const luma = (X: number, Y: number) => {
+      const p = (Y * outW + X) * 3;
+      return 0.299 * big[p] + 0.587 * big[p + 1] + 0.114 * big[p + 2];
+    };
+    let change = 0;
+    let pairs = 0;
+    for (let Y = 0; Y < outH; Y += 1) {
+      for (let X = 0; X < outW - 1; X += 1) {
+        if (!painted(X, Y) || !painted(X + 1, Y)) continue;
+        change += Math.abs(luma(X + 1, Y) - luma(X, Y));
+        pairs += 1;
+      }
+    }
+    if (pairs && change / pairs > MAX_FILL_STRIPE) {
+      return no(
+        'The writing sits on a textured surface — a wall, stone or brushed metal — and painting it out would leave visible stripes behind the customer\'s name. Upload the flat design file the piece is cut from and the preview will be built from that.',
+      );
     }
   }
 
