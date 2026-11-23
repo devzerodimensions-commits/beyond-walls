@@ -1032,17 +1032,45 @@ router.get(
   }),
 );
 
+/**
+ * One symbol or a whole alphabet.
+ *
+ * A monogram plate is sold in twenty-six letters, each one its own piece of
+ * artwork, and adding them one upload at a time is the kind of work nobody
+ * finishes. A set arrives together and each is named after its own file, so
+ * A.png becomes "A" -- which is how a studio's letter folder is already
+ * named. The name given alongside is used only when a single file is sent.
+ */
 router.post(
   '/symbols',
-  upload.single('file'),
+  upload.array('files', 40),
   asyncHandler(async (req, res) => {
-    const file = req.file as Express.Multer.File | undefined;
-    if (!file) throw ApiError.badRequest('Choose a picture of the symbol — PNG, JPG or WebP.');
-    const symbols = await addSymbol(file, {
-      label: typeof req.body?.label === 'string' ? req.body.label : undefined,
-      tint: req.body?.tint === undefined ? true : String(req.body.tint) !== 'false',
-    });
-    res.status(201).json({ success: true, data: symbols });
+    const many = (req.files as Express.Multer.File[] | undefined) ?? [];
+    const one = req.file as Express.Multer.File | undefined;
+    const files = many.length ? many : one ? [one] : [];
+    if (!files.length) throw ApiError.badRequest('Choose a picture of the symbol — PNG, JPG or WebP.');
+
+    const tint = req.body?.tint === undefined ? true : String(req.body.tint) !== 'false';
+    const named = typeof req.body?.label === 'string' ? req.body.label : undefined;
+
+    let symbols = await listSymbols();
+    const failed: string[] = [];
+    for (const file of files) {
+      try {
+        symbols = await addSymbol(file, { label: files.length === 1 ? named : undefined, tint });
+      } catch (error) {
+        /*
+         * One unreadable file does not throw away the rest: a studio sending
+         * twenty-six letters should not lose twenty-five of them because one
+         * was saved oddly. Which ones failed is said in the reply.
+         */
+        failed.push(file.originalname);
+      }
+    }
+    if (!symbols.length && failed.length) {
+      throw ApiError.badRequest(`No symbol could be made out of ${failed.join(', ')}.`);
+    }
+    res.status(201).json({ success: true, data: symbols, meta: failed.length ? { failed } : undefined });
   }),
 );
 

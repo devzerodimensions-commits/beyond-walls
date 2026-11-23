@@ -78,10 +78,11 @@ export function ProductSymbols({
   });
 
   const upload = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async (files: File[]) => {
       const form = new FormData();
-      form.append('file', file);
-      if (name.trim()) form.append('label', name.trim());
+      for (const file of files) form.append('files', file);
+      /* A name belongs to one symbol; a set is named after its own files. */
+      if (files.length === 1 && name.trim()) form.append('label', name.trim());
       form.append('tint', 'true');
       return api.upload<PlateSymbol[]>('/admin/symbols', form);
     },
@@ -102,7 +103,11 @@ export function ProductSymbols({
         }
       }
       await refresh();
-      push('Symbol added — it is offered on every plate with a symbol.', 'success');
+      push(
+        list.length ? 'Symbols added — they are offered on every plate with a symbol.'
+          : 'Symbol added — it is offered on every plate with a symbol.',
+        'success',
+      );
     },
     onError: fail,
     onSettled: () => { if (fileRef.current) fileRef.current.value = ''; },
@@ -182,6 +187,26 @@ export function ProductSymbols({
         Shared across every plate that has a symbol, so a symbol added here is offered on all of them —
         and on products you add later. Ticked ones are offered on this plate.
       </p>
+
+      {symbols.length > 3 ? (
+        <p className="mb-2 text-2xs text-ink-400">
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-ink"
+            onClick={() => saveField.mutate({ options: [] })}
+          >
+            Offer all {symbols.length}
+          </button>
+          {' · '}
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-ink"
+            onClick={() => saveField.mutate({ options: symbols.slice(0, 1).map((s) => ({ label: s.label, value: s.url })) })}
+          >
+            Offer only the first
+          </button>
+        </p>
+      ) : null}
 
       {symbols.length ? (
         <div className="flex flex-wrap gap-2">
@@ -298,20 +323,22 @@ export function ProductSymbols({
           )}
         >
           {upload.isPending ? <Spinner size={13} /> : <UploadIcon size={13} />}
-          {upload.isPending ? 'Uploading…' : 'Upload a symbol'}
+          {upload.isPending ? 'Uploading…' : 'Upload symbols'}
           <input
             type="file"
             accept=".png,.jpg,.jpeg,.webp"
+            multiple
             className="hidden"
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) upload.mutate(file);
+              const files = [...(e.target.files ?? [])];
+              if (files.length) upload.mutate(files);
             }}
           />
         </label>
       </div>
       <p className="mt-1 text-2xs leading-relaxed text-ink-400">
-        The symbol on a plain background, or a transparent PNG. The background is removed for you.
+        One file or a whole set — a monogram's twenty-six letters go in together, each named after its
+        own file. The symbol on a plain background, or a transparent PNG; the background is removed for you.
         {symbols.length ? ' Click a symbol to offer it on this plate or take it off; click its name to rename it.' : ''}
       </p>
 
