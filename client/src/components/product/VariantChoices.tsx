@@ -51,8 +51,15 @@ export function choiceRows(variants: ProductVariant[]): ChoiceRow[] {
       else if (!row.values.includes(value)) row.values.push(value);
     }
   }
-  const complete = rows.filter((row) => variants.every((v) => valueOf(v, row.name)));
-  // One row whose every variant has its own value adds nothing over the labels.
+  /*
+   * A choice with one answer is not a choice.
+   *
+   * Every acrylic plate is acrylic, so "Choose a material: Acrylic" is a step
+   * that asks nothing and numbers itself ahead of the steps that do. It is
+   * left out of the rows; it constrains nothing either, since every variant
+   * carries the same value for it.
+   */
+  const complete = rows.filter((row) => variants.every((v) => valueOf(v, row.name)) && row.values.length > 1);
   if (!complete.length) return [];
   const combinations = complete.reduce((n, row) => n * row.values.length, 1);
   return combinations >= variants.length ? complete : [];
