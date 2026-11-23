@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../../lib/api';
+import { VariantChoices, choiceRows, valueOf, variantFor } from '../../components/product/VariantChoices';
 import type { Faq, Product } from '../../lib/types';
 import { Seo, breadcrumbSchema, productSchema } from '../../lib/seo';
 import { formatPrice, toNumber } from '../../lib/format';
@@ -164,6 +165,31 @@ export default function ProductPage() {
 
   const variants = sellableVariants(product.variants);
   const variant = variants.find((v) => v.id === variantId) ?? null;
+
+  /*
+   * The choices behind the variants: a row of sizes, a row of colours.
+   *
+   * Empty when the variants carry none, and then the plain list of labels is
+   * shown exactly as before -- which is every product set up until now.
+   */
+  const rows = choiceRows(variants);
+  const picked: Record<string, string> = {};
+  for (const row of rows) picked[row.name] = variant ? valueOf(variant, row.name) : '';
+
+  /*
+   * Picking a value keeps everything else the customer has already chosen
+   * where it can: changing the colour of a 15 x 7 plate leaves it 15 x 7. If
+   * that pairing is not sold, the nearest one that is wins, so a choice never
+   * lands on nothing.
+   */
+  const pickValue = (name: string, value: string) => {
+    const wanted = { ...picked, [name]: value };
+    const exact = variantFor(variants, rows, wanted);
+    if (exact) { setVariantId(exact.id); return; }
+    const nearest = variants.find((v) => valueOf(v, name) === value
+      && (!product.trackInventory || v.stock > 0));
+    if (nearest) setVariantId(nearest.id);
+  };
 
   // Variant price wins; a product with no base price is still buyable when the
   // selected variant carries one.
@@ -559,8 +585,19 @@ export default function ProductPage() {
 
               <div className="my-4 rule sm:my-6" />
 
-              {/* Variants */}
-              {variants.length > 1 ? (
+              {/* Variants, as the choices they are made of where there are any. */}
+              {variants.length > 1 && rows.length ? (
+                <VariantChoices
+                  variants={variants}
+                  rows={rows}
+                  picked={picked}
+                  basePrice={basePrice}
+                  trackInventory={product.trackInventory}
+                  onPick={pickValue}
+                />
+              ) : null}
+
+              {variants.length > 1 && !rows.length ? (
                 <div className="mb-6">
                   <p className="field-label flex items-center" id="variant-label">
                     <StepNumber>1</StepNumber>
@@ -624,7 +661,7 @@ export default function ProductPage() {
                     className="mb-6 hidden border border-stone-line bg-paper p-5 lg:block"
                   >
                     <h2 className="mb-1 flex items-center text-xs font-semibold uppercase tracking-architect">
-                      <StepNumber>{variants.length > 1 ? 2 : 1}</StepNumber>
+                      <StepNumber>{variants.length > 1 ? (rows.length || 1) + 1 : 1}</StepNumber>
                       Make it yours
                     </h2>
                     <p className="mb-5 text-2xs text-ink-400">

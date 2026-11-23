@@ -20,6 +20,7 @@ import { ReadPhotograph } from '../../components/admin/ReadPhotograph';
 import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
 import { FontChoice } from '../../components/admin/FontChoice';
 import { ProductSymbols } from '../../components/admin/ProductSymbols';
+import { ProductChoices } from '../../components/admin/ProductChoices';
 import {
   LivePreview, PLATE_FONTS, PREVIEW_SLOTS, SIZEABLE_SLOTS, buildPreviewSlots, previewIsUsable,
   resolvePreviewConfig,
@@ -730,11 +731,27 @@ export default function AdminProductEdit() {
             onContinue={() => save.mutate({ publish: false, continueTo: 'variants' })}
           />
         ) : (
-          <VariantsTab
-            productId={id!}
-            variants={product?.variants ?? []}
-            countsStock={form.trackInventory}
-          />
+          <>
+            {/*
+              * The choices first, the combinations they produce below.
+              *
+              * Adding a colour to a product sold in three sizes is one row
+              * here and six rows of price underneath; doing it in the list
+              * below means inventing six names by hand, which is the job
+              * nobody could find.
+              */}
+            <ProductChoices
+              productId={id!}
+              variants={product?.variants ?? []}
+              productPrice={form.price}
+              countsStock={form.trackInventory}
+            />
+            <VariantsTab
+              productId={id!}
+              variants={product?.variants ?? []}
+              countsStock={form.trackInventory}
+            />
+          </>
         )
       ) : null}
 

@@ -1451,6 +1451,76 @@ router.patch(
   }),
 );
 
+/**
+ * The whole set of choices for a product, written in one go.
+ *
+ * Adding a colour to a product sold in three sizes means six combinations,
+ * and adding them one at a time -- inventing a name for each, remembering
+ * which are already there -- is the job the studio could not work out how to
+ * do. The editor builds the combinations from the choices themselves and
+ * sends them here together: what is listed is kept or created, and a
+ * combination no longer listed is removed. One request, so the product can
+ * never be left half-changed.
+ *
+ * A combination already on an order keeps its own snapshot of the label and
+ * the price, so removing it here never rewrites what somebody bought.
+ */
+router.post(
+  '/:id/variants/bulk',
+  asyncHandler(async (req, res) => {
+    const schema = z.object({
+      variants: z.array(z.object({
+        id: z.string().optional(),
+        label: z.string().min(1).max(120),
+        sku: z.string().max(60).nullable().optional(),
+        price: nullableNumber,
+        stock: z.number().int().min(0).max(1_000_000).optional(),
+        options: z.record(z.string().max(40)).optional(),
+        status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
+      })).max(60),
+    });
+    const { variants } = schema.parse(req.body);
+
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, variants: { select: { id: true } } },
+    });
+    if (!product) throw ApiError.notFound('Product not found');
+
+    const known = new Set(product.variants.map((v) => v.id));
+    const kept = new Set(variants.map((v) => v.id).filter((id): id is string => !!id && known.has(id)));
+
+    await prisma.$transaction(async (tx) => {
+      for (const [index, variant] of variants.entries()) {
+        const data = {
+          label: variant.label,
+          sku: variant.sku ?? null,
+          price: variant.price ?? null,
+          stock: variant.stock ?? 0,
+          options: (variant.options ?? {}) as never,
+          status: variant.status ?? 'PUBLISHED',
+          sortOrder: index,
+          /* The first combination is the one a product page opens on. */
+          isDefault: index === 0,
+        };
+        if (variant.id && known.has(variant.id)) {
+          await tx.productVariant.update({ where: { id: variant.id }, data });
+        } else {
+          await tx.productVariant.create({ data: { ...data, productId: product.id } });
+        }
+      }
+      const gone = [...known].filter((id) => !kept.has(id));
+      if (gone.length) await tx.productVariant.deleteMany({ where: { id: { in: gone } } });
+    });
+
+    const saved = await prisma.productVariant.findMany({
+      where: { productId: product.id },
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json({ success: true, data: saved });
+  }),
+);
+
 router.post(
   '/:id/variants/reorder',
   asyncHandler(async (req, res) => {
