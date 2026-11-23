@@ -1907,10 +1907,6 @@ interface VariantDraft {
   options: { key: string; value: string }[];
 }
 
-const EMPTY_VARIANT: VariantDraft = {
-  label: '', sku: '', price: null, stock: 0, isDefault: false, status: 'PUBLISHED', options: [],
-};
-
 function VariantsTab({
   productId, variants, countsStock,
 }: {
@@ -1975,14 +1971,19 @@ function VariantsTab({
 
   return (
     <>
+      {/*
+        * Detail on what the choices above produced, and nothing is added here.
+        *
+        * This card used to add combinations too, asking for a name to invent
+        * for each -- so a shopkeeper looking for where to add a colour added
+        * one combination called "Colour", and the product went on sale in a
+        * single colourless size. Adding happens in one place now; this is
+        * where a combination's picture, its draft state or a hand-written
+        * name are changed, which the table above does not cover.
+        */}
       <AdminCard
-        title="Variants"
-        description="Sizes, materials or finishes a customer can choose. A variant price overrides the product price."
-        actions={
-          <Button size="sm" icon={<PlusIcon size={14} />} onClick={() => setEditing({ ...EMPTY_VARIANT })}>
-            Add variant
-          </Button>
-        }
+        title="Each combination in detail"
+        description="Made by the choices above. Edit one here to give it its own picture or wording."
       >
         {variants.length ? (
           <SortableList
@@ -1996,6 +1997,20 @@ function VariantsTab({
                     {variant.isDefault ? <Badge tone="dark">Default</Badge> : null}
                     {variant.status === 'DRAFT' ? <Badge tone="warning">Draft</Badge> : null}
                   </p>
+                  {/*
+                    * A combination belonging to no choice.
+                    *
+                    * Made by hand before the choices existed, it is simply one
+                    * more thing to buy with whatever name it was given --
+                    * never a row of colours for the customer to pick from,
+                    * which is what somebody naming one "Colour" meant.
+                    */}
+                  {!Object.keys((variant.options ?? {}) as Record<string, string>).length ? (
+                    <p className="mt-1 text-2xs leading-relaxed text-state-warning">
+                      Not part of any choice — customers see this as one option called
+                      “{variant.label}”. To offer colours or sizes, add them as choices above.
+                    </p>
+                  ) : null}
                   <p className="mt-0.5 text-2xs text-ink-400">
                     {variant.sku ? `${variant.sku} · ` : ''}
                     {variant.price !== null ? `₹${variant.price}` : 'Same price as the product'}
@@ -2042,7 +2057,7 @@ function VariantsTab({
           />
         ) : (
           <p className="py-8 text-center text-sm text-ink-400">
-            No variants. The product is sold as a single option.
+            Nothing yet. Add a choice above and the combinations appear here.
           </p>
         )}
       </AdminCard>

@@ -40,6 +40,24 @@ interface Combination {
 /** "Size" and "size" are the same choice; this is what two spellings are matched on. */
 const key = (name: string) => name.trim().toLowerCase();
 
+/**
+ * What to type next, in the words of the choice being filled in.
+ *
+ * The box suggested a size whatever the choice was called, so somebody who
+ * had just written "colour" was being shown "Add 12 x 6 in" and had to guess
+ * whether a colour meant its name or a paint code. It is the name the
+ * customer reads on the button, so the example says one.
+ */
+function exampleFor(name: string): string {
+  const what = name.trim().toLowerCase();
+  if (!what) return 'Add a choice, then Enter';
+  if (/colou?r|shade|finish/.test(what)) return 'Add Silver, then Enter';
+  if (/size|dimension/.test(what)) return 'Add 12 x 6 in, then Enter';
+  if (/material|metal/.test(what)) return 'Add Acrylic, then Enter';
+  if (/mount|fix/.test(what)) return 'Add Wall mounted, then Enter';
+  return `Add a ${what}, then Enter`;
+}
+
 /** The label a customer sees: "12 x 6 in · Black". */
 export function combinationLabel(values: string[]): string {
   return values.filter(Boolean).join(' · ');
@@ -156,6 +174,8 @@ export function ProductChoices({
 
   /** Combinations that exist today and would go if this were saved. */
   const losing = variants.filter((v) => !rows.some((row) => row.id === v.id));
+  /** Made by hand, belonging to no choice: see the warning on the card below. */
+  const loose = variants.filter((v) => !Object.keys((v.options ?? {}) as Record<string, string>).length);
   const submit = () => (losing.length ? setConfirming(rows) : save.mutate(rows));
 
   return (
@@ -204,8 +224,8 @@ export function ProductChoices({
                 </span>
               ))}
               <input
-                className="field w-44 py-1 text-xs"
-                placeholder={index === 0 ? 'Add 12 x 6 in, then Enter' : 'Add a choice, then Enter'}
+                className="field w-56 py-1 text-xs"
+                placeholder={exampleFor(choice.name)}
                 aria-label={`Add a value to ${choice.name || 'this choice'}`}
                 onKeyDown={(e) => {
                   if (e.key !== 'Enter') return;
@@ -311,10 +331,19 @@ export function ProductChoices({
             </div>
           </div>
         ) : (
-          <p className="border border-dashed border-stone-line p-4 text-xs leading-relaxed text-ink-400">
-            No choices yet, so this product is sold as one thing. Add “Size” with its sizes, or
-            “Colour” with its colours, and customers pick on the product page.
-          </p>
+          <div className="border border-dashed border-stone-line p-4 text-xs leading-relaxed text-ink-400">
+            <p>
+              No choices yet, so this product is sold as one thing. Add “Size” with its sizes, or
+              “Colour” with its colours, and customers pick on the product page.
+            </p>
+            {loose.length ? (
+              <p className="mt-2 text-state-warning">
+                {loose.map((v) => `“${v.label}”`).join(', ')} {loose.length === 1 ? 'is' : 'are'} listed
+                below as {loose.length === 1 ? 'a thing' : 'things'} to buy, not as a choice. Adding the
+                choices here replaces {loose.length === 1 ? 'it' : 'them'}.
+              </p>
+            ) : null}
+          </div>
         )}
       </div>
 
