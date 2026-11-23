@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../../lib/api';
-import { VariantChoices, choiceRows, mediaFor, statedChoices, valueOf, variantFor } from '../../components/product/VariantChoices';
+import { StatedChoice, VariantChoices, choiceRows, mediaFor, statedChoices, valueOf, variantFor } from '../../components/product/VariantChoices';
 import type { Faq, Product } from '../../lib/types';
 import { Seo, breadcrumbSchema, productSchema } from '../../lib/seo';
 import { formatPrice, toNumber } from '../../lib/format';
@@ -621,18 +621,11 @@ export default function ProductPage() {
                 * has to know what size they are buying, and leaving it out
                 * put it nowhere on the page at all.
                 */}
-              {stated.length ? (
-                <dl className="mt-3.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-500">
-                  {stated.map((fact) => (
-                    <div key={fact.name} className="flex gap-1.5">
-                      <dt className="text-ink-400">{fact.name}</dt>
-                      <dd className="font-medium text-ink">{fact.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : null}
-
               <div className="my-4 rule sm:my-6" />
+
+              {stated.map((fact) => (
+                <StatedChoice key={fact.name} name={fact.name} value={fact.value} />
+              ))}
 
               {/* Variants, as the choices they are made of where there are any. */}
               {variants.length > 1 && rows.length ? (

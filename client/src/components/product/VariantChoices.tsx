@@ -128,6 +128,26 @@ export function mediaFor(
   return {};
 }
 
+/**
+ * A choice with one answer, shown the way the choices are shown.
+ *
+ * It was a line of small grey print beside the price, which is where a
+ * customer's eye does not go and where "15x11.25" reads as a footnote rather
+ * than as the size of the thing they are buying. It is a labelled pill now,
+ * the same shape as the sizes on a plate that has several -- stated rather
+ * than asked, so it carries no step number and nothing to click.
+ */
+export function StatedChoice({ name, value }: { name: string; value: string }) {
+  return (
+    <div className="mb-6">
+      <p className="field-label">{name}</p>
+      <span className="inline-block rounded-full border border-ink bg-ink px-4 py-2 text-xs font-medium text-paper">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export function VariantChoices({
   variants, rows, picked, basePrice, trackInventory, onPick, startStep = 1, swatches,
 }: {
@@ -173,60 +193,98 @@ export function VariantChoices({
 
   return (
     <>
-      {rows.map((row, index) => (
-        <div key={row.name} className="mb-6">
-          <p className="field-label flex items-center" id={`choice-${index}`}>
-            <span
-              className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-ink text-[0.6rem] text-paper"
-              aria-hidden="true"
-            >
-              {startStep + index}
-            </span>
-            Choose a {row.name.toLowerCase()}
-          </p>
-          <div role="radiogroup" aria-labelledby={`choice-${index}`} className="flex flex-wrap gap-2">
-            {row.values.map((value) => {
-              const info = detail[row.name]?.[value];
-              const selected = picked[row.name] === value;
-              const disabled = !info?.sold;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-disabled={disabled || undefined}
-                  disabled={disabled}
-                  onClick={() => onPick(row.name, value)}
-                  className={clsx(
-                    'border px-4 py-2.5 text-xs transition-colors duration-200',
-                    selected ? 'border-ink bg-ink text-paper' : 'border-stone-line hover:border-ink',
-                    disabled && 'cursor-not-allowed line-through opacity-40',
-                  )}
+      {rows.map((row, index) => {
+        /*
+         * A colour is picked by looking at it, everything else by reading it.
+         *
+         * Where the studio has said what colour every value is, the words are
+         * dropped and the colours themselves are shown -- a customer weighing
+         * "Navy" against "Forest" by the words alone is choosing blind. The
+         * one they are on is named beside the question, so nothing is lost by
+         * taking the labels off the buttons.
+         */
+        const asSwatches = row.values.every((value) => hexFor(swatches, row.name, value));
+        return (
+          <div key={row.name} className="mb-6">
+            <p className="field-label flex flex-wrap items-center gap-x-2" id={`choice-${index}`}>
+              <span className="flex items-center">
+                <span
+                  className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-ink text-[0.6rem] text-paper"
+                  aria-hidden="true"
                 >
-                  {/*
-                    * Shown rather than named, where the studio has said what
-                    * colour it is: a customer choosing "Silver" over "Golden"
-                    * by the words alone is choosing blind.
-                    */}
-                  {hexFor(swatches, row.name, value) ? (
-                    <span
-                      aria-hidden="true"
-                      className="mr-2 inline-block h-3.5 w-3.5 translate-y-[2px] rounded-full border border-stone-line"
-                      style={{ backgroundColor: hexFor(swatches, row.name, value) as string }}
+                  {startStep + index}
+                </span>
+                Choose a {row.name.toLowerCase()}
+              </span>
+              {asSwatches && picked[row.name] ? (
+                <span className="normal-case tracking-normal text-ink-500">— {picked[row.name]}</span>
+              ) : null}
+            </p>
+            <div role="radiogroup" aria-labelledby={`choice-${index}`} className="flex flex-wrap gap-2">
+              {row.values.map((value) => {
+                const info = detail[row.name]?.[value];
+                const selected = picked[row.name] === value;
+                const disabled = !info?.sold;
+                const hex = hexFor(swatches, row.name, value);
+                const extra = selected && info?.price !== null && info?.price !== undefined && info.price !== basePrice
+                  ? formatPrice(info.price)
+                  : null;
+
+                if (asSwatches) {
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-label={`${value}${disabled ? ' — not available' : ''}`}
+                      aria-disabled={disabled || undefined}
+                      disabled={disabled}
+                      title={value}
+                      onClick={() => onPick(row.name, value)}
+                      className={clsx(
+                        'h-9 w-9 rounded-md border-2 transition-colors duration-200',
+                        /* The ring is the selection; the square stays the colour itself. */
+                        selected ? 'border-ink ring-2 ring-ink ring-offset-2' : 'border-stone-line hover:border-ink',
+                        disabled && 'cursor-not-allowed opacity-30',
+                      )}
+                      style={{ backgroundColor: hex as string }}
                     />
-                  ) : null}
-                  {value}
-                  {selected && info?.price !== null && info?.price !== undefined && info.price !== basePrice ? (
-                    <span className="ml-2 opacity-70">{formatPrice(info.price)}</span>
-                  ) : null}
-                  {disabled ? <span className="sr-only"> — not available</span> : null}
-                </button>
-              );
-            })}
+                  );
+                }
+
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    aria-disabled={disabled || undefined}
+                    disabled={disabled}
+                    onClick={() => onPick(row.name, value)}
+                    className={clsx(
+                      'rounded-full border px-4 py-2 text-xs transition-colors duration-200',
+                      selected ? 'border-ink bg-ink font-medium text-paper' : 'border-stone-line hover:border-ink',
+                      disabled && 'cursor-not-allowed line-through opacity-40',
+                    )}
+                  >
+                    {hex ? (
+                      <span
+                        aria-hidden="true"
+                        className="mr-2 inline-block h-3.5 w-3.5 translate-y-[2px] rounded-full border border-stone-line"
+                        style={{ backgroundColor: hex }}
+                      />
+                    ) : null}
+                    {value}
+                    {extra ? <span className="ml-2 opacity-70">{extra}</span> : null}
+                    {disabled ? <span className="sr-only"> — not available</span> : null}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
