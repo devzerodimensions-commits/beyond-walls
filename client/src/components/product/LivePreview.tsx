@@ -430,6 +430,33 @@ export const PREVIEW_PRESETS: Record<string, Partial<PreviewConfig>> = {
    * actually makes. The plate list is left with the one entry the wall stands
    * for, rather than offering colours for a panel that does not exist.
    */
+  /*
+   * A monogram is the letter, not a plate with a letter on it.
+   *
+   * Every other design here starts from a photograph of a piece and puts the
+   * customer's words where the sample's were. A monogram cannot work that
+   * way: the curls belong to the letter they were drawn around, so rubbing
+   * out an L and typing an R shows somebody a piece nobody makes -- and
+   * rubbing a large cut piece off a brick wall leaves a smear where the wall
+   * was. So this one is not a photograph at all. The letter the customer
+   * picks is their own artwork, drawn at the size it is cut, with the family
+   * name on the bar across it, and the wall shows through as it does in life.
+   */
+  monogram: {
+    aspect: { width: 1000, height: 1000 },
+    plate: { inset: 0, radius: 0, showScrews: false, borderOnLight: false },
+    defaults: { plateColor: '#F2EFE9', textColor: '#C8A961', fontFamily: 'serif' },
+    placeholders: { line1: 'Your Name' },
+    palette: {
+      plate: [{ value: 'wall', label: 'Wall', hex: '#F2EFE9' }],
+      text: [
+        { value: 'gold', label: 'Gold', hex: '#C8A961' },
+        { value: 'black', label: 'Black', hex: '#141414' },
+        { value: 'steel', label: 'Steel', hex: '#C9CCD1' },
+        { value: 'copper', label: 'Copper', hex: '#B87333' },
+      ],
+    },
+  },
   'script-cut': {
     aspect: { width: 500, height: 180 },
     plate: { inset: 0, radius: 0, showScrews: false, borderOnLight: false },
@@ -599,6 +626,8 @@ export function LivePreview({
 
   const body = (() => {
     switch (template) {
+      case 'monogram':
+        return <PlateMonogram {...shared} />;
       case 'script-cut':
         return <ScriptCut {...shared} />;
       case 'photo':
@@ -1597,6 +1626,137 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
 }
 
 /**
+ * One cut letter, with the family name on a bar across it.
+ *
+ * The letter is the customer's own choice out of the studio's alphabet, drawn
+ * from its artwork rather than typed, because the flourishes around an A were
+ * drawn for an A. It is filled with the finish the piece is cut in, the same
+ * way the symbols are, so one set of black artwork serves gold, steel and
+ * black alike and the studio draws each letter once.
+ *
+ * Nothing is drawn behind it. The piece is a cut shape on a wall, and the
+ * shadow is what it does standing off one -- which is also what keeps a pale
+ * finish legible against a pale page.
+ */
+function PlateMonogram({ slots, text, font, config, uid }: TemplateProps) {
+  const { width: VW, height: VH } = config.aspect;
+  const measure = useTextMetrics();
+
+  const letter = (slots.logo ?? '').trim();
+  const name = (slots.line1 ?? '').trim();
+  const second = (slots.line2 ?? '').trim();
+
+  /*
+   * The bar sits across the letter's waist, as it does on the piece, and runs
+   * wider than the letter so the name has room to breathe at either end.
+   */
+  const barH = Math.max(VH * 0.085, 10);
+  const barY = VH * 0.52;
+  const barW = VW * 0.82;
+  const barX = (VW - barW) / 2;
+
+  /*
+   * The name is cut OUT of the bar, so it reads as the wall showing through
+   * -- which is what the piece does. Drawn in the page's own colour when the
+   * finish is dark enough to need it.
+   */
+  const through = isLight(text) ? '#2A2520' : '#F7F6F4';
+  const room = barW * 0.88;
+  const nm = measure(name || 'Your Name', font);
+  const nameSize = Math.max(10, Math.min(barH * 0.62 / Math.max(0.01, nm.ink), room / Math.max(0.01, nm.width)));
+
+  const secondSize = second
+    ? Math.max(8, Math.min(VH * 0.055, (room * 0.8) / Math.max(0.01, measure(second, font).width)))
+    : 0;
+
+  /** The letter stands above the bar and reaches below it, as a cut letter does. */
+  const letterTop = VH * 0.06;
+  const letterH = VH * (second ? 0.74 : 0.80);
+  const letterW = VW * 0.72;
+  const letterX = (VW - letterW) / 2;
+
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="Monogram preview">
+      <defs>
+        <filter id={`lift-${uid}`} x="-12%" y="-12%" width="130%" height="140%">
+          <feDropShadow
+            dx={VW * 0.004} dy={VH * 0.016} stdDeviation={VH * 0.014}
+            floodColor="#2B2520" floodOpacity="0.3"
+          />
+        </filter>
+        {letter ? (
+          <mask id={`letter-${uid}`} maskUnits="userSpaceOnUse" x={letterX} y={letterTop} width={letterW} height={letterH} style={{ maskType: 'alpha' }}>
+            <image
+              href={assetUrl(letter)}
+              x={letterX}
+              y={letterTop}
+              width={letterW}
+              height={letterH}
+              preserveAspectRatio="xMidYMid meet"
+            />
+          </mask>
+        ) : null}
+      </defs>
+
+      <g filter={`url(#lift-${uid})`}>
+        {/*
+          * The letter, in the finish it is cut in.
+          *
+          * Before one is chosen a plain capital stands in, so the shape of the
+          * piece is plain from the first look -- and it is visibly type rather
+          * than artwork, which is the honest way to say "pick your letter".
+          */}
+        {letter ? (
+          <rect x={letterX} y={letterTop} width={letterW} height={letterH} fill={text} mask={`url(#letter-${uid})`} />
+        ) : (
+          <text
+            x={VW / 2}
+            y={letterTop + letterH * 0.82}
+            textAnchor="middle"
+            fill={text}
+            fontFamily={font}
+            fontSize={letterH * 0.95}
+            opacity="0.45"
+          >
+            {(name || 'A').trim().charAt(0).toUpperCase()}
+          </text>
+        )}
+
+        <rect x={barX} y={barY} width={barW} height={barH} rx={barH * 0.12} fill={text} />
+      </g>
+
+      {name ? (
+        <text
+          x={VW / 2}
+          y={barY + barH / 2 + measure(name, font).ink * nameSize * 0.36}
+          textAnchor="middle"
+          fill={through}
+          fontFamily={font}
+          fontSize={nameSize}
+          letterSpacing={nameSize * 0.06}
+        >
+          {name}
+        </text>
+      ) : null}
+
+      {second ? (
+        <text
+          x={VW / 2}
+          y={barY + barH + VH * 0.075}
+          textAnchor="middle"
+          fill={text}
+          fontFamily={font}
+          fontSize={secondSize}
+          letterSpacing={secondSize * 0.12}
+        >
+          {second}
+        </text>
+      ) : null}
+    </svg>
+  );
+}
+
+/**
  * Lettering cut out and fixed straight to the wall.
  *
  * Every other design here draws a plate and writes on it. This piece has no
@@ -1711,6 +1871,7 @@ export const PREVIEW_TEMPLATES = [
    * none would draw an empty plate. It is set by reading a photograph.
    */
   { value: 'photo', label: 'From the product photograph (set up automatically)' },
+  { value: 'monogram', label: 'Monogram — a cut letter with the name across it' },
 ];
 
 /**
