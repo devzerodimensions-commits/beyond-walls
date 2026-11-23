@@ -316,7 +316,17 @@ export function ProductGallery({
             </button>
           </div>
 
-          <div className="relative flex flex-1 items-center justify-center px-4 pb-6">
+          {/*
+            * min-h-0 is what makes the picture fit.
+            *
+            * A flex child will not shrink below the height of its contents
+            * unless it is told it may, so this box grew to whatever the
+            * photograph was and the rest hung off the bottom of the screen --
+            * a tall picture opened on its top third with no way to see the
+            * rest. With it, max-h-full has a height to measure against and
+            * every picture is shown whole, however it is shaped.
+            */}
+          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 pb-6">
             <img
               src={assetUrl(current.url)}
               alt={current.alt ?? productName}
