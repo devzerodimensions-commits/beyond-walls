@@ -1065,6 +1065,20 @@ async function buildPreviewFromPhoto(productId: string, force = false) {
    */
   if (!force && Array.isArray(existing.photo?.boxes) && existing.photo.boxes.length) return null;
 
+  /*
+   * A template the studio chose by hand is not a guess to be overwritten.
+   *
+   * Reading a photograph always ends in the 'photo' template, because that is
+   * what a read produces: a picture of the piece with the words placed on it.
+   * It is the wrong answer for a plate drawn from its own parts -- a monogram
+   * is its cut letter, not a photograph of one -- and such a product has no
+   * photo boxes to guard it, so the catalogue picture arriving on the Images
+   * tab used to convert it and take the working preview with it. The studio
+   * uploading a photograph is not asking for that. Pressing the button still
+   * is, and is still obeyed.
+   */
+  if (!force && product.livePreviewTemplate && product.livePreviewTemplate !== 'photo') return null;
+
   /* The primary first, because it is usually the best picture of the piece. */
   const ordered = [
     ...product.images.filter((i) => i.isPrimary),
