@@ -228,7 +228,7 @@ export function ProductChoices({
               <input
                 className="field flex-1"
                 value={choice.name}
-                placeholder="What they choose — e.g. Size, Colour, Finish"
+                placeholder="Name it first — Size, Colour or Finish"
                 aria-label={`Name of choice ${index + 1}`}
                 onChange={(e) => setChoice(index, { name: e.target.value })}
               />
@@ -241,6 +241,14 @@ export function ProductChoices({
                 <CloseIcon size={15} />
               </button>
             </div>
+
+            {isColourChoice(choice.name) ? (
+              <p className="mt-2 text-2xs leading-relaxed text-ink-400">
+                Type each colour&apos;s name below and press Enter — “Silver”, “Golden”. Each one gets a
+                square beside it: click that to set its exact shade, which is what customers see on
+                the product page.
+              </p>
+            ) : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {choice.values.map((value, vi) => (
@@ -262,7 +270,7 @@ export function ProductChoices({
                       aria-label={`Colour of ${value}`}
                       title={`Colour of ${value}`}
                       value={swatches[choice.name.trim()]?.[value] ?? guessHex(value)}
-                      className="h-5 w-5 cursor-pointer border border-stone-line bg-paper p-0"
+                      className="h-6 w-6 cursor-pointer rounded-sm border border-stone-line bg-paper p-0 hover:border-ink"
                       onChange={(e) => setSwatches((current) => ({
                         ...current,
                         [choice.name.trim()]: { ...(current[choice.name.trim()] ?? {}), [value]: e.target.value },
