@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma';
 import { ApiError, asyncHandler, buildPageMeta, parsePagination } from '../../utils/http';
 import { toBool, uniqueSlug } from '../../utils/helpers';
@@ -1478,8 +1478,10 @@ router.post(
         options: z.record(z.string().max(40)).optional(),
         status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
       })).max(60),
+      /* { "Colour": { "Silver": "#C9CCD1" } } — the colour each value actually is. */
+      swatches: z.record(z.record(z.string().regex(/^#[0-9a-fA-F]{6}$/))).optional(),
     });
-    const { variants } = schema.parse(req.body);
+    const { variants, swatches } = schema.parse(req.body);
 
     const product = await prisma.product.findUnique({
       where: { id: req.params.id },
@@ -1511,6 +1513,12 @@ router.post(
       }
       const gone = [...known].filter((id) => !kept.has(id));
       if (gone.length) await tx.productVariant.deleteMany({ where: { id: { in: gone } } });
+      if (swatches !== undefined) {
+        await tx.product.update({
+          where: { id: product.id },
+          data: { choiceSwatches: (Object.keys(swatches).length ? swatches : Prisma.DbNull) as never },
+        });
+      }
     });
 
     const saved = await prisma.productVariant.findMany({

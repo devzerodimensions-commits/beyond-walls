@@ -590,6 +590,7 @@ export default function ProductPage() {
                 <VariantChoices
                   variants={variants}
                   rows={rows}
+                  swatches={product.choiceSwatches}
                   picked={picked}
                   basePrice={basePrice}
                   trackInventory={product.trackInventory}

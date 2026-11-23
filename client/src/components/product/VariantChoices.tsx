@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import clsx from 'clsx';
 import { formatPrice, toNumber } from '../../lib/format';
-import type { ProductVariant } from '../../lib/types';
+import type { ChoiceSwatches, ProductVariant } from '../../lib/types';
 
 /**
  * Choosing a size and a colour, rather than reading a list of every pairing.
@@ -70,11 +70,21 @@ export function variantFor(variants: ProductVariant[], rows: ChoiceRow[], picked
   return variants.find((v) => rows.every((row) => valueOf(v, row.name) === picked[row.name])) ?? null;
 }
 
+/** The colour saved for a value, whatever case the choice was named in. */
+function hexFor(swatches: ChoiceSwatches | null | undefined, name: string, value: string): string | null {
+  if (!swatches) return null;
+  const found = Object.entries(swatches).find(([n]) => key(n) === key(name));
+  const hex = found?.[1]?.[value];
+  return typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : null;
+}
+
 export function VariantChoices({
-  variants, rows, picked, basePrice, trackInventory, onPick, startStep = 1,
+  variants, rows, picked, basePrice, trackInventory, onPick, startStep = 1, swatches,
 }: {
   variants: ProductVariant[];
   rows: ChoiceRow[];
+  /** The colour each value is, where the studio has said. */
+  swatches?: ChoiceSwatches | null;
   /** The value chosen in each row, by the row's name. */
   picked: Record<string, string>;
   /** What the product costs without a variant price; null when it has none. */
@@ -144,6 +154,18 @@ export function VariantChoices({
                     disabled && 'cursor-not-allowed line-through opacity-40',
                   )}
                 >
+                  {/*
+                    * Shown rather than named, where the studio has said what
+                    * colour it is: a customer choosing "Silver" over "Golden"
+                    * by the words alone is choosing blind.
+                    */}
+                  {hexFor(swatches, row.name, value) ? (
+                    <span
+                      aria-hidden="true"
+                      className="mr-2 inline-block h-3.5 w-3.5 translate-y-[2px] rounded-full border border-stone-line"
+                      style={{ backgroundColor: hexFor(swatches, row.name, value) as string }}
+                    />
+                  ) : null}
                   {value}
                   {selected && info?.price !== null && info?.price !== undefined && info.price !== basePrice ? (
                     <span className="ml-2 opacity-70">{formatPrice(info.price)}</span>

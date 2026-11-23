@@ -335,6 +335,8 @@ model Product {
   designNote       String?
   materialNote     String?
   careInstructions String?
+  /// The colour each choice value is, for swatches: { "Colour": { "Silver": "#C9CCD1" } }.
+  choiceSwatches   Json?
   /// Fulfilment copy shown as its own section on the product page.
   installationNote String?
   shippingNote     String?

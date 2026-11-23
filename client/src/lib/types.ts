@@ -99,6 +99,9 @@ export interface ProductVariant {
   status?: ContentStatus;
 }
 
+/** The colour each choice value is: { "Colour": { "Silver": "#C9CCD1" } }. */
+export type ChoiceSwatches = Record<string, Record<string, string>>;
+
 export interface PersonalizationOption {
   label: string;
   value: string;
@@ -172,6 +175,8 @@ export interface Product {
   livePreviewEnabled: boolean;
   livePreviewTemplate?: string | null;
   livePreviewConfig?: Record<string, unknown>;
+  /** The colour each choice value is, for swatches on the product page. */
+  choiceSwatches?: ChoiceSwatches | null;
   productionDays?: number | null;
   /** Optional gallery video: a YouTube or Vimeo link, or a direct mp4/webm. */
   videoUrl?: string | null;

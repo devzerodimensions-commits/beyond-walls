@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { ApiError, api } from '../../lib/api';
 import { useToast } from '../../context/StoreProvider';
-import type { ProductVariant } from '../../lib/types';
+import type { ChoiceSwatches, ProductVariant } from '../../lib/types';
 import { AdminCard } from './AdminKit';
 import { Button, CloseIcon, ConfirmDialog, PlusIcon } from '../ui';
 
@@ -39,6 +39,26 @@ interface Combination {
 
 /** "Size" and "size" are the same choice; this is what two spellings are matched on. */
 const key = (name: string) => name.trim().toLowerCase();
+
+/** Whether this choice is about colour, and so worth showing as a swatch. */
+export const isColourChoice = (name: string) => /colou?r|shade|finish/.test(key(name));
+
+/** A starting colour for a value, so the picker does not open on black for every one. */
+const GUESSES: [RegExp, string][] = [
+  [/silver|steel|chrome|grey|gray/, '#C9CCD1'],
+  [/gold/, '#C8A961'],
+  [/black|matt/, '#111111'],
+  [/white|ivory|cream/, '#F5F3EF'],
+  [/copper|bronze|rose/, '#B87333'],
+  [/wood|teak|oak|brown/, '#8B5A2B'],
+  [/green|forest/, '#1F3B2E'],
+  [/blue|navy/, '#1F3A5F'],
+  [/red|maroon/, '#8C1C2B'],
+];
+function guessHex(value: string): string {
+  const found = GUESSES.find(([pattern]) => pattern.test(value.toLowerCase()));
+  return found ? found[1] : '#C9CCD1';
+}
 
 /**
  * What to type next, in the words of the choice being filled in.
@@ -86,13 +106,15 @@ function choicesOf(variants: ProductVariant[]): Choice[] {
 }
 
 export function ProductChoices({
-  productId, variants, productPrice, countsStock,
+  productId, variants, productPrice, countsStock, savedSwatches,
 }: {
   productId: string;
   variants: ProductVariant[];
   /** Shown as the price a combination falls back to. */
   productPrice: number | null;
   countsStock: boolean;
+  /** The colours already saved for this product's choice values. */
+  savedSwatches?: ChoiceSwatches | null;
 }) {
   const queryClient = useQueryClient();
   const { push } = useToast();
@@ -101,6 +123,8 @@ export function ProductChoices({
   const [choices, setChoices] = useState<Choice[]>(saved);
   const [prices, setPrices] = useState<Record<string, { price: number | null; stock: number; sku: string | null; id?: string }>>({});
   const [confirming, setConfirming] = useState<Combination[] | null>(null);
+  /** The colour each value is, kept as the studio sets it: { Colour: { Silver: '#C9CCD1' } }. */
+  const [swatches, setSwatches] = useState<ChoiceSwatches>(savedSwatches ?? {});
 
   /*
    * What is already saved, held against the combinations about to be written,
@@ -121,7 +145,8 @@ export function ProductChoices({
     }
     setPrices(byValues);
     setChoices(saved);
-  }, [variants, saved]);
+    setSwatches(savedSwatches ?? {});
+  }, [variants, saved, savedSwatches]);
 
   const rows: Combination[] = useMemo(() => {
     const usable = choices.filter((c) => c.name.trim() && c.values.length);
@@ -141,7 +166,19 @@ export function ProductChoices({
   const save = useMutation({
     mutationFn: (combinations: Combination[]) => {
       const usable = choices.filter((c) => c.name.trim() && c.values.length);
+      /* Only the colours still offered; a value removed takes its swatch with it. */
+      const keptSwatches: ChoiceSwatches = {};
+      for (const choice of usable) {
+        if (!isColourChoice(choice.name)) continue;
+        const forChoice: Record<string, string> = {};
+        for (const value of choice.values) {
+          const hex = swatches[choice.name.trim()]?.[value];
+          if (hex) forChoice[value] = hex;
+        }
+        if (Object.keys(forChoice).length) keptSwatches[choice.name.trim()] = forChoice;
+      }
       return api.post<ProductVariant[]>(`/admin/products/${productId}/variants/bulk`, {
+        swatches: keptSwatches,
         variants: combinations.map((row) => ({
           id: row.id,
           label: combinationLabel(row.values),
@@ -212,6 +249,26 @@ export function ProductChoices({
                   key={vi}
                   className="inline-flex items-center gap-1.5 border border-stone-line bg-paper-off px-2.5 py-1 text-xs"
                 >
+                  {/*
+                    * The colour this value actually is.
+                    *
+                    * "Silver" and "Golden" are two words to a customer until
+                    * one of them is silver, so a colour choice carries the
+                    * colour itself and the product page shows it.
+                    */}
+                  {isColourChoice(choice.name) ? (
+                    <input
+                      type="color"
+                      aria-label={`Colour of ${value}`}
+                      title={`Colour of ${value}`}
+                      value={swatches[choice.name.trim()]?.[value] ?? guessHex(value)}
+                      className="h-5 w-5 cursor-pointer border border-stone-line bg-paper p-0"
+                      onChange={(e) => setSwatches((current) => ({
+                        ...current,
+                        [choice.name.trim()]: { ...(current[choice.name.trim()] ?? {}), [value]: e.target.value },
+                      }))}
+                    />
+                  ) : null}
                   {value}
                   <button
                     type="button"
