@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../../lib/api';
-import { VariantChoices, choiceRows, mediaFor, valueOf, variantFor } from '../../components/product/VariantChoices';
+import { VariantChoices, choiceRows, mediaFor, statedChoices, valueOf, variantFor } from '../../components/product/VariantChoices';
 import type { Faq, Product } from '../../lib/types';
 import { Seo, breadcrumbSchema, productSchema } from '../../lib/seo';
 import { formatPrice, toNumber } from '../../lib/format';
@@ -186,6 +186,8 @@ export default function ProductPage() {
    * that colour's, so their name appears on the piece they chose. A colour
    * with no picture of its own changes nothing.
    */
+  /* What this piece simply is: a size it only comes in, the material it is cut from. */
+  const stated = statedChoices(variants);
   const chosenMedia = mediaFor(product.choiceImages, rows, picked);
   const galleryImages = chosenMedia.photo
     ? [
@@ -609,6 +611,25 @@ export default function ProductPage() {
                   {!outOfStock ? <CheckIcon size={13} /> : null}
                   {outOfStock ? 'Out of stock' : lowStock ? `Only ${stock} left` : 'In stock'}
                 </p>
+              ) : null}
+
+              {/*
+                * Facts rather than questions.
+                *
+                * A plate sold in one size has nothing to choose, and asking
+                * would be a step that does nothing -- but a customer still
+                * has to know what size they are buying, and leaving it out
+                * put it nowhere on the page at all.
+                */}
+              {stated.length ? (
+                <dl className="mt-3.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-500">
+                  {stated.map((fact) => (
+                    <div key={fact.name} className="flex gap-1.5">
+                      <dt className="text-ink-400">{fact.name}</dt>
+                      <dd className="font-medium text-ink">{fact.value}</dd>
+                    </div>
+                  ))}
+                </dl>
               ) : null}
 
               <div className="my-4 rule sm:my-6" />

@@ -52,17 +52,42 @@ export function choiceRows(variants: ProductVariant[]): ChoiceRow[] {
     }
   }
   /*
-   * A choice with one answer is not a choice.
+   * A choice with one answer is not a choice, but it is still a fact.
    *
-   * Every acrylic plate is acrylic, so "Choose a material: Acrylic" is a step
+   * Every plate here is 15"x11.25", so "Choose a size: 15x11.25" is a step
    * that asks nothing and numbers itself ahead of the steps that do. It is
-   * left out of the rows; it constrains nothing either, since every variant
-   * carries the same value for it.
+   * left out of the pickers -- and said instead, by statedChoices below,
+   * because a customer still has to know what size they are buying. Leaving
+   * it out altogether was the fault: the plate was sold with its size
+   * nowhere on the page.
    */
   const complete = rows.filter((row) => variants.every((v) => valueOf(v, row.name)) && row.values.length > 1);
   if (!complete.length) return [];
   const combinations = complete.reduce((n, row) => n * row.values.length, 1);
   return combinations >= variants.length ? complete : [];
+}
+
+/**
+ * The choices that have only one answer, stated rather than asked.
+ *
+ * "Size 15x11.25" and "Material Acrylic" are what this piece is, not
+ * decisions anybody makes. Shown as a line of plain facts beside the price,
+ * where a customer reads them without being asked to do anything.
+ */
+export function statedChoices(variants: ProductVariant[]): { name: string; value: string }[] {
+  if (!variants.length) return [];
+  const rows: ChoiceRow[] = [];
+  for (const variant of variants) {
+    for (const [name, value] of Object.entries(optionsOf(variant))) {
+      if (!value) continue;
+      const row = rows.find((r) => key(r.name) === key(name));
+      if (!row) rows.push({ name, values: [value] });
+      else if (!row.values.includes(value)) row.values.push(value);
+    }
+  }
+  return rows
+    .filter((row) => row.values.length === 1 && variants.every((v) => valueOf(v, row.name)))
+    .map((row) => ({ name: row.name, value: row.values[0] }));
 }
 
 /** The variant matching one value from each row, or null when that pairing is not sold. */
