@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import clsx from 'clsx';
 import { formatPrice, toNumber } from '../../lib/format';
-import type { ChoiceSwatches, ProductVariant } from '../../lib/types';
+import type { ChoiceImages, ChoiceSwatches, ProductVariant } from '../../lib/types';
 
 /**
  * Choosing a size and a colour, rather than reading a list of every pairing.
@@ -76,6 +76,31 @@ function hexFor(swatches: ChoiceSwatches | null | undefined, name: string, value
   const found = Object.entries(swatches).find(([n]) => key(n) === key(name));
   const hex = found?.[1]?.[value];
   return typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : null;
+}
+
+/**
+ * The picture and the plain plate the chosen values are sold as.
+ *
+ * Read from the values rather than from the combination, because the colour
+ * is what changes how a plate looks and the size is not. Where two choices
+ * both carry a picture the first one wins, which is the order the studio put
+ * them in. Nothing set anywhere gives null, and the product's own
+ * photographs are shown exactly as before.
+ */
+export function mediaFor(
+  images: ChoiceImages | null | undefined,
+  rows: ChoiceRow[],
+  picked: Record<string, string>,
+): { photo?: string; blank?: string } {
+  if (!images) return {};
+  for (const row of rows) {
+    const value = picked[row.name];
+    if (!value) continue;
+    const found = Object.entries(images).find(([n]) => key(n) === key(row.name));
+    const entry = found?.[1]?.[value];
+    if (entry && (entry.photo || entry.blank)) return entry;
+  }
+  return {};
 }
 
 export function VariantChoices({

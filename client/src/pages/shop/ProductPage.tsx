@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../../lib/api';
-import { VariantChoices, choiceRows, valueOf, variantFor } from '../../components/product/VariantChoices';
+import { VariantChoices, choiceRows, mediaFor, valueOf, variantFor } from '../../components/product/VariantChoices';
 import type { Faq, Product } from '../../lib/types';
 import { Seo, breadcrumbSchema, productSchema } from '../../lib/seo';
 import { formatPrice, toNumber } from '../../lib/format';
@@ -175,6 +175,33 @@ export default function ProductPage() {
   const rows = choiceRows(variants);
   const picked: Record<string, string> = {};
   for (const row of rows) picked[row.name] = variant ? valueOf(variant, row.name) : '';
+
+  /*
+   * The picture of what they have actually chosen.
+   *
+   * A customer who picks "purple" and goes on looking at a silver plate is
+   * being shown the wrong product at the moment they decide to buy it, which
+   * is the one thing this page exists to prevent. The colour's own picture
+   * leads the gallery, and the plain plate behind the live preview becomes
+   * that colour's, so their name appears on the piece they chose. A colour
+   * with no picture of its own changes nothing.
+   */
+  const chosenMedia = mediaFor(product.choiceImages, rows, picked);
+  const galleryImages = chosenMedia.photo
+    ? [
+      { id: `choice-${chosenMedia.photo}`, url: chosenMedia.photo, alt: product.name, isPrimary: true, sortOrder: -1 },
+      ...product.images.filter((image) => image.url !== chosenMedia.photo),
+    ]
+    : product.images;
+  const previewConfig = chosenMedia.blank && product.livePreviewTemplate === 'photo'
+    ? {
+      ...(product.livePreviewConfig ?? {}),
+      photo: {
+        ...((product.livePreviewConfig as { photo?: Record<string, unknown> } | null)?.photo ?? {}),
+        image: chosenMedia.blank,
+      },
+    }
+    : product.livePreviewConfig;
 
   /*
    * Picking a value keeps everything else the customer has already chosen
@@ -478,7 +505,8 @@ export default function ProductPage() {
             */}
             <div className="gallery-sticky">
             <ProductGallery
-              images={product.images}
+              images={galleryImages}
+              jumpTo={chosenMedia.photo ?? null}
               productName={product.name}
               videoUrl={product.videoUrl}
               previewFilled={hasTypedForPreview}
@@ -497,7 +525,7 @@ export default function ProductPage() {
                   <div ref={previewRef}>
                     <LivePreview
                       template={product.livePreviewTemplate}
-                      config={product.livePreviewConfig}
+                      config={previewConfig}
                       slots={previewSlots}
                       placeholders={samplePlaceholders}
                       scales={textSizes}
@@ -1096,7 +1124,7 @@ export default function ProductPage() {
               >
                 <LivePreview
                   template={product.livePreviewTemplate}
-                  config={product.livePreviewConfig}
+                  config={previewConfig}
                   slots={previewSlots}
                   placeholders={samplePlaceholders}
                   scales={textSizes}

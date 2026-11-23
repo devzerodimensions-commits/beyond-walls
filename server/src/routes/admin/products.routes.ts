@@ -1480,8 +1480,17 @@ router.post(
       })).max(60),
       /* { "Colour": { "Silver": "#C9CCD1" } } — the colour each value actually is. */
       swatches: z.record(z.record(z.string().regex(/^#[0-9a-fA-F]{6}$/))).optional(),
+      /*
+       * { "Colour": { "Silver": { photo, blank } } } — what each value looks
+       * like. Only a file this site stored itself may be named, so a picture
+       * can never be pulled in from somewhere else.
+       */
+      images: z.record(z.record(z.object({
+        photo: z.string().regex(/^\/uploads\/[\w./-]+$/).optional(),
+        blank: z.string().regex(/^\/uploads\/[\w./-]+$/).optional(),
+      }))).optional(),
     });
-    const { variants, swatches } = schema.parse(req.body);
+    const { variants, swatches, images } = schema.parse(req.body);
 
     const product = await prisma.product.findUnique({
       where: { id: req.params.id },
@@ -1513,10 +1522,17 @@ router.post(
       }
       const gone = [...known].filter((id) => !kept.has(id));
       if (gone.length) await tx.productVariant.deleteMany({ where: { id: { in: gone } } });
-      if (swatches !== undefined) {
+      if (swatches !== undefined || images !== undefined) {
         await tx.product.update({
           where: { id: product.id },
-          data: { choiceSwatches: (Object.keys(swatches).length ? swatches : Prisma.DbNull) as never },
+          data: {
+            ...(swatches === undefined ? {} : {
+              choiceSwatches: (Object.keys(swatches).length ? swatches : Prisma.DbNull) as never,
+            }),
+            ...(images === undefined ? {} : {
+              choiceImages: (Object.keys(images).length ? images : Prisma.DbNull) as never,
+            }),
+          },
         });
       }
     });

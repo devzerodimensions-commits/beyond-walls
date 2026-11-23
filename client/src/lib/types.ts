@@ -102,6 +102,15 @@ export interface ProductVariant {
 /** The colour each choice value is: { "Colour": { "Silver": "#C9CCD1" } }. */
 export type ChoiceSwatches = Record<string, Record<string, string>>;
 
+/**
+ * What each choice value looks like.
+ *
+ * `photo` is the picture the gallery shows when that value is picked;
+ * `blank` is the same plate with no lettering, which the live preview draws
+ * the customer's own words on. Either may be absent.
+ */
+export type ChoiceImages = Record<string, Record<string, { photo?: string; blank?: string }>>;
+
 export interface PersonalizationOption {
   label: string;
   value: string;
@@ -177,6 +186,8 @@ export interface Product {
   livePreviewConfig?: Record<string, unknown>;
   /** The colour each choice value is, for swatches on the product page. */
   choiceSwatches?: ChoiceSwatches | null;
+  /** The picture each choice value is sold as; see ChoiceImages. */
+  choiceImages?: ChoiceImages | null;
   productionDays?: number | null;
   /** Optional gallery video: a YouTube or Vimeo link, or a direct mp4/webm. */
   videoUrl?: string | null;

@@ -275,6 +275,33 @@ export interface PreviewSnapshot {
   scales?: Record<string, number>;
 }
 
+/**
+ * The plate of the colour actually being bought.
+ *
+ * The design, the lettering and where every line sits are the same whichever
+ * colour the piece is cut in -- only the plate behind them changes -- so the
+ * blank is swapped and nothing else. Without this a customer who chose purple
+ * would have a silver plate kept with their order, and the studio would cut
+ * from the picture rather than from what was agreed.
+ */
+function withChosenPlate(config: unknown, images: unknown, variant?: { options?: unknown } | null): unknown {
+  const photo = (config as { photo?: { image?: string } } | null)?.photo;
+  if (!photo?.image || !images || !variant) return config;
+  const options = (variant.options ?? {}) as Record<string, string>;
+  const library = images as Record<string, Record<string, { blank?: string }>>;
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+  for (const [name, value] of Object.entries(options)) {
+    if (!value) continue;
+    const found = Object.entries(library).find(([choice]) => same(choice, name));
+    const blank = found?.[1]?.[value]?.blank;
+    if (typeof blank === 'string' && blank.startsWith('/uploads/')) {
+      return { ...(config as object), photo: { ...photo, image: blank } };
+    }
+  }
+  return config;
+}
+
 /** What a snapshot may draw into; anything else in a request is ignored. */
 const DRAWN_SLOTS = new Set(['number', 'line1', 'line2', 'line3', 'fontFamily', 'textColor', 'plateColor', 'logo']);
 
@@ -287,13 +314,21 @@ const DRAWN_SLOTS = new Set(['number', 'line1', 'line2', 'line3', 'fontFamily', 
  * numbers within the range the size buttons offer.
  */
 export function previewSnapshot(
-  product: { livePreviewEnabled: boolean; livePreviewTemplate: string | null; livePreviewConfig: unknown },
+  product: {
+    livePreviewEnabled: boolean;
+    livePreviewTemplate: string | null;
+    livePreviewConfig: unknown;
+    /** { "Colour": { "Golden": { blank } } }; see the migration of the same name. */
+    choiceImages?: unknown;
+  },
   fields: PersonalizationField[],
   entries: PersonalizationEntry[],
   scales?: Record<string, unknown>,
+  /** The combination being bought, so the plate kept is the colour they chose. */
+  variant?: { options?: unknown } | null,
 ): PreviewSnapshot | null {
   if (!product.livePreviewEnabled || !product.livePreviewTemplate) return null;
-  const config = bindPreviewBoxes(product.livePreviewConfig, fields);
+  const config = withChosenPlate(bindPreviewBoxes(product.livePreviewConfig, fields), product.choiceImages, variant);
   if (product.livePreviewTemplate === 'photo') {
     const photo = (config as { photo?: { image?: string; boxes?: unknown[] } } | null)?.photo;
     if (!photo?.image || !photo.boxes?.length) return null;

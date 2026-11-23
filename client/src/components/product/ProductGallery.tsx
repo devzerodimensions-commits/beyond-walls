@@ -12,7 +12,7 @@ import { Badge, ChevronLeft, ChevronRight, CloseIcon } from '../ui';
  * Falls back cleanly to plain tap-through on touch devices.
  */
 export function ProductGallery({
-  images, productName, badges, videoUrl, preview, previewFilled,
+  images, productName, badges, videoUrl, preview, previewFilled, jumpTo,
 }: {
   images: ProductImage[];
   productName: string;
@@ -37,6 +37,12 @@ export function ProductGallery({
    * goes back to look at a photograph is not dragged away from it again.
    */
   previewFilled?: boolean;
+  /**
+   * A picture to turn to the moment it changes: the colour the customer has
+   * just picked. Looking at the third photograph and choosing purple, they
+   * should be shown the purple plate rather than left on a silver detail.
+   */
+  jumpTo?: string | null;
 }) {
   const [active, setActive] = useState(0);
   const [zooming, setZooming] = useState(false);
@@ -76,6 +82,22 @@ export function ProductGallery({
   );
 
   useEffect(() => setActive(0), [productName]);
+
+  /*
+   * Turn to the chosen colour. Skipped on the first render, so a product
+   * whose first colour already has a picture still opens where it would
+   * have, and skipped while the customer is looking at their own plate --
+   * which is theirs whatever colour it is drawn on.
+   */
+  const shown = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (shown.current === undefined) { shown.current = jumpTo; return; }
+    if (shown.current === jumpTo) return;
+    shown.current = jumpTo;
+    if (!jumpTo) return;
+    const at = images.findIndex((image) => image.url === jumpTo);
+    if (at >= 0 && !(hasPreview && active === previewIndex)) setActive(at);
+  }, [jumpTo, images, hasPreview, active, previewIndex]);
 
   /*
    * Turn to their plate the first time they write something.

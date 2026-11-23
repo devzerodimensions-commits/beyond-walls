@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ApiError, api } from '../../lib/api';
+import { ApiError, api, assetUrl } from '../../lib/api';
 import { useToast } from '../../context/StoreProvider';
-import type { ChoiceSwatches, ProductVariant } from '../../lib/types';
-import { AdminCard } from './AdminKit';
+import type { ChoiceImages, ChoiceSwatches, MediaAsset, ProductVariant } from '../../lib/types';
+import { AdminCard, MediaPicker } from './AdminKit';
 import { Button, CloseIcon, ConfirmDialog, PlusIcon } from '../ui';
 
 /**
@@ -106,7 +106,7 @@ function choicesOf(variants: ProductVariant[]): Choice[] {
 }
 
 export function ProductChoices({
-  productId, variants, productPrice, countsStock, savedSwatches,
+  productId, variants, productPrice, countsStock, savedSwatches, savedImages,
 }: {
   productId: string;
   variants: ProductVariant[];
@@ -115,6 +115,8 @@ export function ProductChoices({
   countsStock: boolean;
   /** The colours already saved for this product's choice values. */
   savedSwatches?: ChoiceSwatches | null;
+  /** The pictures already saved for this product's choice values. */
+  savedImages?: ChoiceImages | null;
 }) {
   const queryClient = useQueryClient();
   const { push } = useToast();
@@ -125,6 +127,10 @@ export function ProductChoices({
   const [confirming, setConfirming] = useState<Combination[] | null>(null);
   /** The colour each value is, kept as the studio sets it: { Colour: { Silver: '#C9CCD1' } }. */
   const [swatches, setSwatches] = useState<ChoiceSwatches>(savedSwatches ?? {});
+  /** What each value looks like: the gallery picture, and the plain plate for the preview. */
+  const [media, setMedia] = useState<ChoiceImages>(savedImages ?? {});
+  /** Which slot a picture is being chosen for. */
+  const [picking, setPicking] = useState<{ choice: string; value: string; slot: 'photo' | 'blank' } | null>(null);
 
   /*
    * What is already saved, held against the combinations about to be written,
@@ -146,7 +152,8 @@ export function ProductChoices({
     setPrices(byValues);
     setChoices(saved);
     setSwatches(savedSwatches ?? {});
-  }, [variants, saved, savedSwatches]);
+    setMedia(savedImages ?? {});
+  }, [variants, saved, savedSwatches, savedImages]);
 
   const rows: Combination[] = useMemo(() => {
     const usable = choices.filter((c) => c.name.trim() && c.values.length);
@@ -177,8 +184,19 @@ export function ProductChoices({
         }
         if (Object.keys(forChoice).length) keptSwatches[choice.name.trim()] = forChoice;
       }
+      const keptImages: ChoiceImages = {};
+      for (const choice of usable) {
+        const name = choice.name.trim();
+        const forChoice: ChoiceImages[string] = {};
+        for (const value of choice.values) {
+          const entry = media[name]?.[value];
+          if (entry?.photo || entry?.blank) forChoice[value] = entry;
+        }
+        if (Object.keys(forChoice).length) keptImages[name] = forChoice;
+      }
       return api.post<ProductVariant[]>(`/admin/products/${productId}/variants/bulk`, {
         swatches: keptSwatches,
+        images: keptImages,
         variants: combinations.map((row) => ({
           id: row.id,
           label: combinationLabel(row.values),
@@ -384,6 +402,79 @@ export function ProductChoices({
               </table>
             </div>
 
+            {/*
+              * A picture per value, not per combination.
+              *
+              * The colour is what changes how a plate looks and the size is
+              * not, so a plate in three sizes and three colours needs three
+              * photographs rather than nine -- and adding a fourth size later
+              * needs none at all.
+              */}
+            <div className="mt-5">
+              <p className="field-label">What each one looks like</p>
+              <p className="mb-2 mt-1 text-2xs leading-relaxed text-ink-400">
+                Optional. A picture here is shown the moment a customer picks that value. The plain
+                plate is the same piece with no lettering — give it and the live preview draws their
+                name on that one.
+              </p>
+              <div className="space-y-2">
+                {choices.filter((c) => c.name.trim() && c.values.length).flatMap((choice) => choice.values.map((value) => {
+                  const name = choice.name.trim();
+                  const entry = media[name]?.[value] ?? {};
+                  return (
+                    <div key={`${name}-${value}`} className="flex flex-wrap items-center gap-3 border border-stone-line p-2.5">
+                      <span className="flex min-w-[8rem] items-center gap-2 text-xs">
+                        {isColourChoice(name) ? (
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-3.5 w-3.5 rounded-full border border-stone-line"
+                            style={{ backgroundColor: swatches[name]?.[value] ?? guessHex(value) }}
+                          />
+                        ) : null}
+                        {value}
+                      </span>
+                      {(['photo', 'blank'] as const).map((slot) => (
+                        <span key={slot} className="flex items-center gap-1.5">
+                          {entry[slot] ? (
+                            <img
+                              src={assetUrl(entry[slot] as string)}
+                              alt=""
+                              className="h-10 w-10 border border-stone-line bg-paper-off object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-10 w-10 items-center justify-center border border-dashed border-stone-line text-2xs text-ink-300">
+                              —
+                            </span>
+                          )}
+                          <span className="flex flex-col">
+                            <button
+                              type="button"
+                              className="text-2xs underline underline-offset-2 hover:text-ink"
+                              onClick={() => setPicking({ choice: name, value, slot })}
+                            >
+                              {slot === 'photo' ? 'Picture' : 'Plain plate'}
+                            </button>
+                            {entry[slot] ? (
+                              <button
+                                type="button"
+                                className="text-2xs text-ink-300 underline underline-offset-2 hover:text-red-700"
+                                onClick={() => setMedia((current) => ({
+                                  ...current,
+                                  [name]: { ...(current[name] ?? {}), [value]: { ...entry, [slot]: undefined } },
+                                }))}
+                              >
+                                remove
+                              </button>
+                            ) : null}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  );
+                }))}
+              </div>
+            </div>
+
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button type="button" size="sm" loading={save.isPending} onClick={submit}>
                 Save choices
@@ -411,6 +502,26 @@ export function ProductChoices({
           </div>
         )}
       </div>
+
+      <MediaPicker
+        open={Boolean(picking)}
+        accept="image"
+        folder="products"
+        onClose={() => setPicking(null)}
+        onPick={(assets: MediaAsset[]) => {
+          const chosen = assets[0]?.url;
+          const at = picking;
+          setPicking(null);
+          if (!chosen || !at) return;
+          setMedia((current) => ({
+            ...current,
+            [at.choice]: {
+              ...(current[at.choice] ?? {}),
+              [at.value]: { ...(current[at.choice]?.[at.value] ?? {}), [at.slot]: chosen },
+            },
+          }));
+        }}
+      />
 
       <ConfirmDialog
         open={Boolean(confirming)}

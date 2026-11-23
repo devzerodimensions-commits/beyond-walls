@@ -95,7 +95,8 @@ async function countReferences(url: string, ignore?: { model: string; id: string
   const [row] = await prisma.$queryRaw<{ n: bigint }[]>`
     SELECT
         (SELECT COUNT(*) FROM "Product"
-           WHERE "livePreviewConfig"::text LIKE ${pattern} OR "videoUrl" = ${url} OR "ogImage" = ${url})
+           WHERE "livePreviewConfig"::text LIKE ${pattern} OR "choiceImages"::text LIKE ${pattern}
+             OR "videoUrl" = ${url} OR "ogImage" = ${url})
       + (SELECT COUNT(*) FROM "Category" WHERE "ogImage" = ${url})
       + (SELECT COUNT(*) FROM "AttributeValue" WHERE "image" = ${url})
       + (SELECT COUNT(*) FROM "PersonalizationField" WHERE "options"::text LIKE ${pattern})

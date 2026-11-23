@@ -337,6 +337,8 @@ model Product {
   careInstructions String?
   /// The colour each choice value is, for swatches: { "Colour": { "Silver": "#C9CCD1" } }.
   choiceSwatches   Json?
+  /// The picture each choice value is sold as: { "Colour": { "Silver": { "photo", "blank" } } }.
+  choiceImages     Json?
   /// Fulfilment copy shown as its own section on the product page.
   installationNote String?
   shippingNote     String?

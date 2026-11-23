@@ -1,0 +1,15 @@
+-- The picture a choice's value is actually sold as.
+--
+-- A plate offered in golden and purple showed the same silver photograph
+-- whichever a customer picked, and the one thing a preview exists to prevent
+-- is somebody buying a piece that does not look like what they were shown.
+--
+-- Kept against the value rather than against each combination: the colour is
+-- what changes the look, and the size is not, so a plate in three sizes and
+-- three colours needs three photographs and not nine. Shaped
+-- { "Colour": { "Golden": { "photo": "...", "blank": "..." } } }, where
+-- `photo` is what the gallery shows and `blank` is the plain plate the live
+-- preview draws the customer's own words on.
+--
+-- Additive and nullable: a product without one behaves exactly as before.
+ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "choiceImages" JSONB;

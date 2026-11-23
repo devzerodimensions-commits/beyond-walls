@@ -746,6 +746,7 @@ export default function AdminProductEdit() {
               productPrice={form.price}
               countsStock={form.trackInventory}
               savedSwatches={product?.choiceSwatches ?? null}
+              savedImages={product?.choiceImages ?? null}
             />
             <VariantsTab
               productId={id!}

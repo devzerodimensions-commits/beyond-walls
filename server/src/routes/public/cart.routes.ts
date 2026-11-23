@@ -90,7 +90,9 @@ router.post(
     );
 
     // The plate exactly as it was approved, so the cart and the order can show it.
-    const preview = previewSnapshot(product, product.personalization, entries, body.previewScales);
+    /* The full row, since resolveVariant hands back only what pricing needs. */
+    const chosen = variant ? product.variants.find((v) => v.id === variant.id) ?? null : null;
+    const preview = previewSnapshot(product, product.personalization, entries, body.previewScales, chosen);
 
     if (existing) {
       // Re-check the combined quantity against stock and per-order limits.
@@ -148,7 +150,7 @@ router.patch(
       data.personalization = entries;
       // Redrawn from the new answers, keeping the sizes the customer had set.
       const before = item.preview as { scales?: Record<string, number> } | null;
-      const preview = previewSnapshot(item.product, item.product.personalization, entries, before?.scales);
+      const preview = previewSnapshot(item.product, item.product.personalization, entries, before?.scales, item.variant);
       data.preview = preview ?? Prisma.DbNull;
     }
 
