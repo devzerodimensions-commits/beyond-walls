@@ -139,6 +139,17 @@ export function PersonalizationForm({
   const active = fields.filter((f) => f.status === 'PUBLISHED').sort((a, b) => a.sortOrder - b.sortOrder);
   if (!active.length) return null;
 
+  /*
+   * Whatever the customer has chosen to have the plate lettered in.
+   *
+   * A monogram is a letterform, not a word: "R" in a cut script and "R" in a
+   * block sans are two different pieces, and choosing between twenty-six
+   * identical grey Rs tells a customer nothing. The tiles are set in the face
+   * the plate will actually be cut in.
+   */
+  const letteringField = active.find((f) => f.previewSlot === 'fontFamily');
+  const lettering = letteringField ? (values[letteringField.key] || letteringField.defaultValue || '') : '';
+
   const input = (field: PersonalizationField) => (
     <PersonalizationInput
       key={field.id}
@@ -149,6 +160,8 @@ export function PersonalizationForm({
       script={script}
       sizes={sizes}
       onSize={onSize}
+      /* The face the plate is lettered in, so a monogram is picked by its shape. */
+      face={lettering}
       onChange={(value) => onChange(field.key, value)}
     />
   );
@@ -186,15 +199,18 @@ function priceSuffix(delta: number | string | undefined): string {
 
 function PersonalizationInput({
   field, value, error, onChange, palette, script, sizes, onSize,
+  face,
 }: {
-  sizes?: Record<string, number>;
-  onSize?: (slot: string, size: number) => void;
   field: PersonalizationField;
   value: string;
   error?: string;
   onChange: (value: string) => void;
   palette?: { plate: PaletteChoice[]; text: PaletteChoice[] };
   script?: 'latin' | 'devanagari';
+  sizes?: Record<string, number>;
+  onSize?: (slot: string, size: number) => void;
+  /** The face the plate is lettered in, for choices that are letterforms. */
+  face?: string;
 }) {
   const label = `${field.label}${priceSuffix(field.priceDelta)}`;
   // Whether an answer is compulsory is the admin's call, field by field, and
@@ -353,7 +369,39 @@ function PersonalizationInput({
         </Select>
       );
 
+    /*
+     * A row of single characters is an alphabet, not a list of choices.
+     *
+     * Twenty-six options in a three-column grid of wide buttons is a column
+     * of nearly-empty boxes three screens long. Shown as letter tiles they
+     * are read the way an alphabet is read, and each one is set in the face
+     * the plate is cut in so the customer is choosing the letterform itself.
+     */
     case 'RADIO':
+      if (field.options.length > 6 && field.options.every((o) => (o.value ?? '').trim().length === 1)) {
+        return (
+          <FieldWrap label={label} required={required} error={error} hint={field.helpText ?? undefined}>
+            <div className="flex flex-wrap gap-1.5">
+              {field.options.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  aria-pressed={value === opt.value}
+                  title={opt.label}
+                  onClick={() => onChange(opt.value)}
+                  className={clsx(
+                    'flex h-11 w-11 items-center justify-center border text-lg leading-none transition-colors',
+                    value === opt.value ? 'border-ink bg-ink text-paper' : 'border-stone-line hover:border-ink',
+                  )}
+                  style={{ fontFamily: fontStack(face) }}
+                >
+                  {opt.value}
+                </button>
+              ))}
+            </div>
+          </FieldWrap>
+        );
+      }
       return (
         <FieldWrap label={label} required={required} error={error} hint={field.helpText ?? undefined}>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

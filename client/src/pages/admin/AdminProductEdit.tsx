@@ -2745,14 +2745,36 @@ function FieldForm({
               {PLATE_FONTS.map((face) => <option key={face.id} value={face.id}>{face.label}</option>)}
             </datalist>
           ) : null}
-          <Button
-            type="button" size="sm" variant="ghost"
-            onClick={() =>
-              setForm({ ...form, options: [...form.options, { label: '', value: '', priceDelta: 0 }] })
-            }
-          >
-            + Add option
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button" size="sm" variant="ghost"
+              onClick={() =>
+                setForm({ ...form, options: [...form.options, { label: '', value: '', priceDelta: 0 }] })
+              }
+            >
+              + Add option
+            </Button>
+            {/*
+              * A monogram plate asks for one letter out of twenty-six, and
+              * typing twenty-six rows by hand is the kind of work nobody
+              * finishes. Only offered where the list is empty, so it can
+              * never wipe out choices somebody has written.
+              */}
+            {(form.type === 'RADIO' || form.type === 'SELECT') && !form.options.length ? (
+              <Button
+                type="button" size="sm" variant="ghost"
+                onClick={() => setForm({
+                  ...form,
+                  options: Array.from({ length: 26 }, (_, i) => {
+                    const letter = String.fromCharCode(65 + i);
+                    return { label: letter, value: letter, priceDelta: 0 };
+                  }),
+                })}
+              >
+                + Fill with A–Z
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
