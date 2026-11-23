@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import { useToast } from '../../context/StoreProvider';
 import type { ChoiceImages, ChoiceSwatches, MediaAsset, ProductVariant } from '../../lib/types';
+import { colourGuess } from '../../lib/colourNames';
 import { AdminCard, MediaPicker } from './AdminKit';
 import { Button, CloseIcon, ConfirmDialog, PlusIcon } from '../ui';
 
@@ -43,22 +44,6 @@ const key = (name: string) => name.trim().toLowerCase();
 /** Whether this choice is about colour, and so worth showing as a swatch. */
 export const isColourChoice = (name: string) => /colou?r|shade|finish/.test(key(name));
 
-/** A starting colour for a value, so the picker does not open on black for every one. */
-const GUESSES: [RegExp, string][] = [
-  [/silver|steel|chrome|grey|gray/, '#C9CCD1'],
-  [/gold/, '#C8A961'],
-  [/black|matt/, '#111111'],
-  [/white|ivory|cream/, '#F5F3EF'],
-  [/copper|bronze|rose/, '#B87333'],
-  [/wood|teak|oak|brown/, '#8B5A2B'],
-  [/green|forest/, '#1F3B2E'],
-  [/blue|navy/, '#1F3A5F'],
-  [/red|maroon/, '#8C1C2B'],
-];
-function guessHex(value: string): string {
-  const found = GUESSES.find(([pattern]) => pattern.test(value.toLowerCase()));
-  return found ? found[1] : '#C9CCD1';
-}
 
 /**
  * What to type next, in the words of the choice being filled in.
@@ -179,8 +164,7 @@ export function ProductChoices({
         if (!isColourChoice(choice.name)) continue;
         const forChoice: Record<string, string> = {};
         for (const value of choice.values) {
-          const hex = swatches[choice.name.trim()]?.[value];
-          if (hex) forChoice[value] = hex;
+          forChoice[value] = swatches[choice.name.trim()]?.[value] ?? colourGuess(value);
         }
         if (Object.keys(forChoice).length) keptSwatches[choice.name.trim()] = forChoice;
       }
@@ -287,7 +271,7 @@ export function ProductChoices({
                       type="color"
                       aria-label={`Colour of ${value}`}
                       title={`Colour of ${value}`}
-                      value={swatches[choice.name.trim()]?.[value] ?? guessHex(value)}
+                      value={swatches[choice.name.trim()]?.[value] ?? colourGuess(value)}
                       className="h-6 w-6 cursor-pointer rounded-sm border border-stone-line bg-paper p-0 hover:border-ink"
                       onChange={(e) => setSwatches((current) => ({
                         ...current,
@@ -428,7 +412,7 @@ export function ProductChoices({
                           <span
                             aria-hidden="true"
                             className="inline-block h-3.5 w-3.5 rounded-full border border-stone-line"
-                            style={{ backgroundColor: swatches[name]?.[value] ?? guessHex(value) }}
+                            style={{ backgroundColor: swatches[name]?.[value] ?? colourGuess(value) }}
                           />
                         ) : null}
                         {value}

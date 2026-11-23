@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import clsx from 'clsx';
 import { formatPrice, toNumber } from '../../lib/format';
+import { colourFromName } from '../../lib/colourNames';
 import type { ChoiceImages, ChoiceSwatches, ProductVariant } from '../../lib/types';
 
 /**
@@ -95,12 +96,20 @@ export function variantFor(variants: ProductVariant[], rows: ChoiceRow[], picked
   return variants.find((v) => rows.every((row) => valueOf(v, row.name) === picked[row.name])) ?? null;
 }
 
-/** The colour saved for a value, whatever case the choice was named in. */
+/**
+ * The colour a value is: what the studio set, or what its own name says.
+ *
+ * Falling back to the name is what lets a plate offered in Blue, Navy and
+ * Forest show three colours without anybody having set anything -- including
+ * every product set up before colours could be set at all. A name that says
+ * nothing about colour gets no square, because a guessed one would be
+ * telling a customer something untrue.
+ */
 function hexFor(swatches: ChoiceSwatches | null | undefined, name: string, value: string): string | null {
-  if (!swatches) return null;
-  const found = Object.entries(swatches).find(([n]) => key(n) === key(name));
+  const found = swatches ? Object.entries(swatches).find(([n]) => key(n) === key(name)) : undefined;
   const hex = found?.[1]?.[value];
-  return typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : null;
+  if (typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex)) return hex;
+  return colourFromName(value);
 }
 
 /**
