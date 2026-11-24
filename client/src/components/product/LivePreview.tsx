@@ -243,6 +243,18 @@ export function buildPreviewSlots(
 
   for (const field of fields) {
     if (!field.previewSlot) continue;
+
+    /*
+     * A code is named by the question that asked for it, and the name is
+     * recorded whether or not the customer has answered yet. That is what
+     * puts four empty, labelled squares on the board before anybody types:
+     * the piece shows what it will carry, instead of appearing to carry
+     * nothing and growing squares as links are pasted in.
+     */
+    if (/^qr[1-4]$/.test(field.previewSlot) && field.label?.trim()) {
+      slots.qrLabels = { ...slots.qrLabels, [field.previewSlot]: field.label.trim() };
+    }
+
     const raw = values[field.key];
     if (raw === undefined || raw === '') continue;
 
@@ -255,15 +267,6 @@ export function buildPreviewSlots(
     }
 
     (slots as Record<string, string>)[field.previewSlot] = raw;
-
-    /*
-     * A code is named by the question that asked for it. Carried alongside the
-     * link so the drawing can set it above the code without the template
-     * needing to know anything about personalisation fields.
-     */
-    if (/^qr[1-4]$/.test(field.previewSlot) && field.label?.trim()) {
-      slots.qrLabels = { ...slots.qrLabels, [field.previewSlot]: field.label.trim() };
-    }
   }
 
   return slots;
@@ -665,6 +668,18 @@ interface LivePreviewProps {
   config?: Record<string, unknown> | null;
 }
 
+/** The code slots that exist on this product, and what each is called. */
+function qrSlots(slots: PreviewSlots, fallback: PreviewSlots): Partial<PreviewSlots> {
+  const out: Partial<PreviewSlots> = {};
+  for (const key of ['qr1', 'qr2', 'qr3', 'qr4'] as const) {
+    const value = slots[key] ?? fallback[key];
+    if (value !== undefined) out[key] = value;
+  }
+  const labels = { ...fallback.qrLabels, ...slots.qrLabels };
+  if (Object.keys(labels).length) out.qrLabels = labels;
+  return out;
+}
+
 export function LivePreview({
   template, slots, className, placeholders, config, hideLabel, hideCaption, scales,
 }: LivePreviewProps) {
@@ -685,6 +700,15 @@ export function LivePreview({
       textColor: slots.textColor || fallback.textColor || resolved.defaults.textColor,
       plateColor: slots.plateColor || fallback.plateColor || resolved.defaults.plateColor,
       logo: slots.logo || fallback.logo || '',
+      /*
+       * The codes are carried through as they are, and only where they exist.
+       *
+       * Everything above is given an empty string so a template can set it
+       * without checking. A code cannot be: a board draws a square for every
+       * slot it is handed, so defaulting all four would put four squares on a
+       * piece the studio asked to carry two. Absent has to stay absent.
+       */
+      ...qrSlots(slots, fallback),
     };
   }, [slots, placeholders, resolved]);
 
