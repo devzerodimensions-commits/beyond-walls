@@ -21,6 +21,9 @@
  * sandboxed render will accept.
  */
 
+import { assetUrl } from './api';
+import { uploadedFonts } from './uploadedFonts';
+
 /** Fetches a URL and returns it as a data: URI the sandbox will accept. */
 async function inline(url: string): Promise<string> {
   const response = await fetch(url);
@@ -48,13 +51,17 @@ function familiesIn(stack: string): string[] {
  * nothing.
  */
 async function embeddedFonts(stylesheet: string, wanted: Set<string>): Promise<string> {
-  let css: string;
+  let css = '';
   try {
     const response = await fetch(stylesheet);
-    if (!response.ok) return '';
-    css = await response.text();
+    /*
+     * A stylesheet that cannot be read is not the end of it. The studio's own
+     * faces are registered from the settings and have nothing to do with this
+     * file, so they are still worth carrying in.
+     */
+    if (response.ok) css = await response.text();
   } catch {
-    return '';
+    css = '';
   }
 
   const blocks = css.match(/@font-face\s*\{[^}]*\}/g) ?? [];
@@ -65,7 +72,12 @@ async function embeddedFonts(stylesheet: string, wanted: Set<string>): Promise<s
   });
 
   const resolved = await Promise.all(keep.map(async (block) => {
-    const src = /url\((https:\/\/[^)]+)\)/.exec(block);
+    /*
+     * Whatever src the rule names, not only an absolute https one: a face the
+     * studio uploaded is served from this site under /uploads, and a pattern
+     * that insisted on https dropped every one of them without a word.
+     */
+    const src = /url\(\s*["']?([^)"']+)["']?\s*\)/.exec(block);
     if (!src) return '';
     try {
       return block.replace(src[1], await inline(src[1]));
@@ -74,7 +86,28 @@ async function embeddedFonts(stylesheet: string, wanted: Set<string>): Promise<s
     }
   }));
 
-  return resolved.filter(Boolean).join('\n');
+  /*
+   * The studio's own faces, which are not in the shop's stylesheet at all.
+   *
+   * They are registered at runtime out of the settings, so a plate set in an
+   * uploaded face found nothing here to embed and was drawn in whatever the
+   * sandbox fell back to. The Ganesha plate is set in Tangerine, and went out
+   * as a grotesque: a picture of a different product from the one being sold.
+   */
+  const own = await Promise.all(
+    uploadedFonts()
+      .filter((font) => wanted.has(font.family))
+      .map(async (font) => {
+        try {
+          const data = await inline(assetUrl(font.url));
+          return `@font-face{font-family:"${font.family}";src:url(${data}) format("${font.format}");}`;
+        } catch {
+          return '';
+        }
+      }),
+  );
+
+  return [...resolved, ...own].filter(Boolean).join('\n');
 }
 
 /**
@@ -93,7 +126,39 @@ export async function previewToPng(
   const width = box?.width || svg.clientWidth || 800;
   const height = box?.height || svg.clientHeight || 400;
 
+  /*
+   * How wide each line of writing actually is, measured on the page before
+   * anything is copied.
+   *
+   * The preview sizes lettering by measuring the real face and writing out a
+   * font-size, and that size only means what it should while the same face is
+   * drawing it. If a face cannot be carried into the sandbox -- a network
+   * failure, a file withdrawn, a face added tomorrow by some route this code
+   * does not know about -- the fallback sets the same size wider, and the
+   * customer's name runs off the edge of the plate in the very picture they
+   * send to their family.
+   *
+   * Pinning the width each line already has makes that impossible. Where the
+   * face does arrive the measurement agrees and nothing moves; where it does
+   * not, the line is squeezed into its own width instead of overrunning the
+   * piece. Either way the plate in the picture is the plate on the page.
+   */
+  const widths = Array.from(svg.querySelectorAll('text')).map((node) => {
+    try {
+      return node.textContent?.trim() ? node.getComputedTextLength() : 0;
+    } catch {
+      return 0;
+    }
+  });
+
   const clone = svg.cloneNode(true) as SVGSVGElement;
+
+  Array.from(clone.querySelectorAll('text')).forEach((node, i) => {
+    const width = widths[i];
+    if (!width || !Number.isFinite(width)) return;
+    node.setAttribute('textLength', String(width));
+    node.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+  });
 
   // Artwork as bytes: a sandboxed render refuses to go and fetch it.
   const images = Array.from(clone.querySelectorAll('image'));
