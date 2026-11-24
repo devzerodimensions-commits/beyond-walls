@@ -80,7 +80,8 @@ export function validatePersonalization(
 
   for (const field of active) {
     const raw = answers[field.key];
-    const value = raw === null || raw === undefined ? '' : String(raw).trim();
+    /* Not const: a web address is stored with the scheme it was given without. */
+    let value = raw === null || raw === undefined ? '' : String(raw).trim();
 
     if (!value) {
       if (field.required) {
@@ -132,16 +133,40 @@ export function validatePersonalization(
           throw ApiError.unprocessable(`"${field.label}" must be a valid phone number`, { field: field.key });
         }
         break;
-      case 'URL':
+      case 'URL': {
+        /*
+         * People write instagram.com/brewandco, not the scheme in front of it.
+         *
+         * Insisting on https:// here refused a link the preview had already
+         * drawn a working QR code from, so the customer was shown their piece
+         * and then told at checkout that the link they could see on it was not
+         * a link. The scheme is assumed where it is missing, exactly as the
+         * drawing assumes it, and the two now agree. A value that still will
+         * not parse, or that asks for some other scheme entirely, is refused.
+         */
+        const assumed = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value.replace(/^\/+/, '')}`;
+        let parsed: URL;
         try {
-          // eslint-disable-next-line no-new
-          new URL(value);
+          parsed = new URL(assumed);
         } catch {
-          throw ApiError.unprocessable(`"${field.label}" must be a valid URL (including https://)`, {
+          throw ApiError.unprocessable(`"${field.label}" must be a web address, like https://example.com`, {
             field: field.key,
           });
         }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          throw ApiError.unprocessable(`"${field.label}" must be a web address, like https://example.com`, {
+            field: field.key,
+          });
+        }
+        if (!/^[^.\s]+(\.[^.\s]+)+$/.test(parsed.hostname)) {
+          throw ApiError.unprocessable(`"${field.label}" must include a site, like example.com`, {
+            field: field.key,
+          });
+        }
+        /* Stored with the scheme, so production reads the same link. */
+        value = assumed;
         break;
+      }
       case 'NUMBER':
         if (!Number.isFinite(Number(value))) {
           throw ApiError.unprocessable(`"${field.label}" must be a number`, { field: field.key });

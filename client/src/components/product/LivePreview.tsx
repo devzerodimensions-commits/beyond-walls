@@ -5,6 +5,7 @@ import { assetUrl } from '../../lib/api';
 import { useSettings } from '../../context/StoreProvider';
 import { findUploadedFont, type UploadedFontKind } from '../../lib/uploadedFonts';
 import { parsePlateSymbols } from '../../lib/plateSymbols';
+import { qrDrawing } from '../../lib/qr';
 import { CubeBand, LeafFrame, VINE_PALETTE, VineBand } from './plateOrnaments';
 
 /**
@@ -26,6 +27,26 @@ export interface PreviewSlots {
   textColor?: string;
   plateColor?: string;
   logo?: string;
+  /**
+   * Up to four links, drawn as the QR codes those links make.
+   *
+   * A connect piece carries a customer's website, their Instagram, a review
+   * page — different for every buyer, and nothing a photograph of the piece
+   * can stand in for. The customer gives the link and the code is drawn from
+   * it; lib/qr.ts says why it is never collected as a picture.
+   */
+  qr1?: string;
+  qr2?: string;
+  qr3?: string;
+  qr4?: string;
+  /**
+   * What to call each code, keyed by slot.
+   *
+   * The studio names the question — "Website", "Google review", "Menu" — and
+   * that name is what is set above the code on the piece, so one product
+   * serves a café, a salon and a clinic without being set up three times.
+   */
+  qrLabels?: Record<string, string>;
 }
 
 /**
@@ -234,6 +255,15 @@ export function buildPreviewSlots(
     }
 
     (slots as Record<string, string>)[field.previewSlot] = raw;
+
+    /*
+     * A code is named by the question that asked for it. Carried alongside the
+     * link so the drawing can set it above the code without the template
+     * needing to know anything about personalisation fields.
+     */
+    if (/^qr[1-4]$/.test(field.previewSlot) && field.label?.trim()) {
+      slots.qrLabels = { ...slots.qrLabels, [field.previewSlot]: field.label.trim() };
+    }
   }
 
   return slots;
@@ -295,11 +325,25 @@ export interface PreviewConfig {
    * the server that made it.
    */
   photo?: PreviewPhoto;
+  /**
+   * The shape of a board of codes, for the studio to set per product.
+   *
+   * The arch stand with a panel behind it is one piece; the next QR product
+   * will be a table tent or a flat square, and should not need a developer.
+   */
+  qr?: {
+    shape?: 'arch' | 'rounded' | 'square';
+    /** The taller panel behind, carrying the heading around its curve. */
+    back?: boolean;
+    /** The flat foot the piece stands on. */
+    base?: boolean;
+  };
 }
 
 /** Where one line of writing sits on a photographed plate. */
 export interface PreviewPhotoBox {
-  slot: keyof PreviewSlots;
+  /** Every slot that holds a value — not qrLabels, which names the others. */
+  slot: Exclude<keyof PreviewSlots, 'qrLabels'>;
   /** Top of the lettering, as a fraction of the picture's height. */
   y: number;
   /** Height of the lettering — the design's own type size for this line. */
@@ -454,6 +498,35 @@ export const PREVIEW_PRESETS: Record<string, Partial<PreviewConfig>> = {
         { value: 'black', label: 'Black', hex: '#141414' },
         { value: 'steel', label: 'Steel', hex: '#C9CCD1' },
         { value: 'copper', label: 'Copper', hex: '#B87333' },
+      ],
+    },
+  },
+  /*
+   * A board of codes: the piece whose whole content belongs to the buyer.
+   *
+   * Everything else here is a plate with a name on it. This one carries a
+   * café's four links, and the next buyer's four are different -- so there is
+   * nothing to photograph and paint out. It is drawn from its parts: the
+   * shape, the buyer's own logo, a heading, and one to four codes made from
+   * the links they gave. The count is whatever the studio asked for, because
+   * a table tent wants two and this stand wants four.
+   */
+  'qr-board': {
+    aspect: { width: 1000, height: 1150 },
+    plate: { inset: 0, radius: 0, showScrews: false, borderOnLight: false },
+    defaults: { plateColor: '#FFFFFF', textColor: '#1B2A5B', fontFamily: 'sans' },
+    placeholders: { line1: "LET'S CONNECT" },
+    palette: {
+      plate: [
+        { value: 'white', label: 'White', hex: '#FFFFFF' },
+        { value: 'ivory', label: 'Ivory', hex: '#F3F1EC' },
+        { value: 'black', label: 'Black', hex: '#161616' },
+      ],
+      text: [
+        { value: 'navy', label: 'Navy', hex: '#1B2A5B' },
+        { value: 'black', label: 'Black', hex: '#161616' },
+        { value: 'forest', label: 'Forest', hex: '#1F3B2E' },
+        { value: 'gold', label: 'Gold', hex: '#A8873F' },
       ],
     },
   },
@@ -626,6 +699,8 @@ export function LivePreview({
 
   const body = (() => {
     switch (template) {
+      case 'qr-board':
+        return <PlateQrBoard {...shared} />;
       case 'monogram':
         return <PlateMonogram {...shared} />;
       case 'script-cut':
@@ -1625,6 +1700,231 @@ function PlatePhoto({ slots, plate, text, font, config, uid, scales }: TemplateP
   );
 }
 
+/** The outline of a board: an arch, a rounded rectangle or a plain one. */
+function boardPath(
+  x: number, y: number, w: number, h: number, shape: 'arch' | 'rounded' | 'square',
+): string {
+  if (shape === 'arch') {
+    const r = w / 2;
+    return `M${x} ${y + h} L${x} ${y + r} A${r} ${r} 0 0 1 ${x + w} ${y + r} L${x + w} ${y + h} Z`;
+  }
+  const r = shape === 'rounded' ? Math.min(w, h) * 0.06 : 0;
+  return `M${x + r} ${y} h${w - r * 2} a${r} ${r} 0 0 1 ${r} ${r} v${h - r * 2}`
+    + ` a${r} ${r} 0 0 1 ${-r} ${r} h${-(w - r * 2)} a${r} ${r} 0 0 1 ${-r} ${-r}`
+    + ` v${-(h - r * 2)} a${r} ${r} 0 0 1 ${r} ${-r} Z`;
+}
+
+/**
+ * A board of codes, drawn from the links the customer gave.
+ *
+ * ---- Why this one is drawn and not photographed ----
+ *
+ * Every other piece here is a plate with somebody's name on it, so its own
+ * photograph can be reused: paint the sample name out and set the customer's
+ * in its place. This piece has no such thing. Its whole content is four links
+ * that belong to the buyer, and the next buyer's four are different, so there
+ * is no sample to paint out and nothing a photograph could stand in for.
+ *
+ * It is therefore drawn from its parts: the shape, the buyer's own logo, a
+ * heading, and one to four codes. One to four and not four, because the count
+ * follows whatever the studio asked for -- a table tent wants two, this stand
+ * wants four -- and the arrangement rearranges itself rather than leaving a
+ * hole where a fourth code would have been.
+ *
+ * The codes are made here, from the links, for the reason set out in lib/qr.ts:
+ * a code drawn from a link is right by construction, where a code uploaded as
+ * a picture is a screenshot whose failure is discovered after the cut.
+ */
+function PlateQrBoard({ slots, plate, text, font, config, uid }: TemplateProps) {
+  const { width: VW, height: VH } = config.aspect;
+  const measure = useTextMetrics();
+
+  const shape = config.qr?.shape ?? 'arch';
+  const wantBack = config.qr?.back ?? shape === 'arch';
+  const wantBase = config.qr?.base ?? shape === 'arch';
+
+  const heading = (slots.line1 ?? '').trim();
+  const logo = (slots.logo ?? '').trim();
+
+  /*
+   * Only the codes the studio asked for, in the order it asked for them. An
+   * empty answer still holds its place while the customer is typing, so the
+   * board does not jump about under their hands between keystrokes.
+   */
+  const asked = (['qr1', 'qr2', 'qr3', 'qr4'] as const).filter(
+    (key) => slots[key] !== undefined || slots.qrLabels?.[key],
+  );
+  const codes = asked.map((key) => ({
+    key,
+    label: slots.qrLabels?.[key] ?? '',
+    drawing: qrDrawing(slots[key] ?? ''),
+  }));
+
+  /*
+   * A code must be dark on light to be read at all, whatever the piece is
+   * made of. A navy code on a black board is a pattern, not a link.
+   */
+  const tile = isLight(plate) ? plate : '#FFFFFF';
+  const ink = isLight(text) ? '#141414' : text;
+
+  const BASE_H = wantBase ? VH * 0.038 : 0;
+  const floor = VH - BASE_H;
+
+  const frontW = wantBack ? VW * 0.56 : VW * 0.68;
+  const frontH = VH * 0.70;
+  const frontX = wantBack ? VW * 0.30 : (VW - frontW) / 2;
+  const frontY = floor - frontH;
+
+  const backW = VW * 0.40;
+  const backH = VH * 0.84;
+  const backX = VW * 0.12;
+  const backY = floor - backH;
+
+  /** The codes, laid out two to a row — or one across when there is one. */
+  const perRow = codes.length <= 1 ? 1 : 2;
+  const rows = Math.ceil(codes.length / perRow);
+  const padX = frontW * 0.11;
+  const gap = frontW * 0.07;
+  const cellW = (frontW - padX * 2 - gap * (perRow - 1)) / perRow;
+
+  const logoH = frontH * 0.15;
+  const logoY = frontY + frontH * 0.10;
+  const gridTop = logoY + logoH + frontH * 0.07;
+  const gridH = floor - gridTop - frontH * 0.09;
+  const rowH = rows ? gridH / rows : 0;
+  const labelH = Math.min(rowH * 0.17, cellW * 0.12);
+  const codeSide = Math.min(cellW, rowH - labelH * 2.1);
+
+  return (
+    <svg viewBox={`0 0 ${VW} ${VH}`} className="mx-auto block w-full max-w-lg" role="img" aria-label="QR board preview">
+      <defs>
+        <filter id={`qrlift-${uid}`} x="-12%" y="-10%" width="130%" height="130%">
+          <feDropShadow dx={VW * 0.004} dy={VH * 0.008} stdDeviation={VH * 0.009} floodColor="#2B2520" floodOpacity="0.22" />
+        </filter>
+        {wantBack ? (
+          <path
+            id={`qrarc-${uid}`}
+            fill="none"
+            d={`M${backX + backW * 0.06} ${backY + backW * 0.62} A${backW * 0.44} ${backW * 0.44} 0 0 1 ${backX + backW * 0.94} ${backY + backW * 0.62}`}
+          />
+        ) : null}
+        {logo ? (
+          <clipPath id={`qrlogo-${uid}`}>
+            <rect x={frontX + padX} y={logoY} width={frontW - padX * 2} height={logoH} />
+          </clipPath>
+        ) : null}
+      </defs>
+
+      <g filter={`url(#qrlift-${uid})`}>
+        {wantBack ? (
+          <path d={boardPath(backX, backY, backW, backH, 'arch')} fill={plate} />
+        ) : null}
+        <path d={boardPath(frontX, frontY, frontW, frontH, shape)} fill={plate} />
+        {wantBase ? (
+          <rect x={VW * 0.10} y={floor} width={VW * 0.80} height={BASE_H} rx={BASE_H * 0.18} fill={plate} />
+        ) : null}
+      </g>
+
+      {/*
+        * The heading follows the curve of the panel behind, which is where it
+        * sits on the piece. Without a panel it is set straight above the
+        * codes, because a curve with nothing to curve around is a flourish.
+        */}
+      {heading && wantBack ? (
+        <text fill={text} fontFamily={font} fontSize={backW * 0.115} letterSpacing={backW * 0.012} fontWeight={600}>
+          <textPath href={`#qrarc-${uid}`} startOffset="50%" textAnchor="middle">{heading}</textPath>
+        </text>
+      ) : null}
+      {heading && !wantBack ? (
+        <text
+          x={frontX + frontW / 2}
+          y={frontY + frontH * 0.11}
+          textAnchor="middle"
+          fill={text}
+          fontFamily={font}
+          fontWeight={600}
+          fontSize={Math.min(frontH * 0.07, (frontW * 0.76) / Math.max(0.01, measure(heading, font).width))}
+          letterSpacing={frontW * 0.008}
+        >
+          {heading}
+        </text>
+      ) : null}
+
+      {/*
+        * The buyer's own mark, kept whole. A logo squeezed to fill a box is a
+        * different logo, so it is fitted inside one and left alone.
+        */}
+      {logo ? (
+        <image
+          href={assetUrl(logo)}
+          x={frontX + padX}
+          y={logoY}
+          width={frontW - padX * 2}
+          height={logoH}
+          preserveAspectRatio="xMidYMid meet"
+          clipPath={`url(#qrlogo-${uid})`}
+        />
+      ) : null}
+
+      {codes.map((code, i) => {
+        const row = Math.floor(i / perRow);
+        const col = i % perRow;
+        const inRow = Math.min(perRow, codes.length - row * perRow);
+        const rowW = cellW * inRow + gap * (inRow - 1);
+        const cx = frontX + (frontW - rowW) / 2 + col * (cellW + gap) + cellW / 2;
+        const top = gridTop + row * rowH;
+        const side = Math.max(10, codeSide);
+        const codeY = top + labelH * 1.9;
+
+        return (
+          <g key={code.key}>
+            {code.label ? (
+              <text
+                x={cx}
+                y={top + labelH}
+                textAnchor="middle"
+                fill={text}
+                fontFamily={font}
+                fontWeight={600}
+                fontSize={Math.min(labelH, (cellW * 0.95) / Math.max(0.01, measure(code.label, font).width))}
+                letterSpacing={labelH * 0.07}
+              >
+                {code.label.toUpperCase()}
+              </text>
+            ) : null}
+
+            <rect x={cx - side / 2} y={codeY} width={side} height={side} fill={tile} />
+            {code.drawing ? (
+              <g transform={`translate(${cx - side / 2} ${codeY}) scale(${side / code.drawing.size})`}>
+                <path d={code.drawing.path} fill={ink} shapeRendering="crispEdges" />
+              </g>
+            ) : (
+              /*
+               * Nothing given yet. A dashed square says a code belongs here
+               * and is waiting, which is the truth; a fake pattern of squares
+               * would be a picture of a code that scans to nowhere.
+               */
+              <g>
+                <rect
+                  x={cx - side / 2} y={codeY} width={side} height={side}
+                  fill="none" stroke={text} strokeOpacity="0.35" strokeDasharray={`${side * 0.05} ${side * 0.04}`}
+                />
+                <text
+                  x={cx} y={codeY + side / 2 + side * 0.04}
+                  textAnchor="middle" fill={text} fillOpacity="0.5"
+                  fontFamily={font} fontSize={side * 0.12}
+                >
+                  your link
+                </text>
+              </g>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 /**
  * One cut letter, with the family name on a bar across it.
  *
@@ -1872,6 +2172,7 @@ export const PREVIEW_TEMPLATES = [
    */
   { value: 'photo', label: 'From the product photograph (set up automatically)' },
   { value: 'monogram', label: 'Monogram — a cut letter with the name across it' },
+  { value: 'qr-board', label: 'QR board — a logo and up to four scannable links' },
 ];
 
 /**
@@ -1936,5 +2237,9 @@ export const PREVIEW_SLOTS = [
   { value: 'fontFamily', label: 'Font' },
   { value: 'textColor', label: 'Text colour' },
   { value: 'plateColor', label: 'Plate colour' },
-  { value: 'logo', label: 'Logo image' },
+  { value: 'logo', label: 'Logo or symbol image' },
+  { value: 'qr1', label: 'QR code 1 — the link the customer gives' },
+  { value: 'qr2', label: 'QR code 2 — the link the customer gives' },
+  { value: 'qr3', label: 'QR code 3 — the link the customer gives' },
+  { value: 'qr4', label: 'QR code 4 — the link the customer gives' },
 ];

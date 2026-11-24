@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import type { PersonalizationField } from '../../lib/types';
 import { api, assetUrl } from '../../lib/api';
 import { formatPrice, toNumber } from '../../lib/format';
+import { linkLooksRight } from '../../lib/qr';
 import { FieldWrap, Input, Select, Spinner, Textarea, UploadIcon, CloseIcon } from '../ui';
 import { DEFAULT_TEXT_SIZE, SIZEABLE_SLOTS, TEXT_SIZES, fontStack } from './LivePreview';
 import { ScriptInput } from './ScriptInput';
@@ -759,13 +760,15 @@ export function validatePersonalizationValues(
     if (field.type === 'PHONE' && !/^[0-9+\-\s()]{6,20}$/.test(value)) {
       errors[field.key] = 'Enter a valid phone number';
     }
-    if (field.type === 'URL') {
-      try {
-        // eslint-disable-next-line no-new
-        new URL(value);
-      } catch {
-        errors[field.key] = 'Enter a valid URL including https://';
-      }
+    /*
+     * A web address, with the scheme assumed where it is missing.
+     *
+     * People write instagram.com/brewandco. Refusing that told a customer the
+     * link they could already see working as a code on their own preview was
+     * not a link. The server assumes the same scheme, so the two agree.
+     */
+    if (field.type === 'URL' && !linkLooksRight(value)) {
+      errors[field.key] = 'Enter a web address, like example.com';
     }
   }
 

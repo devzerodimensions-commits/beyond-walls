@@ -20,6 +20,7 @@ import { ReadPhotograph } from '../../components/admin/ReadPhotograph';
 import { PhotoArtworkEditor } from '../../components/admin/PhotoArtworkEditor';
 import { FontChoice } from '../../components/admin/FontChoice';
 import { ProductSymbols } from '../../components/admin/ProductSymbols';
+import { ProductQrCodes } from '../../components/admin/ProductQrCodes';
 import { ProductChoices } from '../../components/admin/ProductChoices';
 import {
   LivePreview, PLATE_FONTS, PREVIEW_SLOTS, SIZEABLE_SLOTS, buildPreviewSlots, previewIsUsable,
@@ -581,6 +582,21 @@ export default function AdminProductEdit() {
                       ((form.livePreviewConfig as { photo?: { boxes?: { slot?: string }[] } })?.photo?.boxes ?? [])
                         .some((box) => box?.slot === 'logo')
                     }
+                  />
+
+                  {/*
+                    * A piece that carries scannable links, set up here in full.
+                    *
+                    * The studio asked how they would put the next QR product up
+                    * themselves. Everything one needs is on this panel, so the
+                    * answer is: the same way as this one, without us.
+                    */}
+                  <ProductQrCodes
+                    productId={id!}
+                    fields={product?.personalization ?? []}
+                    template={form.livePreviewTemplate}
+                    config={form.livePreviewConfig as Record<string, unknown> | null}
+                    onConfigChange={(next) => set('livePreviewConfig', next)}
                   />
 
                   {/*
