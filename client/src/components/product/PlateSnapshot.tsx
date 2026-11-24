@@ -15,6 +15,8 @@ export interface PreviewSnapshot {
   config: Record<string, unknown> | null;
   slots: PreviewSlots;
   scales?: Record<string, number>;
+  /** What each code is called, kept beside the links it names. */
+  qrLabels?: Record<string, string>;
 }
 
 /**
@@ -36,7 +38,7 @@ export function PlateSnapshot({
     <LivePreview
       template={preview.template}
       config={preview.config}
-      slots={preview.slots}
+      slots={preview.qrLabels ? { ...preview.slots, qrLabels: preview.qrLabels } : preview.slots}
       scales={preview.scales}
       placeholders={NOTHING}
       hideLabel

@@ -298,6 +298,8 @@ export interface PreviewSnapshot {
   config: unknown;
   slots: Record<string, string>;
   scales?: Record<string, number>;
+  /** What each code on the plate is called, for the codes that were answered. */
+  qrLabels?: Record<string, string>;
 }
 
 /**
@@ -328,7 +330,18 @@ function withChosenPlate(config: unknown, images: unknown, variant?: { options?:
 }
 
 /** What a snapshot may draw into; anything else in a request is ignored. */
-const DRAWN_SLOTS = new Set(['number', 'line1', 'line2', 'line3', 'fontFamily', 'textColor', 'plateColor', 'logo']);
+const DRAWN_SLOTS = new Set([
+  'number', 'line1', 'line2', 'line3', 'fontFamily', 'textColor', 'plateColor', 'logo',
+  /*
+   * The codes are part of the plate that was approved.
+   *
+   * Left out of this set, a board of codes kept with an order would have been
+   * kept blank: the customer approves a piece carrying their four links and
+   * the studio opens the order to a bare board. The links are what that piece
+   * is.
+   */
+  'qr1', 'qr2', 'qr3', 'qr4',
+]);
 
 /**
  * Builds the snapshot from answers that have already been validated.
@@ -377,11 +390,27 @@ export function previewSnapshot(
     const n = Number(size);
     if (DRAWN_SLOTS.has(slot) && Number.isFinite(n) && n >= 50 && n <= 200 && n !== 100) kept[slot] = Math.round(n);
   }
+  /*
+   * The name of each code that was actually given.
+   *
+   * Only the answered ones. On the product page an unanswered code shows a
+   * dashed square saying a link belongs there, which is right while somebody
+   * is filling the piece in; on an order it would read as a code that was
+   * bought and left blank. An order shows what was ordered.
+   */
+  const qrLabels: Record<string, string> = {};
+  for (const field of fields) {
+    const slot = field.previewSlot;
+    if (!slot || !/^qr[1-4]$/.test(slot) || !slots[slot] || !field.label?.trim()) continue;
+    qrLabels[slot] = field.label.trim();
+  }
+
   return {
     template: product.livePreviewTemplate,
     config,
     slots,
     ...(Object.keys(kept).length ? { scales: kept } : {}),
+    ...(Object.keys(qrLabels).length ? { qrLabels } : {}),
   };
 }
 
