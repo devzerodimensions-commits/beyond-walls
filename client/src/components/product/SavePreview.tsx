@@ -29,7 +29,16 @@ export function SavePreview({
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
 
-  const shop = get<string>('brand.name', 'Beyond Walls');
+  /*
+   * The shop's name is on every picture that leaves here, without exception.
+   *
+   * The settings getter falls back only when a value is missing, not when it
+   * is blank -- so a brand name cleared in Settings, by accident or while
+   * editing, would have taken the shop's name off every preview a customer
+   * sends to their family. That is the one thing the picture exists to carry,
+   * and it is not something to leave to a field being filled in.
+   */
+  const shop = get<string>('brand.name', '').trim() || 'Beyond Walls';
 
   const save = async () => {
     const svg = target.current?.querySelector('[data-plate] > svg');
