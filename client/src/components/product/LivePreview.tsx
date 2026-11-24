@@ -1898,14 +1898,23 @@ function PlateQrBoard({ slots, plate, text, font, config, uid }: TemplateProps) 
         const cx = frontX + (frontW - rowW) / 2 + col * (cellW + gap) + cellW / 2;
         const top = gridTop + row * rowH;
         const side = Math.max(10, codeSide);
-        const codeY = top + labelH * 1.9;
+        /*
+         * The row's contents sit in the middle of the room the row has.
+         *
+         * Two codes leave a row twice as tall as they need, and hung from the
+         * top of it they bunch under the logo with the lower half of the
+         * piece empty -- which reads as a four-code board someone forgot to
+         * finish, rather than the two-code piece it is.
+         */
+        const lift = Math.max(0, (rowH - (labelH * 1.9 + side)) / 2);
+        const codeY = top + lift + labelH * 1.9;
 
         return (
           <g key={code.key}>
             {code.label ? (
               <text
                 x={cx}
-                y={top + labelH}
+                y={top + lift + labelH}
                 textAnchor="middle"
                 fill={text}
                 fontFamily={font}
