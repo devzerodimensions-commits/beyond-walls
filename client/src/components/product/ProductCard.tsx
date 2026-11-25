@@ -120,11 +120,25 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
           </div>
         )}
 
-        <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-1.5">
+        {/*
+          * On a phone the card is half the screen, and a column of badges
+          * stacked down its corner stopped being a label on a photograph and
+          * became a sticker over the piece -- on a grid of nameplates it sat
+          * across the very lettering a customer is trying to judge.
+          *
+          * What stays on the picture there is what is worth covering it for:
+          * a price cut, or a word the studio put on deliberately. Personalise
+          * moves below, because on a wall of nameplates nearly every card
+          * carries it, and a badge that is on everything tells nobody
+          * anything -- least of all at the cost of the photograph.
+          */}
+        <div className="pointer-events-none absolute left-2.5 top-2.5 flex flex-col items-start gap-1 sm:left-3 sm:top-3 sm:gap-1.5">
           {product.badge ? <Badge tone="dark">{product.badge}</Badge> : null}
           {product.isNew && !product.badge ? <Badge tone="dark">New</Badge> : null}
           {discount ? <Badge tone="danger">−{discount}%</Badge> : null}
-          {product.livePreviewEnabled ? <Badge tone="neutral">Personalise</Badge> : null}
+          {product.livePreviewEnabled ? (
+            <Badge tone="neutral" className="hidden sm:inline-flex">Personalise</Badge>
+          ) : null}
         </div>
 
         {outOfStock ? (
@@ -169,8 +183,18 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
       ) : null}
 
       <div className="flex flex-1 flex-col pt-3.5">
-        <span className="eyebrow mb-1.5 block min-h-[0.875rem] truncate">
-          {product.category?.name ?? ' '}
+        /*
+          * The line that was already here, now carrying the phone's version of
+          * the Personalise mark: off the photograph, on a row that was holding
+          * one short word and a good deal of nothing. The category gives up the
+          * room, because "For Home" repeated down a category page is the least
+          * useful thing on the card.
+          */
+        <span className="eyebrow mb-1.5 flex min-h-[0.875rem] items-center gap-1.5">
+          <span className="truncate">{product.category?.name ?? ' '}</span>
+          {product.livePreviewEnabled ? (
+            <span className="shrink-0 text-ink-300 sm:hidden">· Personalise</span>
+          ) : null}
         </span>
 
         {/*
