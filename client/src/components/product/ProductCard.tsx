@@ -183,13 +183,13 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
       ) : null}
 
       <div className="flex flex-1 flex-col pt-3.5">
-        /*
+        {/*
           * The line that was already here, now carrying the phone's version of
           * the Personalise mark: off the photograph, on a row that was holding
           * one short word and a good deal of nothing. The category gives up the
           * room, because "For Home" repeated down a category page is the least
           * useful thing on the card.
-          */
+          */}
         <span className="eyebrow mb-1.5 flex min-h-[0.875rem] items-center gap-1.5">
           <span className="truncate">{product.category?.name ?? ' '}</span>
           {product.livePreviewEnabled ? (
