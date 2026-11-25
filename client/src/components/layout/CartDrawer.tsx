@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useCart, useSettings } from '../../context/StoreProvider';
 import { describePersonalization, formatPrice } from '../../lib/format';
 import { Button, ButtonLink, CartIcon, Drawer, EmptyState, MinusIcon, PlusIcon, TrashIcon } from '../ui';
@@ -8,6 +9,33 @@ export function CartDrawer() {
   const { cart, isDrawerOpen, closeDrawer, updateItem, removeItem } = useCart();
   const { get } = useSettings();
   const checkoutEnabled = get('store.enableCheckout', true);
+
+  /*
+   * The drawer closes when the page under it changes.
+   *
+   * Its Checkout and View cart buttons are links: they navigated, and the
+   * drawer stayed open on top of the page they had navigated to -- so a
+   * customer pressing Checkout watched the panel sit there over a checkout
+   * page they could not see, and reported that the button did nothing. It
+   * was the one button on the site that had to work.
+   *
+   * Closing on the route rather than on each link's onClick is deliberate.
+   * The links inside the list already carried an onClick; the two in the
+   * footer were added later and did not, which is how this happened, and the
+   * next link added would have gone the same way. Back and forward close it
+   * now too.
+   *
+   * Guarded on the path actually changing, because closeDrawer is rebuilt
+   * whenever the cart state does: an effect that simply depended on it would
+   * fire the moment the drawer opened and shut it again.
+   */
+  const { pathname } = useLocation();
+  const shown = useRef(pathname);
+  useEffect(() => {
+    if (shown.current === pathname) return;
+    shown.current = pathname;
+    closeDrawer();
+  }, [pathname, closeDrawer]);
 
   const lines = cart?.lines ?? [];
   const totals = cart?.totals;
