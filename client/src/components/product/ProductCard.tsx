@@ -191,9 +191,13 @@ export function ProductCard({ product, className, hideWishlist, priority }: Prop
           * useful thing on the card.
           */}
         <span className="eyebrow mb-1.5 flex min-h-[0.875rem] items-center gap-1.5">
-          <span className="truncate">{product.category?.name ?? ' '}</span>
+          <span
+            className={clsx('truncate', product.livePreviewEnabled && 'hidden sm:inline')}
+          >
+            {product.category?.name ?? ' '}
+          </span>
           {product.livePreviewEnabled ? (
-            <span className="shrink-0 text-ink-300 sm:hidden">· Personalise</span>
+            <span className="shrink-0 sm:hidden">Personalise</span>
           ) : null}
         </span>
 
